@@ -211,7 +211,13 @@ const resolveCatalogModel = Effect.fn("ModelResolver.resolveCatalogModel")(funct
   }
   const specifier = Provider.packageName(resolved.package)
   if (!specifier) return yield* unsupported(resolved)
-  const mapped = yield* prepareProviderSettings(resolved, Provider.nativeSettings(configured))
+  // `timeout` is a transport key (stripped for native packages because the aisdk fetch
+  // wrapper does not apply here); carry it into the native route budget as `timeoutMs`.
+  const transportTimeout = typeof configured.timeout === "number" && configured.timeout > 0 ? configured.timeout : undefined
+  const mapped = yield* prepareProviderSettings(resolved, {
+    ...Provider.nativeSettings(configured),
+    ...(transportTimeout === undefined ? {} : { timeoutMs: transportTimeout }),
+  })
   const module = yield* (dependencies?.loadPackage ?? Provider.loadPackage)(specifier).pipe(
     Effect.mapError((error) => initialization(resolved, "load", error.cause)),
   )

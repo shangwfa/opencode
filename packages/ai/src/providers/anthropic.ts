@@ -18,6 +18,8 @@ export type Config = RouteDefaultsInput &
   ProviderAuthOption<"optional"> & {
     readonly baseURL?: string
     readonly providerOptions?: AnthropicMessages.ProviderOptionsInput
+    /** Connection/first-byte budget in ms; lowered onto the route's http options. */
+    readonly timeoutMs?: number
   }
 
 export type Settings = ProviderPackage.Settings &
@@ -27,6 +29,8 @@ export type Settings = ProviderPackage.Settings &
     | { readonly apiKey?: never; readonly authToken?: string }
   ) & {
     readonly baseURL?: string
+    /** Connection/first-byte budget in ms; lowered onto the route's http options. */
+    readonly timeoutMs?: number
   }
 
 const auth = (options: ProviderAuthOption<"optional">) => {
@@ -37,9 +41,10 @@ const auth = (options: ProviderAuthOption<"optional">) => {
 }
 
 export const configure = (input: Config = {}) => {
-  const { apiKey: _, auth: _auth, baseURL, ...rest } = input
+  const { apiKey: _, auth: _auth, baseURL, timeoutMs, ...rest } = input
   const compatible = AnthropicCompatible.configure({
     ...rest,
+    ...(timeoutMs === undefined ? {} : { http: { ...rest.http, timeoutMs } }),
     auth: auth(input),
     baseURL: baseURL ?? AnthropicMessages.DEFAULT_BASE_URL,
     provider: id,
@@ -54,7 +59,7 @@ export const configure = (input: Config = {}) => {
 export const provider = configure()
 export const model: ProviderPackage.Definition<Settings, AnthropicMessages.ProviderOptionsInput>["model"] = (
   modelID,
-  { apiKey, authToken, baseURL, body, headers, ...providerOptions },
+  { apiKey, authToken, baseURL, body, headers, timeoutMs, ...providerOptions },
 ) => {
   if (apiKey !== undefined && authToken !== undefined)
     throw new ProviderConfigurationError({
@@ -65,7 +70,13 @@ export const model: ProviderPackage.Definition<Settings, AnthropicMessages.Provi
     ...(authToken === undefined ? { apiKey: apiKey } : { auth: Auth.bearer(authToken) }),
     baseURL,
     headers: headers === undefined ? undefined : { ...headers },
-    http: body === undefined ? undefined : { body: { ...body } },
+    http:
+      body === undefined && timeoutMs === undefined
+        ? undefined
+        : {
+            ...(body === undefined ? {} : { body: { ...body } }),
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          },
     providerOptions,
   }).model(modelID)
 }

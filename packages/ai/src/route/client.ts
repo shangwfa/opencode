@@ -1,4 +1,4 @@
-import { Cause, Context, Effect, Layer, Schema, Stream } from "effect"
+import { Cause, Context, Duration, Effect, Layer, Schema, Stream } from "effect"
 import { Auth } from "./auth.js"
 import { Endpoint, type EndpointPatch } from "./endpoint.js"
 import { RequestExecutor } from "./executor.js"
@@ -26,6 +26,7 @@ import {
   InvalidProviderOutputError,
   ProviderConfigurationError,
   ProviderID,
+  TransportError,
   mergeGenerationOptions,
   mergeHttpOptions,
   mergeProviderOptions,
@@ -423,8 +424,10 @@ function makeFromTransport<Body, Prepared, Frame, Event, State>(
         }),
       streamPrepared: (prepared: Prepared, request: LLMRequest, runtime: TransportRuntime, options?: StreamOptions) => {
         const route = `${request.model.provider}/${request.model.route.id}`
+        const deadline = transportDeadline(route, request.http?.timeoutMs)
+        const executed = routeInput.transport.execute(prepared, request, runtime, options)
         return Stream.unwrap(
-          routeInput.transport.execute(prepared, request, runtime, options).pipe(
+          (deadline === undefined ? executed : deadline(executed)).pipe(
             Effect.map((execution) => {
               const terminal = protocol.stream.terminal
               // Preserve assembled inputs; replace only serialized event fallbacks with their original wire data.
@@ -552,6 +555,34 @@ export function make<Body, Prepared, Frame, Event, State>(
     defaults: input.defaults,
   })
 }
+
+/**
+ * Connection/first-byte budget for a provider request, from the resolved `http.timeoutMs`.
+ * Interrupting the fiber aborts the underlying fetch, so a provider that never responds
+ * settles as a typed transport timeout instead of relying on socket defaults. Response
+ * streaming after headers is intentionally outside this budget.
+ */
+const transportDeadline = (route: string, timeoutMs: number | undefined) =>
+  timeoutMs === undefined
+    ? undefined
+    : <A, E, R>(self: Effect.Effect<A, E, R>) =>
+        self.pipe(
+          Effect.timeout(Duration.millis(timeoutMs)),
+          Effect.catchIf(
+            (error): error is Cause.TimeoutError => Cause.isTimeoutError(error),
+            () =>
+              Effect.fail(
+                new AIError({
+                  reason: new TransportError({
+                    message: `${route} request timed out after ${timeoutMs}ms without response headers`,
+                    transport: "http",
+                    operation: "request",
+                    code: "Timeout",
+                  }),
+                }),
+              ),
+          ),
+        )
 
 const prepareRequest = (request: LLMRequest) => {
   const original = resolveRequestOptions(request)

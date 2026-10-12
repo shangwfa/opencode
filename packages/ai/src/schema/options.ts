@@ -47,6 +47,12 @@ export class HttpOptions extends Schema.Class<HttpOptions>("AI.HttpOptions")({
   body: Schema.optional(JsonSchema),
   headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
   query: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+  /**
+   * Connection/first-byte budget for the provider HTTP request, in milliseconds. Covers
+   * `transport.execute` only: time to receive response headers. In-flight stream idleness
+   * is a separate concern (chunk timeout), so a long generation is never cut short by it.
+   */
+  timeoutMs: Schema.optional(Schema.Number),
 }) {}
 
 export namespace HttpOptions {
@@ -60,8 +66,10 @@ export const mergeHttpOptions = (...items: ReadonlyArray<HttpOptions | undefined
   const body = mergeJsonRecords(...items.map((item) => item?.body))
   const headers = mergeStringRecords(...items.map((item) => item?.headers))
   const query = mergeStringRecords(...items.map((item) => item?.query))
-  if (!body && !headers && !query) return undefined
-  return new HttpOptions({ body, headers, query })
+  // Finer-grained levels (model) win; `undefined` never clears an earlier value.
+  const timeoutMs = items.findLast((item) => item?.timeoutMs !== undefined)?.timeoutMs
+  if (!body && !headers && !query && timeoutMs === undefined) return undefined
+  return new HttpOptions({ body, headers, query, ...(timeoutMs === undefined ? {} : { timeoutMs }) })
 }
 
 export class GenerationOptions extends Schema.Class<GenerationOptions>("LLM.GenerationOptions")({

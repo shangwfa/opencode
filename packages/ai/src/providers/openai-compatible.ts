@@ -12,6 +12,8 @@ type GenericModelOptions = Omit<RouteDefaultsInput, "providerOptions"> &
     readonly provider?: string
     readonly baseURL: string
     readonly providerOptions?: OpenAIProviderOptionsInput
+    /** Connection/first-byte budget in ms; lowered onto the route's http options. */
+    readonly timeoutMs?: number
   }
 
 export type Settings = ProviderPackage.Settings &
@@ -19,18 +21,21 @@ export type Settings = ProviderPackage.Settings &
     readonly apiKey?: string
     readonly baseURL: string
     readonly provider?: string
+    /** Connection/first-byte budget in ms; lowered onto the route's http options. */
+    readonly timeoutMs?: number
   }
 
 export const routes = [OpenAICompatibleChat.route]
 
 export const configure = (input: GenericModelOptions) => {
   const provider = input.provider ?? "openai-compatible"
-  const { provider: _, baseURL, apiKey: _apiKey, auth: _auth, ...rest } = input
+  const { provider: _, baseURL, apiKey: _apiKey, auth: _auth, timeoutMs, ...rest } = input
   const route = OpenAICompatibleChat.route.with({
     ...rest,
     provider,
     endpoint: { baseURL },
     auth: AuthOptions.bearer(input, []),
+    ...(timeoutMs === undefined ? {} : { http: { ...rest.http, timeoutMs } }),
   })
   return {
     id: ProviderID.make(provider),
@@ -47,13 +52,19 @@ export const provider = {
 
 export const model: ProviderPackage.Definition<Settings, OpenAIProviderOptionsInput>["model"] = (
   modelID,
-  { apiKey, baseURL, body, headers, provider, ...providerOptions },
+  { apiKey, baseURL, body, headers, provider, timeoutMs, ...providerOptions },
 ) =>
   configure({
     apiKey,
     baseURL,
     headers: headers === undefined ? undefined : { ...headers },
-    http: body === undefined ? undefined : { body: { ...body } },
+    http:
+      body === undefined && timeoutMs === undefined
+        ? undefined
+        : {
+            ...(body === undefined ? {} : { body: { ...body } }),
+            ...(timeoutMs === undefined ? {} : { timeoutMs }),
+          },
     provider,
     providerOptions,
   }).model(modelID)
