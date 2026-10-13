@@ -1,0 +1,13 @@
+export const DEFAULT_EMBEDDING_MODEL = 'openai/text-embedding-3-small'
+export const DEFAULT_SEARCH_TIMEOUT_MS = 5_000
+export const MAX_WRITE_CONCURRENCY = 2
+export const EMBEDDING_BATCH_SIZE = 100
+export const MAX_CONTENT_BYTES = 2 * 1024 * 1024
+export const MAX_CHUNKS_PER_DOCUMENT = 2_000
+export const MAX_EXCLUDED_DOCUMENT_IDS = 1_000
+export const DEFAULT_TOP_K = 10
+export const MAX_TOP_K = 100
+export const MIN_SEARCH_TIMEOUT_MS = 100
+export const MAX_SEARCH_TIMEOUT_MS = 30_000
+export const RRF_K = 60
+export const MAX_HNSW_VECTOR_DIMENSION = 2_000

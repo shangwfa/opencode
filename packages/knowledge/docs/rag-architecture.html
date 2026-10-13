@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RAG 检索问答架构</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans SC', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1120px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Knowledge Playground</p>
+    <h1>RAG 检索问答架构</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1120 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="rag-arch-title rag-arch-desc">
+        <title id="rag-arch-title">RAG 检索问答架构</title>
+        <desc id="rag-arch-desc">文档与数据经解析、分块、向量化入库 PostgreSQL；四种检索与召回增强构成知识服务核心，经 MCP/HTTP 供 saas Agent 与应用消费。</desc>
+        <defs>
+          <marker id="rag-arch-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="rag-arch-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- ═══ Zones（先于箭头与节点）═══ -->
+        <rect x="32" y="56" width="1056" height="120" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="316" y="60" width="188" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="410" y="69" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">INGEST · 数据源与入库</text>
+
+        <rect x="32" y="216" width="1056" height="120" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="308" y="220" width="204" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="410" y="229" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">KNOWLEDGE SERVICE · 知识服务</text>
+
+        <rect x="32" y="376" width="1056" height="120" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="328" y="380" width="164" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="410" y="389" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">CONSUMERS · 消费方</text>
+
+        <!-- ═══ Arrows（先于节点，位于底层）═══ -->
+        <!-- 1→2 入库 -->
+        <line x1="328" y1="124" x2="420" y2="124" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <!-- 2→3 写入 -->
+        <line x1="700" y1="124" x2="792" y2="124" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <!-- 3→4 召回候选（右下绕至左上，正交肘形） -->
+        <path d="M 932,160 V 200 Q 932,208 924,208 H 196 Q 188,208 188,216 V 248" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <!-- 4→5 候选集（accent：核心管道） -->
+        <line x1="328" y1="284" x2="420" y2="284" stroke="#bf4520" stroke-width="1.4" marker-end="url(#rag-arch-arrow-accent)"/>
+        <!-- 5→6 证据+分数（accent） -->
+        <line x1="700" y1="284" x2="792" y2="284" stroke="#bf4520" stroke-width="1.4" marker-end="url(#rag-arch-arrow-accent)"/>
+        <!-- 6→7 检索结果（含 hop 跨过 6→8 垂直段） -->
+        <path d="M 852,320 V 372 Q 852,380 844,380 H 754 a 8,8 0 0,1 -16,0 H 382 Q 374,380 374,388 V 408" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <!-- 6→8 REST API（水平段与 6→7 平行错开 12px） -->
+        <path d="M 1012,320 V 360 Q 1012,368 1004,368 H 754 Q 746,368 746,376 V 408" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <!-- 7→4 补查再检索（虚线回环，共 x 直线） -->
+        <line x1="310" y1="408" x2="310" y2="248" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#rag-arch-arrow)"/>
+
+        <!-- ═══ Nodes ═══ -->
+        <!-- N1 文档与数据 -->
+        <rect x="48" y="88" width="280" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="64" y="96" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="90" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">INPUT</text>
+        <text x="64" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">文档与数据</text>
+        <text x="64" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">YYDOC · FILES · TABLES</text>
+
+        <!-- N2 同步入库 -->
+        <rect x="420" y="88" width="280" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="436" y="96" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="458" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">STEP</text>
+        <text x="436" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">同步入库</text>
+        <text x="436" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">PARSE · CHUNK · EMBED</text>
+
+        <!-- N3 PG 存储 -->
+        <rect x="792" y="88" width="280" height="72" rx="6" fill="#ececec" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="808" y="96" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="834" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">STORE</text>
+        <text x="808" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">PG 存储</text>
+        <text x="808" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">PGVECTOR · JSONB · FTS</text>
+
+        <!-- N4 检索 API（accent 焦点） -->
+        <rect x="48" y="248" width="280" height="72" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.4"/>
+        <rect x="64" y="256" width="44" height="12" rx="2" fill="#bf4520"/>
+        <text x="86" y="265" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">API</text>
+        <text x="64" y="290" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">检索 API</text>
+        <text x="64" y="308" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">SEMANTIC · KEYWORD · META · HYBRID</text>
+
+        <!-- N5 召回增强（accent 焦点） -->
+        <rect x="420" y="248" width="280" height="72" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.4"/>
+        <rect x="436" y="256" width="52" height="12" rx="2" fill="#bf4520"/>
+        <text x="462" y="265" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">PIPE</text>
+        <text x="436" y="290" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">召回增强</text>
+        <text x="436" y="308" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">RRF FUSION · RERANK · THRESHOLD</text>
+
+        <!-- N6 MCP / HTTP -->
+        <rect x="792" y="248" width="280" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="808" y="256" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="830" y="265" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">EDGE</text>
+        <text x="808" y="290" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">MCP / HTTP</text>
+        <text x="808" y="308" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">KB-DOCUMENT-SEARCH · REST</text>
+
+        <!-- N7 saas Agent -->
+        <rect x="234" y="408" width="280" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="250" y="416" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="276" y="425" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">AGENT</text>
+        <text x="250" y="450" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">saas Agent（rag agent）</text>
+        <text x="250" y="468" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">SPLIT · SEARCH · SELECT · ANSWER</text>
+
+        <!-- N8 应用与测试台 -->
+        <rect x="606" y="408" width="280" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="622" y="416" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="644" y="425" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">USER</text>
+        <text x="622" y="450" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">应用与测试台</text>
+        <text x="622" y="468" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">UI-DEMOS · API CLIENTS</text>
+
+        <!-- ═══ Arrow labels（最后绘制，避开节点区域）═══ -->
+        <rect x="358" y="116" width="32" height="14" fill="#f5f5f5"/>
+        <text x="374" y="126" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">入库</text>
+        <rect x="730" y="116" width="32" height="14" fill="#f5f5f5"/>
+        <text x="746" y="126" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">写入</text>
+        <rect x="528" y="200" width="64" height="14" fill="#f5f5f5"/>
+        <text x="560" y="210" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">召回候选</text>
+        <rect x="354" y="276" width="40" height="14" fill="#f5f5f5"/>
+        <text x="374" y="286" fill="#bf4520" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">候选集</text>
+        <rect x="714" y="276" width="64" height="14" fill="#f5f5f5"/>
+        <text x="746" y="286" fill="#bf4520" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">证据+分数</text>
+        <rect x="528" y="372" width="64" height="14" fill="#f5f5f5"/>
+        <text x="560" y="382" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">检索结果</text>
+        <rect x="847" y="360" width="64" height="14" fill="#f5f5f5"/>
+        <text x="879" y="370" fill="#2e5aa8" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">REST API</text>
+        <rect x="318" y="320" width="64" height="14" fill="#f5f5f5"/>
+        <text x="322" y="330" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">补查再检索</text>
+
+        <!-- ═══ Legend（底部横条）═══ -->
+        <line x1="48" y1="556" x2="88" y2="556" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#rag-arch-arrow)"/>
+        <text x="96" y="560" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">主流向</text>
+        <line x1="176" y1="556" x2="216" y2="556" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#rag-arch-arrow)"/>
+        <text x="224" y="560" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">补查 / 回环</text>
+        <rect x="336" y="551" width="10" height="10" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="354" y="560" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">检索增强焦点</text>
+        <rect x="464" y="551" width="10" height="10" rx="2" fill="#ececec" stroke="#2d3142" stroke-width="1.2"/>
+        <text x="482" y="560" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">数据存储</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>

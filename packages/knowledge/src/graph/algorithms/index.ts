@@ -1,0 +1,6 @@
+export { ContradictionDetector } from './contradiction-detector.js'
+export type { Contradiction, ContradictionResult, SemanticContradiction } from './contradiction-detector.js'
+export { TemporalConflictResolver, filterActiveEdges, FUNCTIONAL_RELATIONS } from './temporal-conflict-resolver.js'
+export { EntityConsolidator, normalizeEntityName } from './entity-consolidator.js'
+export { EdgeTypeIndexer } from './edge-type-indexer.js'
+export { TruthSubspaceRetriever } from './truth-subspace.js'
