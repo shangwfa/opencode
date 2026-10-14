@@ -100,6 +100,23 @@ export class UnifiedStoreEngine {
       await g.deleteDocumentLinks(documentId)
     }
 
+    // detach 节点回减频次：仍被其它文档引用的共享节点 frequency - 1（保底 1），
+    // 避免"删除后重加"造成频率漂移（unowned 节点已随上面硬删）。
+    if (detachNodeIds.length > 0 && typeof g.decrementNodeFrequencies === 'function') {
+      try {
+        await g.decrementNodeFrequencies(detachNodeIds)
+      } catch { /* 减频失败不阻断删除主流程 */ }
+    }
+
+    // 溯源存储同步清理（对齐 DocumentIngestPipeline.removeDocument 的清理面）：
+    // chunk 原文、chunk 级实体溯源、RDF 事实（按 sourceChunkPrefix）——
+    // 避免属性图删除后这些存储残留旧文档数据。
+    if (typeof g.deleteDocumentChunks === 'function') {
+      await g.deleteDocumentChunks(documentId)
+    }
+    try { await g.chunkTracker?.removeEntityChunksByDocument?.(documentId) } catch { /* best-effort */ }
+    try { await g.rdfStore?.deleteBySourceChunkPrefix?.(`${documentId}#`) } catch { /* best-effort */ }
+
     // 清理孤儿 EntityType 节点（虚拟 kb，对标 cognee _cleanup_orphaned_edge_types 思路）
     if (unownedNodeIds.length > 0) {
       await this.cleanupOrphanedEntityTypes()
@@ -116,7 +133,6 @@ export class UnifiedStoreEngine {
       }
     }
 
-    void detachNodeIds
     return {
       deletedNodeIds: unownedNodeIds,
       deletedEdgeCount,

@@ -61,6 +61,13 @@ export interface DocumentIngestOptions {
   extractMaxRetries?: number
   /** chunk 级检查点：resume 时跳过已持久化抽取结果的 chunk，避免长文档中断后整篇重跑 LLM */
   chunkCheckpoint?: boolean
+  /**
+   * 文档更新模式（默认 append 保持既有行为）：
+   * - append：直接叠加写入（现状语义；同文档重复摄入会累计 frequency）
+   * - replace：写入前先执行 removeDocument 清理本文档旧图数据/溯源/RDF，
+   *   实现"文档内容变更后重摄入 = 替换"（对齐 RAG updateDocument 语义）
+   */
+  updateMode?: 'append' | 'replace'
   /** 分块配置（默认章节感知 2000/50，对齐 TrustGraph 图抽取分块策略） */
   chunkConfig?: { maxSize?: number; overlap?: number; separators?: string[] }
   /** chunk 抽取并发数，默认 4（对标 TrustGraph syncChunks 的 batchSize 并发） */
@@ -249,6 +256,12 @@ export class DocumentIngestPipeline {
     if (checkpoint) {
       const cached = await checkpoint.loadDocumentChunkExtractions(opts.documentId)
       for (const c of cached) cachedByIndex.set(c.chunkIndex, { extraction: c.extraction as CombinedExtraction, chunkHash: c.chunkHash })
+    }
+
+    // replace 模式（显式 opt-in）：写入前清理本文档旧图数据与溯源，实现更新替换语义。
+    // 断点续跑保护：仅当该文档无 chunk 检查点（上次未中断）时才清理，避免删除恢复中的半成品。
+    if (opts.updateMode === 'replace' && cachedByIndex.size === 0) {
+      await this.removeDocument(opts.documentId)
     }
 
     const extractOne = async (chunk: IngestChunk) => {

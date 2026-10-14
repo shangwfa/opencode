@@ -202,8 +202,13 @@ export class WikiCompilerService {
   /** 每个 pod 扫描可领取任务；任务数据只依赖 PG，可在任意 pod 恢复。 */
   startRecovery(): void {
     if (this.recoveryTimer) return
-    void this.recoverAvailableTasks()
-    this.recoveryTimer = setInterval(() => void this.recoverAvailableTasks(), 15000)
+    const recover = () => {
+      void this.recoverAvailableTasks().catch(error => {
+        console.error('[WikiCompiler] task recovery failed:', error)
+      })
+    }
+    recover()
+    this.recoveryTimer = setInterval(recover, 15000)
     this.recoveryTimer.unref?.()
   }
 

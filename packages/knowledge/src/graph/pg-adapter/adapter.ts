@@ -19,6 +19,7 @@ import type {
 import type { GraphDB } from '../interface.js'
 import { PgRdfQuadStore } from '../rdf/pg-quad-store.js'
 import { PgOntologyRegistry } from '../ontology/pg-registry.js'
+import { GraphBrowseRepository } from './browse.js'
 
 export class PgGraphAdapter implements GraphDB {
   public repository: GraphRepository
@@ -26,6 +27,7 @@ export class PgGraphAdapter implements GraphDB {
   public chunkTracker: PgEntityChunkTracker
   public rdfStore: PgRdfQuadStore
   public ontologyRegistry: PgOntologyRegistry
+  public browse: GraphBrowseRepository
   readonly supportsCypherQueries: boolean = false
 
   constructor(
@@ -38,6 +40,7 @@ export class PgGraphAdapter implements GraphDB {
     this.chunkTracker = new PgEntityChunkTracker(pool, schemaName)
     this.rdfStore = new PgRdfQuadStore(pool, schemaName)
     this.ontologyRegistry = new PgOntologyRegistry(pool, schemaName)
+    this.browse = new GraphBrowseRepository(pool, schemaName)
   }
 
   async init(): Promise<void> {
@@ -78,6 +81,10 @@ export class PgGraphAdapter implements GraphDB {
 
   async deleteNodes(ids: string[]): Promise<void> {
     await this.repository.deleteNodes(ids)
+  }
+
+  async decrementNodeFrequencies(nodeIds: string[]): Promise<void> {
+    await this.repository.decrementNodeFrequencies(nodeIds)
   }
 
   async updateNode(id: string, data: UpdateNodeInput): Promise<void> {

@@ -1,6 +1,7 @@
 export { PgGraphAdapter } from './pg-adapter/adapter.js'
 export { GraphRepository, parsePgVector } from './pg-adapter/repository.js'
 export { GraphTraversal } from './pg-adapter/traversal.js'
+export { GraphBrowseRepository, GraphBrowseNotFoundError } from './pg-adapter/browse.js'
 export { getGraphAdapter, initGraphEngine, closeGraphEngine } from './pg-adapter/index.js'
 export { createGraphSchema } from './pg-adapter/schema.js'
 

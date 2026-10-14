@@ -4,7 +4,7 @@
  * 与单元测试的区别：每个用例走完整业务流（摄入 → 构建 → 处理 → 检索/消费 → 清理），
  * 验证多组件协作的正确性，而非单点行为。
  *
- * LLM 代理可用时走真实提取；不可用时降级为确定性数据，流程断言不变。
+ * 图机制 E2E 使用固定 extraction，避免真实模型和网络波动影响回归结果。
  * 运行：DATABASE_URL="postgresql://test:test123@localhost:5433/graph_test" \
  *       npx vitest run src/graph/e2e/
  */
@@ -12,7 +12,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test'
 import { Pool } from 'pg'
 import { PgGraphAdapter } from '../pg-adapter/adapter.js'
 import { GraphBuilder } from '../extraction/graph-builder.js'
-import { EntityExtractor } from '../extraction/entity-extractor.js'
 import { EntityConsolidator } from '../algorithms/entity-consolidator.js'
 import { TemporalConflictResolver, filterActiveEdges } from '../algorithms/temporal-conflict-resolver.js'
 import { ContradictionDetector } from '../algorithms/contradiction-detector.js'
@@ -27,16 +26,6 @@ import { CodeGraphExtractor } from '../extraction/code-graph-extractor.js'
 import type { CombinedExtraction } from '../types.js'
 
 const SCHEMA = 'test_e2e'
-
-/** LLM 可用则真实提取，不可用则确定性降级（不影响流程断言） */
-async function extract(text: string, ontologyText?: string): Promise<CombinedExtraction> {
-  try {
-    const e = new EntityExtractor({ maxRetries: 0 })
-    const r = await e.extract(text, { ontologyText })
-    if (r.entities.length > 0) return r
-  } catch { /* 代理不可用 → 降级 */ }
-  return { entities: [], triplets: [] }
-}
 
 /** 确定性嵌入：同文本同向量，相近文本给相近向量由调用方构造 */
 function emb(seed: number, dim = 64): number[] {
@@ -65,29 +54,23 @@ describe.skipIf(!process.env.DATABASE_URL)('图能力 E2E', () => {
     const kb = 'e2e_full'
     const builder = new GraphBuilder(adapter)
 
-    // 文档 1（真实 LLM 或降级数据；降级时仍写入等价结构验证流程）
-    let d1 = await extract('Django 是一个 Python Web 框架。Python 是一门编程语言。')
-    if (d1.entities.length === 0) {
-      d1 = {
-        entities: [
-          { name: 'Django', type: 'technology' },
-          { name: 'Python', type: 'language' },
-        ],
-        triplets: [{ source: 'Django', relation: '基于', target: 'Python', confidence: 0.9 }],
-      }
+    // 固定 extraction：验证图建构和跨文档检索，不测 LLM 抽取质量。
+    const d1 = {
+      entities: [
+        { name: 'Django', type: 'technology' },
+        { name: 'Python', type: 'language' },
+      ],
+      triplets: [{ source: 'Django', relation: '基于', target: 'Python', confidence: 0.9 }],
     }
     const r1 = await builder.buildFromExtraction(d1, { knowledgeBaseId: kb, documentId: 'doc1' })
 
     // 文档 2：与文档 1 共享实体 Python
-    let d2 = await extract('FastAPI 也是一个 Python Web 框架。')
-    if (d2.entities.length === 0) {
-      d2 = {
-        entities: [
-          { name: 'FastAPI', type: 'technology' },
-          { name: 'Python', type: 'language' },
-        ],
-        triplets: [{ source: 'FastAPI', relation: '基于', target: 'Python', confidence: 0.9 }],
-      }
+    const d2 = {
+      entities: [
+        { name: 'FastAPI', type: 'technology' },
+        { name: 'Python', type: 'language' },
+      ],
+      triplets: [{ source: 'FastAPI', relation: '基于', target: 'Python', confidence: 0.9 }],
     }
     const r2 = await builder.buildFromExtraction(d2, { knowledgeBaseId: kb, documentId: 'doc2' })
 

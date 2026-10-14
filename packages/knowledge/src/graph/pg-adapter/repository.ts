@@ -16,6 +16,21 @@ function mergeNodePropertiesSql(schemaName: string): string {
 }
 
 /**
+ * 边属性 upsert 合并：对齐 mergeNodePropertiesSql 的数组并集语义——
+ * 跨篇写入同一条边时 sourceDocumentIds/mergedFromChunks/pipelineRunIds 取并集而非覆盖，
+ * 其余键保持"最后值获胜"（与节点一致）。
+ */
+function mergeEdgePropertiesSql(schemaName: string): string {
+  const old = `${schemaName}.graph_edges.properties`
+  const merged = (key: string) =>
+    `COALESCE((SELECT jsonb_agg(DISTINCT value) FROM jsonb_array_elements(COALESCE(${old}->'${key}', '[]'::jsonb) || COALESCE(EXCLUDED.properties->'${key}', '[]'::jsonb))), '[]'::jsonb)`
+  return `jsonb_set(jsonb_set(jsonb_set(${old} || EXCLUDED.properties,
+    '{mergedFromChunks}', ${merged('mergedFromChunks')}, true),
+    '{sourceDocumentIds}', ${merged('sourceDocumentIds')}, true),
+    '{pipelineRunIds}', ${merged('pipelineRunIds')}, true)`
+}
+
+/**
  * 解析 pgvector 返回的向量字符串（如 "[0.1,0.2,0.3]"）为 number[]
  */
 export function parsePgVector(value: unknown): number[] | undefined {
@@ -358,6 +373,22 @@ export class GraphRepository {
     })
   }
 
+  /**
+   * 批量回减节点频次（detach 语义）：删除某个来源文档时，仍被其它文档引用的
+   * 共享节点 frequency - 1，保底下限 1（不归零、不为负）。
+   */
+  async decrementNodeFrequencies(nodeIds: string[]): Promise<void> {
+    if (nodeIds.length === 0) return
+    await this.withClient(async (client) => {
+      await client.query(
+        `UPDATE ${this.schemaName}.graph_nodes
+         SET frequency = GREATEST(1, frequency - 1), updated_at = NOW()
+         WHERE id = ANY($1)`,
+        [nodeIds]
+      )
+    })
+  }
+
   async updateNode(id: string, data: UpdateNodeInput): Promise<void> {
     const sets: string[] = []
     const params: unknown[] = []
@@ -428,7 +459,7 @@ export class GraphRepository {
         `INSERT INTO ${this.schemaName}.graph_edges (source_id, target_id, relationship_name, properties, weight, knowledge_base_id, created_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
          ON CONFLICT (source_id, target_id, relationship_name) DO UPDATE SET
-           properties = ${this.schemaName}.graph_edges.properties || EXCLUDED.properties,
+           properties = ${mergeEdgePropertiesSql(this.schemaName)},
            weight = EXCLUDED.weight,
            updated_at = NOW()`,
         [input.sourceId, input.targetId, input.relationshipName, JSON.stringify(input.properties || {}), input.weight || 1.0, input.knowledgeBaseId]
@@ -451,7 +482,7 @@ export class GraphRepository {
             `INSERT INTO ${this.schemaName}.graph_edges (source_id, target_id, relationship_name, properties, weight, knowledge_base_id, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
              ON CONFLICT (source_id, target_id, relationship_name) DO UPDATE SET
-               properties = ${this.schemaName}.graph_edges.properties || EXCLUDED.properties,
+               properties = ${mergeEdgePropertiesSql(this.schemaName)},
                weight = EXCLUDED.weight,
                updated_at = NOW()`,
             [input.sourceId, input.targetId, input.relationshipName, JSON.stringify(input.properties), input.weight || 1.0, input.knowledgeBaseId]

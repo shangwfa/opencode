@@ -76,6 +76,20 @@ export class GraphBuilder {
       await this.ensureEntityTypeNodes(extraction, options, nameToId)
     }
 
+    // 无关系 extraction 也必须记录文档来源，确保后续按文档删除可清理实体。
+    if (options.documentId && nodeIds.length > 0 && typeof (this.graph as any).linkNodesToDocument === 'function') {
+      try {
+        await (this.graph as any).linkNodesToDocument({
+          documentId: options.documentId,
+          nodeIds,
+          chunkIndex: options.chunkIndex,
+          pipelineRunId: options.pipelineRunId,
+        })
+      } catch (err: any) {
+        console.warn(`[图构建] 文档-节点关联写入失败（不影响主流程）: ${err.message}`)
+      }
+    }
+
     if (extraction.triplets.length === 0) {
       return { nodeIds, edgeCount: 0 }
     }
@@ -113,20 +127,6 @@ export class GraphBuilder {
 
     if (edgeInputs.length > 0) {
       await this.graph.addEdges(edgeInputs)
-    }
-
-    // 写入文档-节点关联表（溯源主路径：供按文档删除/按 run 回滚使用）
-    if (options.documentId && nodeIds.length > 0 && typeof (this.graph as any).linkNodesToDocument === 'function') {
-      try {
-        await (this.graph as any).linkNodesToDocument({
-          documentId: options.documentId,
-          nodeIds,
-          chunkIndex: options.chunkIndex,
-          pipelineRunId: options.pipelineRunId,
-        })
-      } catch (err: any) {
-        console.warn(`[图构建] 文档-节点关联写入失败（不影响主流程）: ${err.message}`)
-      }
     }
 
     return { nodeIds, edgeCount: edgeInputs.length }

@@ -24,6 +24,8 @@ export interface GraphSearchInput {
   persistExplanation?: GraphSearchOptions['persistExplanation']
   /** 相关性分数下限（0-1）：低于阈值的边不返回（防幻觉上下文） */
   minScore?: number
+  /** 排除指定关系类型（透传给检索器，如评估时排除 is_a/包含 等结构边） */
+  excludeRelationTypes?: string[]
   /** 严格相关性：查询中的明确实体未命中图谱时返回空结果 */
   strictRelevance?: boolean
   /** 可选本体约束，过滤不符合 domain/range 的检索路径 */
@@ -49,6 +51,7 @@ export async function graphSearch(
     },
     persistExplanation: input.persistExplanation,
     minScore: input.minScore,
+    excludeRelationTypes: input.excludeRelationTypes,
     strictRelevance: input.strictRelevance,
     ontology: input.ontology,
     reason: input.reason,

@@ -6,6 +6,7 @@
  *   /api/base-knowledge/**   base-knowledge 命名空间
  *   /api/database/**         数据表（表问答/行检索）
  *   /api/llm-wiki/**         Wiki 集合/编译/检索
+ *   /api/graph/**            知识图谱（摄入/删除/检索/统计）
  *
  * 组织方式遵循 hono 官方最佳实践：每个业务域导出一个 Hono 子应用，
  * 本文件用 app.route(prefix, subApp) 挂载并导出 AppType（供 hono/client RPC 类型共享）。
@@ -17,6 +18,7 @@ import { baseKnowledgeApp } from "./rag/routes.js"
 import { mountMcpRoutes } from "./mcp/http.js"
 import { databaseApp } from "./data-table/routes/index.js"
 import { llmWikiApp } from "./llm-wiki/routes/index.js"
+import { graphApp } from "./graph/routes/index.js"
 
 /** API 子应用：各业务域子应用按域前缀挂载（basePath 之下） */
 export const api = new Hono()
@@ -26,6 +28,7 @@ export const api = new Hono()
   .route("/base-knowledge", baseKnowledgeApp)
   .route("/database", databaseApp)
   .route("/llm-wiki", llmWikiApp)
+  .route("/graph", graphApp)
 
 /** RPC 客户端类型：`hc<AppType>('http://host/api')` */
 export type AppType = typeof api

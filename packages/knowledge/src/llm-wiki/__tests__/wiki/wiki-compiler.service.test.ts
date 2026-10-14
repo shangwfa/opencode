@@ -1,4 +1,4 @@
-import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test'
+import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from 'bun:test'
 import { createHash } from 'crypto'
 import type { WikiCollection } from '../../types/wiki.types.js'
 
@@ -184,6 +184,51 @@ describe('WikiCompilerService', () => {
     mockKnowledgeBaseService = {}
 
     service = new WikiCompilerService(mockWikiCollectionService)
+  })
+
+  describe('recovery lifecycle', () => {
+    it('logs rejected startup and interval scans without stopping later scans', async () => {
+      const callbacks: Array<() => void> = []
+      const timer = { unref: mock() }
+      const interval = spyOn(globalThis, 'setInterval').mockImplementation(((callback: () => void) => {
+        callbacks.push(callback)
+        return timer
+      }) as any)
+      const clear = spyOn(globalThis, 'clearInterval').mockImplementation(() => {})
+      const log = spyOn(console, 'error').mockImplementation(() => {})
+      const failure = Object.assign(new Error('relation does not exist'), { code: '42P01' })
+      service.recoverAvailableTasks = mock()
+        .mockRejectedValueOnce(failure)
+        .mockRejectedValueOnce(new Error('connection lost'))
+        .mockResolvedValue(undefined)
+      try {
+        service.startRecovery()
+        await Promise.resolve()
+        expect(log).toHaveBeenCalledWith('[WikiCompiler] task recovery failed:', failure)
+        service.startRecovery()
+        expect(interval).toHaveBeenCalledTimes(1)
+        callbacks[0]!()
+        await Promise.resolve()
+        expect(log).toHaveBeenCalledTimes(2)
+        callbacks[0]!()
+        await Promise.resolve()
+        expect(service.recoverAvailableTasks).toHaveBeenCalledTimes(3)
+        expect(log).toHaveBeenCalledTimes(2)
+        expect(timer.unref).toHaveBeenCalledTimes(1)
+        service.stopRecovery()
+        expect(clear).toHaveBeenCalledWith(timer)
+      } finally {
+        service.stopRecovery()
+        interval.mockRestore()
+        clear.mockRestore()
+        log.mockRestore()
+      }
+    })
+
+    it('direct recovery retains its rejection contract for callers', async () => {
+      mockPoolQuery.mockRejectedValueOnce(new Error('database unavailable'))
+      await expect(service.recoverAvailableTasks()).rejects.toThrow('database unavailable')
+    })
   })
 
   describe('compileKnowledgeBase', () => {

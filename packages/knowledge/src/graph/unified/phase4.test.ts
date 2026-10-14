@@ -88,7 +88,9 @@ describe('ContradictionDetector', () => {
     if (!cs) return
     pool = new Pool({ connectionString: cs })
     adapter = new PgGraphAdapter(pool, TEST_SCHEMA)
-    detector = new ContradictionDetector(adapter)
+    // model: null 强制纯规则路径（项目既有模式，见 graph.e2e E2E-9）：
+    // 该用例验证规则矛盾检测，不应依赖默认 LLM 端点可用性（.env 指向真实代理时会被拖入网络调用）
+    detector = new ContradictionDetector(adapter, { model: null as never })
     await adapter.init()
   })
 

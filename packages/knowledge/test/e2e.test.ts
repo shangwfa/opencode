@@ -9,6 +9,8 @@
  *   KNOWLEDGE_DATABASE_URL=postgresql://... bun test test/e2e.test.ts
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import type { Pool } from "pg"
+import { createOwnedTestSchema } from "./helpers/owned-schema.js"
 
 const EMBED_DIM = 1536
 
@@ -52,6 +54,9 @@ const databaseUrl = process.env["KNOWLEDGE_DATABASE_URL"] || ""
 const describeE2E = databaseUrl ? describe : describe.skip
 
 describeE2E("knowledge base e2e", () => {
+  const testSchema = createOwnedTestSchema("rag")
+  let pool: Pool | undefined
+  let stopRecovery: (() => void) | undefined
   let app: any
   let base: string
   let kbId: string
@@ -68,16 +73,25 @@ describeE2E("knowledge base e2e", () => {
   }
 
   beforeAll(async () => {
-    process.env["KNOWLEDGE_DATABASE_SCHEMA"] = process.env["KNOWLEDGE_DATABASE_SCHEMA"] || "knowledge_e2e"
+    process.env["KNOWLEDGE_DATABASE_SCHEMA"] = testSchema.name
+    const database = await import("../src/db/index.js")
+    await testSchema.prepare(database.pool, database.schemaName)
+    pool = database.pool
+    const { wikiCompilerService } = await import("../src/llm-wiki/services/index.js")
+    stopRecovery = () => wikiCompilerService.stopRecovery()
     const { createKnowledgeApp } = await import("../src/app.js")
     app = await createKnowledgeApp()
     base = "/api"
   })
 
   afterAll(async () => {
-    const { pool } = await import("../src/db/index.js")
-    await pool.query(`DROP SCHEMA IF EXISTS "${process.env["KNOWLEDGE_DATABASE_SCHEMA"]}" CASCADE`).catch(() => {})
-    await pool.end().catch(() => {})
+    if (!pool) return
+    stopRecovery?.()
+    try {
+      await testSchema.cleanup(pool)
+    } finally {
+      await pool.end()
+    }
   })
 
   test("health", async () => {
