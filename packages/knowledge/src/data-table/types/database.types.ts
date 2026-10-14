@@ -36,10 +36,15 @@ export interface DatabaseDefinition {
   indexCreatedAt?: Date;
   dataTableName: string;
   columnDefinitions: DatabaseColumnDefinition[];
+  vectorStrategy?: VectorStrategy;
+  keyColumn?: string;
   rowCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
+
+export const VECTOR_STRATEGIES = ["row", "field", "row+field"] as const;
+export type VectorStrategy = (typeof VECTOR_STRATEGIES)[number];
 
 /** 与 assertSafeIdentifier 一致；允许 camelCase / PascalCase（首字符须为字母） */
 const columnNameRegex = /^[a-zA-Z][a-zA-Z0-9_]{0,62}$/;
@@ -65,13 +70,22 @@ export const DatabaseColumnDefinitionSchema = z
     }
   });
 
+export const VectorStrategySchema = z.enum(VECTOR_STRATEGIES);
+
 export const CreateDatabaseRequestSchema = z.object({
   id: z.string().optional(),
   name: z.string().min(1),
   description: z.string().optional(),
   columns: z.array(DatabaseColumnDefinitionSchema).min(1),
+  /**
+   * 幂等键列（建库时指定，创建后不可修改）：指定后 POST rows 按该列 upsert，
+   * 相同 key 覆盖整行；重试同一批次不产生重复行。未指定则保持追加写入语义。
+   */
+  keyColumn: z.string().regex(columnNameRegex, "Invalid key column name").optional(),
   /** 建表并创建向量索引后，按列定义批量写入初始行（键与 columns.name 对应） */
   dataSource: z.array(z.record(z.string(), z.unknown())).max(5000).optional(),
+  /** 向量化策略：row=整行单向量（带字段边界）；field=每字段独立向量；row+field=两者并存 */
+  vectorStrategy: VectorStrategySchema.optional().default("row"),
   embeddingModel: z
     .string()
     .optional()
@@ -93,6 +107,14 @@ export const CreateDatabaseRequestSchema = z.object({
     .optional()
     .default("recursive"),
   defaultChunkConfig: z.any().optional(),
+}).superRefine((data, ctx) => {
+  if (data.keyColumn && !data.columns.some((c) => c.name === data.keyColumn)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `keyColumn "${data.keyColumn}" must be one of columns`,
+      path: ["keyColumn"],
+    });
+  }
 });
 
 export type CreateDatabaseRequest = z.infer<typeof CreateDatabaseRequestSchema>;
@@ -102,6 +124,11 @@ export const UpdateDatabaseRequestSchema = z
     columns: z.array(DatabaseColumnDefinitionSchema).min(1),
     name: z.string().min(1).optional(),
     description: z.string().nullable().optional(),
+    vectorStrategy: VectorStrategySchema.optional(),
+    /** 幂等键创建后不可修改：显式拒绝，避免被 zod 静默丢弃造成"改成功了"的假象 */
+    keyColumn: z
+      .undefined({ message: "keyColumn is immutable after creation" })
+      .optional(),
   })
   .superRefine((data, ctx) => {
     const names = data.columns.map((c) => c.name);
@@ -214,6 +241,12 @@ export const RowsSearchRequestSchema = z.preprocess(
     .object({
       query: z.string().min(1).optional(),
       filter: z.record(z.string(), z.unknown()).optional(),
+      /** 字段限定语义检索：仅 field / row+field 向量化策略支持（向量 metadata.field 过滤） */
+      searchFields: z
+        .array(z.string().trim().regex(columnNameRegex, "Invalid search field name"))
+        .min(1)
+        .max(50)
+        .optional(),
       topK: z
         .number()
         .int()
@@ -256,7 +289,7 @@ export const RowsSearchRequestSchema = z.preprocess(
         .object({
           recallTopK: z.number().int().positive().optional(),
           enableQueryExpansion: z.boolean().optional().default(false),
-          enableMultiStage: z.boolean().optional().default(true),
+          enableMultiStage: z.boolean().optional(),
         })
         .optional(),
       rerankConfig: z

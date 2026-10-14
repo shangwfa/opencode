@@ -67,6 +67,7 @@ function baseDataset() {
     defaultChunkStrategy: "recursive" as const,
     dataTableName: "tbl_test",
     columnDefinitions: [{ name: "col_a" }],
+    vectorStrategy: "row",
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -210,6 +211,214 @@ describe("runDatabaseRowsSearch", () => {
     expect(keywordSearch).not.toHaveBeenCalled();
   });
 
+  it("keyword 未指定 recallConfig 时默认关闭多阶段，正常返回 200", async () => {
+    const databaseService = {
+      getDatabase: mock().mockResolvedValue(baseDataset()),
+      searchRowsByFilter: mock(),
+      hydrateSearchResults: mock().mockResolvedValue([]),
+    } as unknown as DatabaseService;
+
+    const out = await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "库存盘点", searchType: "keyword" }),
+      databaseService,
+    );
+
+    expect(out.status).toBe(200);
+    expect(recall).not.toHaveBeenCalled();
+    expect(keywordSearch).toHaveBeenCalled();
+  });
+
+  it("recallConfig 未显式给出 enableMultiStage 时保持 undefined（不被 schema 默认成 true）", () => {
+    const parsed = RowsSearchRequestSchema.parse({
+      query: "库存盘点",
+      searchType: "keyword",
+      recallConfig: { enableQueryExpansion: false },
+    });
+
+    expect(parsed.recallConfig?.enableMultiStage).toBeUndefined();
+  });
+
+  for (const fusionMethod of ["weighted", "rrf", "weighted-rrf", "hybrid"] as const) {
+    it(`默认 hybrid 实际执行混合分支并透传 ${fusionMethod}`, async () => {
+      const service = {
+        getDatabase: mock().mockResolvedValue(baseDataset()),
+        hydrateSearchResults: mock().mockResolvedValue([]),
+      } as unknown as DatabaseService;
+      const out = await runDatabaseRowsSearch("ds1", RowsSearchRequestSchema.parse({
+        query: "库存", searchType: "hybrid", topK: 3, fusionMethod,
+      }), service);
+      expect(out.status).toBe(200);
+      expect(hybridSearch).toHaveBeenCalledTimes(1);
+      expect(hybridSearch.mock.calls[0][2].fusionMethod).toBe(fusionMethod);
+      expect(recall).not.toHaveBeenCalled();
+      expect((out.body as any).execution.strategy).toBe("hybrid");
+    });
+  }
+
+  for (const hybridWeight of [{ semantic: 0, keyword: 1 }, { semantic: 1, keyword: 0 }]) {
+    it(`混合检索保留零权重 ${JSON.stringify(hybridWeight)}`, async () => {
+      const service = {
+        getDatabase: mock().mockResolvedValue(baseDataset()),
+        hydrateSearchResults: mock().mockResolvedValue([]),
+      } as unknown as DatabaseService;
+      const out = await runDatabaseRowsSearch("ds1", RowsSearchRequestSchema.parse({
+        query: "库存", searchType: "hybrid", fusionMethod: "weighted", hybridWeight,
+      }), service);
+      expect(out.status).toBe(200);
+      expect(hybridSearch.mock.calls[0][2].semanticWeight).toBe(hybridWeight.semantic);
+      expect(hybridSearch.mock.calls[0][2].keywordWeight).toBe(hybridWeight.keyword);
+    });
+  }
+
+  for (const searchType of ["keyword", "hybrid"] as const) {
+    for (const options of [
+      { recallConfig: { enableMultiStage: true } },
+      { recallConfig: { enableQueryExpansion: true } },
+      { hydeConfig: { enableHyDE: true } },
+      { multiQueryConfig: { enableMultiQuery: true } },
+    ]) {
+      it(`${searchType} 未支持的增强组合显式拒绝 ${JSON.stringify(options)}`, async () => {
+        const service = { getDatabase: mock().mockResolvedValue(baseDataset()) } as unknown as DatabaseService;
+        const out = await runDatabaseRowsSearch("ds1", RowsSearchRequestSchema.parse({
+          query: "库存", searchType, ...options,
+        }), service);
+        expect(out.status).toBe(400);
+        expect(recall).not.toHaveBeenCalled();
+        expect(keywordSearch).not.toHaveBeenCalled();
+        expect(hybridSearch).not.toHaveBeenCalled();
+      });
+    }
+  }
+
+  it("混合检索全零权重在召回前拒绝", async () => {
+    const service = { getDatabase: mock().mockResolvedValue(baseDataset()) } as unknown as DatabaseService;
+    const out = await runDatabaseRowsSearch("ds1", RowsSearchRequestSchema.parse({
+      query: "库存", searchType: "hybrid", hybridWeight: { semantic: 0, keyword: 0 },
+    }), service);
+    expect(out.status).toBe(400);
+    expect(hybridSearch).not.toHaveBeenCalled();
+  });
+
+  for (const keywordCount of [0, 1]) {
+    it(`混合执行信息记录两路结果与单路空态 keyword=${keywordCount}`, async () => {
+      hybridSearch.mockImplementation(async (_id, _query, options) => {
+        options.debugCollector({ stage: "semantic", results: [{ id: "s1" }] });
+        options.debugCollector({ stage: "keyword", results: keywordCount ? [{ id: "k1" }] : [] });
+        return [];
+      });
+      const service = {
+        getDatabase: mock().mockResolvedValue(baseDataset()),
+        hydrateSearchResults: mock().mockResolvedValue([]),
+      } as unknown as DatabaseService;
+      const out = await runDatabaseRowsSearch("ds1", RowsSearchRequestSchema.parse({
+        query: "库存", searchType: "hybrid",
+      }), service);
+      expect(out.status).toBe(200);
+      expect((out.body as any).execution).toMatchObject({
+        strategy: "hybrid", fusionMethod: "rrf",
+        branchResults: { semantic: 1, keyword: keywordCount },
+        fusionApplied: keywordCount > 0,
+      });
+    });
+  }
+
+  it("semantic 默认过滤零相关行（空结果契约）", async () => {
+    vectorQuery.mockResolvedValue([
+      { id: "r1__c0", score: 0.9, metadata: { rowId: "r1", text: "命中" } },
+      { id: "r2__c0", score: 0, metadata: { rowId: "r2", text: "无关" } },
+    ]);
+    const databaseService = {
+      getDatabase: mock().mockResolvedValue(baseDataset()),
+      searchRowsByFilter: mock(),
+      hydrateSearchResults: mock().mockImplementation(async (_id, items) =>
+        (items as { id: string; metadata?: { rowId?: string } }[]).map((r) => ({
+          ...r,
+          documentId: String(r.metadata?.rowId ?? r.id),
+          row: { id: String(r.metadata?.rowId ?? r.id) },
+        })),
+      ),
+    } as unknown as DatabaseService;
+
+    const out = await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "命中", topK: 10, rerankConfig: { enableRerank: false } }),
+      databaseService,
+    );
+
+    expect(out.status).toBe(200);
+    const body = out.body as import("./database-rows-search.js").DatabaseRowsSearchResponseBody;
+    expect(body.results.map((r) => r.id)).toEqual(["r1__c0"]);
+  });
+
+  it("semantic 透传显式 minScore 到向量查询", async () => {
+    vectorQuery.mockResolvedValue([]);
+    const databaseService = {
+      getDatabase: mock().mockResolvedValue(baseDataset()),
+      searchRowsByFilter: mock(),
+      hydrateSearchResults: mock().mockResolvedValue([]),
+    } as unknown as DatabaseService;
+
+    await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "命中", topK: 5, minScore: 0.4 }),
+      databaseService,
+    );
+
+    expect(vectorQuery.mock.calls[0][4]).toMatchObject({ minScore: 0.4 });
+  });
+
+  it("searchFields 非法字段名被 schema 拒绝", () => {
+    expect(() =>
+      RowsSearchRequestSchema.parse({ query: "命中", searchFields: ["1abc"] }),
+    ).toThrow();
+  });
+
+  it("row 策略不支持 searchFields，显式拒绝", async () => {
+    const databaseService = { getDatabase: mock().mockResolvedValue(baseDataset()) } as unknown as DatabaseService;
+    const out = await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "命中", searchFields: ["col_a"] }),
+      databaseService,
+    );
+    expect(out.status).toBe(400);
+    expect((out.body as { message: string }).message).toContain("field");
+  });
+
+  it("field 策略 searchFields 下推为向量 metadata 过滤", async () => {
+    vectorQuery.mockResolvedValue([]);
+    const databaseService = {
+      getDatabase: mock().mockResolvedValue({ ...baseDataset(), vectorStrategy: "field", columnDefinitions: [{ name: "col_a" }, { name: "col_b" }] }),
+      searchRowsByFilter: mock(),
+      hydrateSearchResults: mock().mockResolvedValue([]),
+    } as unknown as DatabaseService;
+
+    const out = await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "命中", searchFields: ["col_a", "col_b"], rerankConfig: { enableRerank: false }, recallConfig: { enableMultiStage: false } }),
+      databaseService,
+    );
+    expect(out.status).toBe(200);
+    expect(vectorQuery.mock.calls[0][3]).toEqual({ field: { $in: ["col_a", "col_b"] } });
+    expect((out.body as any).execution.searchFields).toEqual(["col_a", "col_b"]);
+  });
+
+  it("field 策略默认多阶段时 searchFields 透传 recallService 过滤", async () => {
+    recall.mockResolvedValue([]);
+    const databaseService = {
+      getDatabase: mock().mockResolvedValue({ ...baseDataset(), vectorStrategy: "field" }),
+      searchRowsByFilter: mock(),
+      hydrateSearchResults: mock().mockResolvedValue([]),
+    } as unknown as DatabaseService;
+
+    await runDatabaseRowsSearch(
+      "ds1",
+      RowsSearchRequestSchema.parse({ query: "命中", searchFields: ["col_a"] }),
+      databaseService,
+    );
+    expect(recall.mock.calls[0][2].filter).toEqual({ field: { $in: ["col_a"] } });
+  });
+
   it("plain semantic + 小 topK 走单阶段向量召回，不调用 recallService.recall", async () => {
     const databaseService = {
       getDatabase: mock().mockResolvedValue(baseDataset()),
@@ -245,7 +454,7 @@ describe("runDatabaseRowsSearch", () => {
       [0.1, 0.2, 0.3],
       10,
       undefined,
-      undefined,
+      { minScore: 0 },
     );
     expect(body.results.length).toBeLessThanOrEqual(10);
   });

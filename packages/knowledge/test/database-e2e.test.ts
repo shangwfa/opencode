@@ -6,6 +6,8 @@
  * LLM/Embedding 用确定性伪向量（bag-of-tokens），不访问外网。
  */
 import { afterAll, beforeAll, describe, expect, mock, test } from "bun:test"
+import type { Pool } from "pg"
+import { createOwnedTestSchema } from "./helpers/owned-schema.js"
 
 const DIM = 1536
 /** bag-of-tokens 确定性伪向量：文本重叠越多 cosine 相似度越高 */
@@ -35,6 +37,9 @@ const databaseUrl = process.env["KNOWLEDGE_DATABASE_URL"] || ""
 const describeE2E = databaseUrl ? describe : describe.skip
 
 describeE2E("database 表检索 e2e", () => {
+  const testSchema = createOwnedTestSchema("database")
+  let pool: Pool | undefined
+  let stopRecovery: (() => void) | undefined
   let app: any
   let rowId: string
 
@@ -48,15 +53,24 @@ describeE2E("database 表检索 e2e", () => {
   }
 
   beforeAll(async () => {
-    process.env["KNOWLEDGE_DATABASE_SCHEMA"] = process.env["KNOWLEDGE_DATABASE_SCHEMA"] || "knowledge_ds_e2e"
+    process.env["KNOWLEDGE_DATABASE_SCHEMA"] = testSchema.name
+    const database = await import("../src/db/index.js")
+    await testSchema.prepare(database.pool, database.schemaName)
+    pool = database.pool
+    const { wikiCompilerService } = await import("../src/llm-wiki/services/index.js")
+    stopRecovery = () => wikiCompilerService.stopRecovery()
     const { createKnowledgeApp } = await import("../src/app.js")
     app = await createKnowledgeApp()
   })
 
   afterAll(async () => {
-    const { pool } = await import("../src/db/index.js")
-    await pool.query(`DROP SCHEMA IF EXISTS "${process.env["KNOWLEDGE_DATABASE_SCHEMA"]}" CASCADE`).catch(() => {})
-    await pool.end().catch(() => {})
+    if (!pool) return
+    stopRecovery?.()
+    try {
+      await testSchema.cleanup(pool)
+    } finally {
+      await pool.end()
+    }
   })
 
   test("建数据集（含初始行，自动建动态表+向量索引）", async () => {
@@ -98,7 +112,7 @@ describeE2E("database 表检索 e2e", () => {
 
   test("语义检索", async () => {
     const { status, json } = await call("POST", "/database/ds_e2e/rows/search", {
-      query: "订单创建",
+      query: "订单服务",
       searchType: "semantic",
       topK: 3,
     })

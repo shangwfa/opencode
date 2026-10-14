@@ -426,6 +426,31 @@ export class VectorService {
   }
 
   /**
+   * 删除某行中不在 keepVectorIds 内的陈旧 chunk 向量（重向量化成功写入新向量后调用）
+   */
+  async pruneByRowId(knowledgeBaseId: string, rowId: string, keepVectorIds: string[]): Promise<void> {
+    const indexName = await this.getIndexName(knowledgeBaseId)
+    const client = await this.pool.connect()
+
+    try {
+      await client.query(`SET search_path TO ${this.schemaName}, public`)
+
+      const staleResult = await client.query(
+        `SELECT vector_id as id
+         FROM ${this.schemaName}.${indexName}
+         WHERE metadata->>'rowId' = $1 AND NOT (vector_id = ANY($2::varchar[]))`,
+        [rowId, keepVectorIds]
+      )
+
+      if (staleResult.rows.length > 0) {
+        await this.deleteBatch(knowledgeBaseId, staleResult.rows.map((row) => row.id))
+      }
+    } finally {
+      client.release()
+    }
+  }
+
+  /**
    * 根据向量ID删除单个向量
    */
   async deleteByVectorId(knowledgeBaseId: string, vectorId: string): Promise<void> {

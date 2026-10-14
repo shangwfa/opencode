@@ -29,8 +29,7 @@ function getProvider(kind: "chat" | "embedding") {
   return provider
 }
 
-/** 内网会话代理 chat provider：按渠道路由（鉴权由 xybot-user header 接管，apiKey 占位）。 */
-function getInnerChatProvider(channel: OpenAICompatibleChannel) {
+/** 内网会话代理 chat provider：按渠道路由（鉴权由 xybot-user header 接管，apiKey 占位）。 */function getInnerChatProvider(channel: OpenAICompatibleChannel) {
   const cacheKey = `chat|inner|${channel}`
   let provider = providerCache.get(cacheKey)
   if (!provider) {
@@ -57,9 +56,22 @@ export function createChatModel(modelId: string) {
   return getProvider("chat").chat(normalizeModelId(modelId))
 }
 
+/**
+ * embedding 端点为 OpenRouter 等 OpenAI 兼容路由时，模型 ID 必须保留完整
+ * "provider/model" 形式（如 openai/text-embedding-3-small）；仅官方 OpenAI/Azure
+ * 端点需要剥前缀。判定基于端点 host，业务模型名无需感知部署差异。
+ */
+function embeddingModelIdFor(modelId: string): string {
+  const endpoint = getEmbeddingEndpoint()
+  if (/^https?:\/\/[^/]*openrouter\.ai/i.test(endpoint.baseURL)) {
+    return modelId
+  }
+  return normalizeModelId(modelId)
+}
+
 /** OpenAI 兼容 embedding 模型 */
 export function createEmbeddingModel(modelId: string) {
-  return getProvider("embedding").embedding(normalizeModelId(modelId))
+  return getProvider("embedding").embedding(embeddingModelIdFor(modelId))
 }
 
 /** 兼容旧调用形态的别名 */

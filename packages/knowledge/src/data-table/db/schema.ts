@@ -17,6 +17,8 @@ export function createDatabaseSchema(schemaName: string) {
     indexDimension: integer('index_dimension').default(1536),
     indexCreated: integer('index_created').default(0),
     indexCreatedAt: timestamp('index_created_at'),
+    vectorStrategy: varchar('vector_strategy', { length: 20 }).notNull().default('row'),
+    keyColumn: varchar('key_column', { length: 63 }),
     dataTableName: varchar('data_table_name', { length: 255 }).notNull().unique(),
     columnDefinitions: jsonb('column_definitions').notNull(),
     createdAt: timestamp('created_at').notNull().defaultNow(),

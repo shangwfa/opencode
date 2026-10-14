@@ -24,11 +24,11 @@ export const listDatabases = new Hono().get('/', async (c) => {
 
     const validated = ListQuerySchema.parse(queryParams)
 
-    if (validated.page && (validated.page < 1 || isNaN(validated.page))) {
+    if (validated.page < 1 || isNaN(validated.page)) {
       return c.json({ code: 400, success: false, message: 'page must be >= 1', data: null }, 400)
     }
 
-    if (validated.pageSize && (validated.pageSize < 1 || validated.pageSize > 100)) {
+    if (validated.pageSize < 1 || validated.pageSize > 100) {
       return c.json(
         { code: 400, success: false, message: 'pageSize must be between 1 and 100', data: null },
         400

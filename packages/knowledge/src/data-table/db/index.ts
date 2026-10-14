@@ -30,11 +30,23 @@ export async function initDatabaseModule(): Promise<void> {
         index_dimension INTEGER DEFAULT 1536,
         index_created INTEGER DEFAULT 0,
         index_created_at TIMESTAMP,
+        vector_strategy VARCHAR(20) NOT NULL DEFAULT 'row',
+        key_column VARCHAR(63),
         data_table_name VARCHAR(255) NOT NULL UNIQUE,
         column_definitions JSONB NOT NULL,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       )
+    `)
+
+    // 存量迁移：旧表补 vector_strategy 列（幂等）
+    await client.query(`
+      ALTER TABLE ${schemaName}.databases
+      ADD COLUMN IF NOT EXISTS vector_strategy VARCHAR(20) NOT NULL DEFAULT 'row'
+    `)
+    await client.query(`
+      ALTER TABLE ${schemaName}.databases
+      ADD COLUMN IF NOT EXISTS key_column VARCHAR(63)
     `)
 
     // 存量迁移：仅当早期表名的表存在时才清理废弃列（新环境无该表，避免误报）

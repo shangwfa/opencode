@@ -118,14 +118,14 @@ export class DatabaseService {
     return `${rowId}__c${chunkIndex}`
   }
 
-  /** 从检索结果解析所属行 id（chunk 向量或旧版单行向量） */
+  /** 从检索结果解析所属行 id（chunk 向量或旧版单行向量）；field 向量 id 形如 <rowId>__f_<col>__c<i> */
   private resolveRowIdFromVectorId(id: string, metadata?: Record<string, unknown>): string {
     const md = metadata || {}
     if (md.rowId != null && String(md.rowId).length > 0) {
       return String(md.rowId)
     }
     const s = String(id)
-    const m = /^(.+)__c(\d+)$/.exec(s)
+    const m = /^(.+?)__(?:f_[A-Za-z0-9_]+__)?c(\d+)$/.exec(s)
     if (m) return m[1]
     return s
   }
@@ -183,6 +183,7 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
     const defaultChunkConfig = { maxSize: 512, overlap: 50 }
     const indexName = getKnowledgeBaseIndexName(id)
     const indexDimension = getEmbeddingDimension()
+    await this.assertIndexNameAvailable(id, indexName, dataTableName)
 
     const [inserted] = await db
       .insert(databaseBases)
@@ -193,6 +194,8 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
         embeddingModel: request.embeddingModel ?? 'openai/text-embedding-3-small',
         defaultChunkStrategy: request.defaultChunkStrategy ?? 'recursive',
         defaultChunkConfig: request.defaultChunkConfig ?? defaultChunkConfig,
+        vectorStrategy: request.vectorStrategy ?? 'row',
+        keyColumn: request.keyColumn ?? null,
         dataTableName,
         columnDefinitions: request.columns as unknown as Record<string, unknown>[],
         createdAt: now,
@@ -206,6 +209,24 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
 
     try {
       await this.createPhysicalTable(dataTableName, request.columns)
+      if (request.keyColumn) {
+        // 幂等键唯一约束：ON CONFLICT upsert 依赖该唯一索引；失败时删除本次新建的表，避免留下无注册的孤儿表
+        assertSafeIdentifier(request.keyColumn)
+        try {
+          const client = await pool.connect()
+          try {
+            await client.query(`SET search_path TO ${schemaName}, public`)
+            await client.query(
+              `CREATE UNIQUE INDEX IF NOT EXISTS "${dataTableName}_key_uidx" ON ${schemaName}.${dataTableName} ("${request.keyColumn}")`
+            )
+          } finally {
+            client.release()
+          }
+        } catch (indexError) {
+          await this.dropPhysicalTable(dataTableName).catch(() => undefined)
+          throw indexError
+        }
+      }
     } catch (e: any) {
       await db.delete(databaseBases).where(eq(databaseBases.id, id))
       throw new Error(`Failed to create dynamic table: ${e.message}`)
@@ -276,7 +297,7 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
       if (!newNames.has(name)) {
         assertSafeIdentifier(name)
         await client.query(
-          `ALTER TABLE ${schemaName}.${dataTableName} DROP COLUMN IF EXISTS ${name}`
+          `ALTER TABLE ${schemaName}.${dataTableName} DROP COLUMN IF EXISTS "${name}"`
         )
       }
     }
@@ -333,6 +354,7 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
     const newCols = request.columns
     const newNames = new Set(newCols.map((c) => c.name))
     const hadRemovedColumns = oldCols.some((c) => !newNames.has(c.name))
+    const strategyChanged = (request.vectorStrategy ?? meta.vectorStrategy ?? 'row') !== (meta.vectorStrategy ?? 'row')
     const dataTableName = meta.dataTableName
     assertSafeIdentifier(dataTableName)
 
@@ -350,9 +372,10 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
 
       await client.query(
         `UPDATE ${schemaName}.databases
-         SET column_definitions = $1::jsonb, name = $2, description = $3, updated_at = $4
+         SET column_definitions = $1::jsonb, name = $2, description = $3, updated_at = $4,
+             vector_strategy = COALESCE($6, vector_strategy)
          WHERE id = $5`,
-        [JSON.stringify(newCols), nameVal, descVal, now, id]
+        [JSON.stringify(newCols), nameVal, descVal, now, id, request.vectorStrategy ?? null]
       )
 
       await client.query('COMMIT')
@@ -372,7 +395,7 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
       throw new Error('Failed to load dataset after update')
     }
 
-    if (hadRemovedColumns && full.indexCreated) {
+    if ((hadRemovedColumns || strategyChanged) && full.indexCreated) {
       await this.revectorizeAllRowsInDataset(id)
     }
 
@@ -394,18 +417,74 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
       indexCreatedAt: r.indexCreatedAt || undefined,
       dataTableName: r.dataTableName,
       columnDefinitions: cols,
+      vectorStrategy: ((r as any).vectorStrategy as DatabaseDefinition['vectorStrategy']) || 'row',
+      keyColumn: ((r as any).keyColumn as string | null) || undefined,
       createdAt: r.createdAt,
       updatedAt: r.updatedAt
     }
   }
 
-  /** 按列定义顺序拼接各字段值为 embedding 文本 */
+  /**
+   * 确定性字段级序列化（F05 修复）：字段名标签 + 换行边界。
+   * 旧行为 join('') 无分隔导致跨字段粘连（"浙江省杭州市"+"企业版授权"）与数值粘连（5+45000→545000）。
+   * 序列化格式变更后，存量数据集需重向量化才会与新写入一致。
+   */
   private embeddingTextFromRecord(record: Record<string, unknown>, columns: DatabaseColumnDefinition[]): string {
-    return columns.map((c) => {
-      const v = record[c.name]
-      if (v === null || v === undefined) return ''
-      return String(v)
-    }).join('')
+    return columns
+      .map((c) => {
+        const v = record[c.name]
+        if (v === null || v === undefined || String(v).trim() === '') return ''
+        return `${c.name}: ${String(v)}`
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  /**
+   * 按数据集向量化策略生成索引任务：
+   * - row：整行序列化文本分块，每块一向量（id <rowId>__c<i>）
+   * - field：每字段 "col: value" 独立向量化（id <rowId>__f_<col>__c<i>，metadata.field 标记）
+   * - row+field：两者并存，向量 id 互不冲突
+   */
+  private async buildIndexTasks(
+    datasetId: string,
+    meta: Pick<DatabaseDefinition, 'vectorStrategy' | 'defaultChunkStrategy' | 'defaultChunkConfig' | 'columnDefinitions'>,
+    rec: Record<string, unknown>,
+    chunker?: Pick<DocumentService, 'chunkPlainText'>
+  ): Promise<Array<{ rowId: string; field?: string; chunkIndex: number; text: string; vectorId: string }>> {
+    const rowId = String(rec.id ?? '')
+    if (!rowId) return []
+    const columns = meta.columnDefinitions
+    if (!columns.length) return []
+    const chunkPlainText = chunker ? chunker.chunkPlainText.bind(chunker) : this.documentService.chunkPlainText.bind(this.documentService)
+    const strategy = meta.vectorStrategy ?? 'row'
+
+    const tasks: Array<{ rowId: string; field?: string; chunkIndex: number; text: string; vectorId: string }> = []
+    const pushChunks = async (text: string, field?: string) => {
+      if (!text.trim()) return
+      const chunks = await chunkPlainText(text, meta.defaultChunkStrategy, meta.defaultChunkConfig)
+      for (let i = 0; i < chunks.length; i++) {
+        tasks.push({
+          rowId,
+          field,
+          chunkIndex: i,
+          text: chunks[i].text,
+          vectorId: field === undefined
+            ? DatabaseService.rowChunkVectorId(rowId, i)
+            : `${rowId}__f_${field}__c${i}`,
+        })
+      }
+    }
+
+    if (strategy === 'row' || strategy === 'row+field') {
+      await pushChunks(this.embeddingTextFromRecord(rec, columns))
+    }
+    if (strategy === 'field' || strategy === 'row+field') {
+      for (const col of columns) {
+        await pushChunks(this.embeddingTextFromRecord(rec, [col]), col.name)
+      }
+    }
+    return tasks
   }
 
   /** 多行批量 upsert 向量：按数据集分块策略对行文本分块，每块一向量（RAG chunk 检索） */
@@ -420,13 +499,16 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
     if (!columns.length) return
 
     const model = createEmbeddingModel(meta.embeddingModel)
-    type ChunkTask = {
+    type RevectorizeTask = {
       rowId: string
+      field?: string
       rec: Record<string, unknown>
       chunkIndex: number
       text: string
+      vectorId: string
     }
-    const tasks: ChunkTask[] = []
+    const tasks: RevectorizeTask[] = []
+    const keepByRow = new Map<string, string[]>()
 
     for (const rec of rows) {
       const rowId = String(rec.id ?? '')
@@ -443,27 +525,9 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
         continue
       }
 
-      const chunks = await this.documentService.chunkPlainText(
-        fullText,
-        meta.defaultChunkStrategy,
-        meta.defaultChunkConfig
-      )
-
-      await this.vectorService.deleteByRowId(datasetId, rowId)
-      try {
-        await this.vectorService.deleteByVectorId(datasetId, rowId)
-      } catch {
-        /* 旧版单行向量 */
-      }
-
-      for (let i = 0; i < chunks.length; i++) {
-        tasks.push({
-          rowId,
-          rec,
-          chunkIndex: i,
-          text: chunks[i].text
-        })
-      }
+      const built = await this.buildIndexTasks(datasetId, meta, rec)
+      tasks.push(...built.map((t) => ({ ...t, rec })))
+      keepByRow.set(rowId, built.map((t) => t.vectorId))
     }
 
     if (tasks.length === 0) return
@@ -481,13 +545,24 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
           chunkIndex: t.chunkIndex,
           text: t.text
         }
+        if (t.field !== undefined) payload.field = t.field
         for (const col of columns) {
           if (col.name in t.rec) payload[col.name] = t.rec[col.name]
         }
         return payload
       })
-      const ids = slice.map((t) => DatabaseService.rowChunkVectorId(t.rowId, t.chunkIndex))
+      const ids = slice.map((t) => t.vectorId)
       await this.vectorService.upsertVectors(datasetId, embeddings, vectorMetas as any, ids)
+    }
+
+    // 新向量全部写入后再清理陈旧向量：模型或写入失败时旧向量仍在，不会出现行无向量
+    for (const [rowId, keep] of keepByRow) {
+      await this.vectorService.pruneByRowId(datasetId, rowId, keep)
+      try {
+        await this.vectorService.deleteByVectorId(datasetId, rowId)
+      } catch {
+        /* 旧版单行向量 */
+      }
     }
   }
 
@@ -591,12 +666,15 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
       throw new Error('Vector index is not ready for this dataset')
     }
 
+    if (meta.keyColumn) {
+      return this.upsertRowsByKey(datasetId, meta, records)
+    }
+
     const texts = records.map((rec) => this.embeddingTextFromRecord(rec, columns))
     const emptyIdx = texts.findIndex((t) => !t || !String(t).trim())
     if (emptyIdx !== -1) {
       throw new Error(`Empty embedding text at rows[${emptyIdx}] (check column values)`)
     }
-
     const baseTs = Date.now()
     const rowIds = records.map(
       (_, i) => `r_${baseTs}_${i}_${Math.random().toString(36).substring(2, 11)}`
@@ -648,68 +726,271 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
       client.release()
     }
 
-    type ChunkTask = {
-      rowId: string
-      rec: Record<string, unknown>
-      chunkIndex: number
-      text: string
-    }
-    const chunkTasks: ChunkTask[] = []
-    for (let b = 0; b < records.length; b += CHUNK_TEXT_BUILD_CONCURRENCY) {
-      const end = Math.min(b + CHUNK_TEXT_BUILD_CONCURRENCY, records.length)
-      const wave = await Promise.all(
-        Array.from({ length: end - b }, async (_, k) => {
-          const i = b + k
-          const rec = records[i]
-          const rowId = rowIds[i]
-          const chunks = await this.documentService.chunkPlainText(
-            texts[i],
-            meta.defaultChunkStrategy,
-            meta.defaultChunkConfig
-          )
-          const tasks: ChunkTask[] = chunks.map((c, j) => ({
-            rowId,
-            rec,
-            chunkIndex: j,
-            text: c.text
-          }))
-          return { i, tasks }
+    try {
+      const chunkTasks: Array<{ rowId: string; field?: string; rec: Record<string, unknown>; chunkIndex: number; text: string; vectorId: string }> = []
+      const recById = new Map<string, Record<string, unknown>>()
+      for (let i = 0; i < records.length; i++) recById.set(rowIds[i], { ...records[i], id: rowIds[i] })
+      for (let b = 0; b < records.length; b += CHUNK_TEXT_BUILD_CONCURRENCY) {
+        const end = Math.min(b + CHUNK_TEXT_BUILD_CONCURRENCY, records.length)
+        const wave = await Promise.all(
+          Array.from({ length: end - b }, async (_, k) => {
+            const i = b + k
+            const tasks = await this.buildIndexTasks(datasetId, meta, recById.get(rowIds[i])!)
+            return { i, tasks }
+          })
+        )
+        wave.sort((a, c) => a.i - c.i)
+        for (const { tasks } of wave) {
+          chunkTasks.push(...tasks.map((t) => ({ ...t, rec: recById.get(t.rowId)! })))
+        }
+      }
+
+      const model = createEmbeddingModel(meta.embeddingModel)
+      for (let off = 0; off < chunkTasks.length; off += EMBEDDING_UPSERT_BATCH_SIZE) {
+        const slice = chunkTasks.slice(off, off + EMBEDDING_UPSERT_BATCH_SIZE)
+        const { embeddings } = await embedMany({
+          model,
+          values: slice.map((t) => t.text)
         })
+        if (embeddings.length !== slice.length) {
+          throw new Error('Embedding count does not match chunk count')
+        }
+
+        const vectorMetas = slice.map((t) => {
+          const payload: Record<string, unknown> = {
+            rowId: t.rowId,
+            chunkIndex: t.chunkIndex,
+            text: t.text
+          }
+          if (t.field !== undefined) payload.field = t.field
+          for (const col of columns) {
+            if (col.name in t.rec) payload[col.name] = t.rec[col.name]
+          }
+          return payload
+        })
+        const vectorIds = slice.map((t) => t.vectorId)
+        await this.vectorService.upsertVectors(datasetId, embeddings, vectorMetas as any, vectorIds)
+      }
+
+      const rows = await this.getRowsByIdsOrdered(meta, rowIds)
+      return { count: rows.length, rows }
+    } catch (e: any) {
+      // 行已提交、向量未完整写入：删除本次写入的行与已写入的向量，保证调用方要么全部成功，要么无残留
+      await this.compensateInsertedRows(datasetId, meta, rowIds)
+      throw new Error(`Failed to index rows: ${e?.message ?? e}`)
+    }
+  }
+
+  /**
+   * 幂等写入（数据集配置了 keyColumn）：按业务 key upsert，相同 key 覆盖整行，重试同一批次不产生重复行。
+   * 语义与补偿：行先提交再写向量；向量失败时只删除本次新插入的行与向量，被覆盖的行保留（旧向量在
+   * 新向量全部写入后才清理，失败时仍在，重试即可收敛）。批内重复 key 与缺失 key 直接拒绝。
+   */
+  private async upsertRowsByKey(
+    datasetId: string,
+    meta: DatabaseDefinition,
+    records: Record<string, unknown>[]
+  ): Promise<{ count: number; rows: Record<string, unknown>[] }> {
+    const columns = meta.columnDefinitions
+    const keyColumn = meta.keyColumn!
+    assertSafeIdentifier(keyColumn)
+
+    const keys = records.map((rec, i) => {
+      const v = rec[keyColumn]
+      if (v === null || v === undefined || String(v).trim() === '') {
+        throw new Error(`Missing key column "${keyColumn}" in rows[${i}]`)
+      }
+      return String(v)
+    })
+    const firstIndexByKey = new Map<string, number>()
+    keys.forEach((k, i) => {
+      const first = firstIndexByKey.get(k)
+      if (first !== undefined) {
+        throw new Error(`Duplicate key "${k}" in rows[${first}] and rows[${i}]`)
+      }
+      firstIndexByKey.set(k, i)
+    })
+
+    const texts = records.map((rec) => this.embeddingTextFromRecord(rec, columns))
+    const emptyIdx = texts.findIndex((t) => !t.trim())
+    if (emptyIdx !== -1) {
+      throw new Error(`Empty embedding text at rows[${emptyIdx}] (check column values)`)
+    }
+
+    const dynColList = columns.map((c) => `"${c.name}"`).join(', ')
+    const updateSet = [
+      ...columns.filter((c) => c.name !== keyColumn).map((c) => `"${c.name}" = EXCLUDED."${c.name}"`),
+      'updated_at = NOW()'
+    ].join(', ')
+
+    const baseTs = Date.now()
+    const idByKey = new Map<string, { id: string; inserted: boolean }>()
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(`SET search_path TO ${schemaName}, public`)
+
+      for (let start = 0; start < records.length; start += PHYSICAL_INSERT_BATCH_SIZE) {
+        const end = Math.min(start + PHYSICAL_INSERT_BATCH_SIZE, records.length)
+        const valueGroups: string[] = []
+        const flatVals: unknown[] = []
+        let param = 1
+        for (let i = start; i < end; i++) {
+          const rec = records[i]
+          const vals: unknown[] = [`r_${baseTs}_${i}_${Math.random().toString(36).substring(2, 11)}`]
+          for (const col of columns) {
+            if (col.name in rec) {
+              vals.push(rec[col.name])
+            } else if (col.notNull) {
+              throw new Error(`Missing required column in rows[${i}]: ${col.name}`)
+            } else {
+              vals.push(null)
+            }
+          }
+          valueGroups.push(`(${vals.map(() => `$${param++}`).join(', ')}, NOW())`)
+          flatVals.push(...vals)
+        }
+        // xmax = 0 表示本行是新插入；冲突更新的行 xmax 非 0
+        const res = await client.query(
+          `INSERT INTO ${schemaName}.${meta.dataTableName} (id, ${dynColList}, updated_at)
+           VALUES ${valueGroups.join(', ')}
+           ON CONFLICT ("${keyColumn}") DO UPDATE SET ${updateSet}
+           RETURNING id, "${keyColumn}" AS k, (xmax = 0) AS inserted`,
+          flatVals
+        )
+        for (const r of res.rows as Array<{ id: string; k: string; inserted: boolean }>) {
+          idByKey.set(String(r.k), { id: String(r.id), inserted: Boolean(r.inserted) })
+        }
+      }
+
+      await client.query('COMMIT')
+    } catch (e: any) {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`Failed to insert rows: ${e.message}`)
+    } finally {
+      client.release()
+    }
+
+    const rowIds = keys.map((k) => idByKey.get(k)!.id)
+    const insertedIds = keys.filter((k) => idByKey.get(k)!.inserted).map((k) => idByKey.get(k)!.id)
+    const updatedIds = keys.filter((k) => !idByKey.get(k)!.inserted).map((k) => idByKey.get(k)!.id)
+
+    try {
+      const recById = new Map<string, Record<string, unknown>>()
+      keys.forEach((_, i) => recById.set(rowIds[i], { ...records[i], id: rowIds[i] }))
+
+      const chunkTasks: Array<{ rowId: string; field?: string; rec: Record<string, unknown>; chunkIndex: number; text: string; vectorId: string }> = []
+      for (let b = 0; b < records.length; b += CHUNK_TEXT_BUILD_CONCURRENCY) {
+        const end = Math.min(b + CHUNK_TEXT_BUILD_CONCURRENCY, records.length)
+        const wave = await Promise.all(
+          Array.from({ length: end - b }, async (_, k) => {
+            const i = b + k
+            const tasks = await this.buildIndexTasks(datasetId, meta, recById.get(rowIds[i])!)
+            return { i, tasks }
+          })
+        )
+        wave.sort((a, c) => a.i - c.i)
+        for (const { tasks } of wave) {
+          chunkTasks.push(...tasks.map((t) => ({ ...t, rec: recById.get(t.rowId)! })))
+        }
+      }
+
+      const keepByRow = new Map<string, string[]>()
+      for (const t of chunkTasks) {
+        const list = keepByRow.get(t.rowId) ?? []
+        list.push(t.vectorId)
+        keepByRow.set(t.rowId, list)
+      }
+
+      const model = createEmbeddingModel(meta.embeddingModel)
+      for (let off = 0; off < chunkTasks.length; off += EMBEDDING_UPSERT_BATCH_SIZE) {
+        const slice = chunkTasks.slice(off, off + EMBEDDING_UPSERT_BATCH_SIZE)
+        const { embeddings } = await embedMany({ model, values: slice.map((t) => t.text) })
+        if (embeddings.length !== slice.length) {
+          throw new Error('Embedding count does not match chunk count')
+        }
+        const vectorMetas = slice.map((t) => {
+          const payload: Record<string, unknown> = { rowId: t.rowId, chunkIndex: t.chunkIndex, text: t.text }
+          if (t.field !== undefined) payload.field = t.field
+          for (const col of columns) {
+            if (col.name in t.rec) payload[col.name] = t.rec[col.name]
+          }
+          return payload
+        })
+        await this.vectorService.upsertVectors(datasetId, embeddings, vectorMetas as any, slice.map((t) => t.vectorId))
+      }
+
+      // 新向量全部写入后，清理被覆盖行的陈旧向量
+      for (const rowId of new Set(updatedIds)) {
+        await this.vectorService.pruneByRowId(datasetId, rowId, keepByRow.get(rowId) ?? [])
+      }
+
+      const rows = await this.getRowsByIdsOrdered(meta, rowIds)
+      return { count: rows.length, rows }
+    } catch (e: any) {
+      await this.compensateInsertedRows(datasetId, meta, insertedIds)
+      throw new Error(`Failed to index rows: ${e?.message ?? e}`)
+    }
+  }
+
+  /** 补偿删除本次写入失败的行与向量；清理失败只记录日志，原始错误仍由调用方抛出 */
+  private async compensateInsertedRows(
+    datasetId: string,
+    meta: Pick<DatabaseDefinition, 'dataTableName'>,
+    rowIds: string[]
+  ): Promise<void> {
+    if (rowIds.length === 0) return
+    const failures: string[] = []
+    for (const rowId of rowIds) {
+      try {
+        await this.vectorService.deleteByRowId(datasetId, rowId)
+      } catch (e: any) {
+        failures.push(`vector:${rowId}:${e?.message ?? e}`)
+      }
+    }
+    const client = await pool.connect()
+    try {
+      await client.query(`SET search_path TO ${schemaName}, public`)
+      await client.query(`DELETE FROM ${schemaName}.${meta.dataTableName} WHERE id = ANY($1::text[])`, [rowIds])
+    } catch (e: any) {
+      failures.push(`rows:${e?.message ?? e}`)
+    } finally {
+      client.release()
+    }
+    if (failures.length) {
+      console.error('[database] insert compensation incomplete, manual reconcile required:', failures.slice(0, 5))
+    }
+  }
+
+  /**
+   * 索引名称冲突检查（建库前）：物理向量表、注册表索引名或数据表名已被占用时拒绝，避免数据串库。
+   * 冲突时抛出 code=INDEX_NAME_CONFLICT，路由映射为 409。
+   */
+  private async assertIndexNameAvailable(id: string, indexName: string, dataTableName: string): Promise<void> {
+    const client = await pool.connect()
+    try {
+      await client.query(`SET search_path TO ${schemaName}, public`)
+      const registry = await client.query(
+        `SELECT id FROM ${schemaName}.databases WHERE index_name = $1 OR data_table_name = $2 LIMIT 1`,
+        [indexName, dataTableName]
       )
-      wave.sort((a, c) => a.i - c.i)
-      for (const { tasks } of wave) {
-        chunkTasks.push(...tasks)
+      const kb = await client
+        .query(`SELECT id FROM ${schemaName}.knowledge_bases WHERE index_name = $1 LIMIT 1`, [indexName])
+        .catch(() => ({ rows: [] as unknown[] }))
+      const physical = await client.query(`SELECT to_regclass($1) AS reg`, [`${schemaName}.${indexName}`])
+      if (registry.rows.length || kb.rows.length || physical.rows[0]?.reg) {
+        throw Object.assign(
+          new Error(`Dataset "${id}" conflicts with existing index "${indexName}"`),
+          { code: 'INDEX_NAME_CONFLICT' }
+        )
       }
+    } finally {
+      client.release()
     }
-
-    const model = createEmbeddingModel(meta.embeddingModel)
-    for (let off = 0; off < chunkTasks.length; off += EMBEDDING_UPSERT_BATCH_SIZE) {
-      const slice = chunkTasks.slice(off, off + EMBEDDING_UPSERT_BATCH_SIZE)
-      const { embeddings } = await embedMany({
-        model,
-        values: slice.map((t) => t.text)
-      })
-      if (embeddings.length !== slice.length) {
-        throw new Error('Embedding count does not match chunk count')
-      }
-
-      const vectorMetas = slice.map((t) => {
-        const payload: Record<string, unknown> = {
-          rowId: t.rowId,
-          chunkIndex: t.chunkIndex,
-          text: t.text
-        }
-        for (const col of columns) {
-          if (col.name in t.rec) payload[col.name] = t.rec[col.name]
-        }
-        return payload
-      })
-      const vectorIds = slice.map((t) => DatabaseService.rowChunkVectorId(t.rowId, t.chunkIndex))
-      await this.vectorService.upsertVectors(datasetId, embeddings, vectorMetas as any, vectorIds)
-    }
-
-    const rows = await this.getRowsByIdsOrdered(meta, rowIds)
-    return { count: rows.length, rows }
   }
 
   async getDatabase(id: string, options?: { includeStats?: boolean }): Promise<DatabaseDefinition | null> {
@@ -904,7 +1185,7 @@ CREATE TABLE IF NOT EXISTS ${schemaName}.${dataTableName} (
         throw new Error(`Unknown column: ${key}`)
       }
       assertSafeIdentifier(key)
-      sets.push(`${key} = $${i++}`)
+      sets.push(`"${key}" = $${i++}`)
       values.push(val)
     }
 

@@ -71,6 +71,69 @@ describe("DatabaseService", () => {
     service = new DatabaseService({} as never, {} as never);
   });
 
+  describe("索引文本序列化（F05：字段边界）", () => {
+    it("行文本带字段名标签与换行边界", () => {
+      const text = (service as any).embeddingTextFromRecord(
+        { title: "订单服务", desc: "处理订单创建" },
+        [{ name: "title" }, { name: "desc" }],
+      );
+      expect(text).toBe("title: 订单服务\ndesc: 处理订单创建");
+    });
+
+    it("null 与空白字段跳过，数值字段独立不粘连", () => {
+      const text = (service as any).embeddingTextFromRecord(
+        { qty: 5, amount: 45000, note: "  ", region: null },
+        [{ name: "qty" }, { name: "amount" }, { name: "note" }, { name: "region" }],
+      );
+      expect(text).toBe("qty: 5\namount: 45000");
+      expect(text).not.toContain("545000");
+    });
+  });
+
+  describe("向量化策略任务生成", () => {
+    const cols = [{ name: "name" }, { name: "desc" }];
+    const rec = { id: "r1", name: "库存管理", desc: "管理库存数量与出入库" };
+
+    it("row 策略：整行单向量，无 field 标记", async () => {
+      const tasks = await (service as any).buildIndexTasks(
+        "ds1",
+        { vectorStrategy: "row", defaultChunkStrategy: "none", defaultChunkConfig: undefined, columnDefinitions: cols },
+        rec,
+        { chunkPlainText: async () => [{ text: "t" }] },
+      );
+      expect(tasks.length).toBe(1);
+      expect(tasks[0].field).toBeUndefined();
+      expect(tasks[0].vectorId).toBe("r1__c0");
+    });
+
+    it("field 策略：每字段一向量，带 field 标记与 __f_ 向量 id", async () => {
+      const tasks = await (service as any).buildIndexTasks(
+        "ds1",
+        { vectorStrategy: "field", defaultChunkStrategy: "none", columnDefinitions: cols },
+        rec,
+        { chunkPlainText: async (t: string) => [{ text: t }] },
+      );
+      expect(tasks.length).toBe(2);
+      expect(tasks.map((t: any) => t.field).sort()).toEqual(["desc", "name"]);
+      for (const t of tasks) {
+        expect(t.vectorId).toMatch(/^r1__f_(name|desc)__c0$/);
+        expect(t.text).toMatch(/^(name|desc): /);
+      }
+    });
+
+    it("row+field 策略：行向量与字段向量并存且 id 不冲突", async () => {
+      const tasks = await (service as any).buildIndexTasks(
+        "ds1",
+        { vectorStrategy: "row+field", defaultChunkStrategy: "none", columnDefinitions: cols },
+        rec,
+        { chunkPlainText: async (t: string) => [{ text: t }] },
+      );
+      expect(tasks.length).toBe(3);
+      expect(new Set(tasks.map((t: any) => t.vectorId)).size).toBe(3);
+      expect(tasks.filter((t: any) => t.field === undefined).length).toBe(1);
+    });
+  });
+
   describe("hydrateSearchResults", () => {
     it("空结果直接返回空数组", async () => {
       const out = await service.hydrateSearchResults("ds1", []);

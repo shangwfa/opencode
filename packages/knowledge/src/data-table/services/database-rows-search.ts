@@ -21,6 +21,9 @@ import {
   DEFAULT_SEARCH_TYPE,
   DEFAULT_ENABLE_MULTI_STAGE,
   DEFAULT_ENABLE_RERANK,
+  DEFAULT_FUSION_METHOD,
+  DEFAULT_SEMANTIC_WEIGHT,
+  DEFAULT_KEYWORD_WEIGHT,
   SEARCH_ERROR_MESSAGES,
 } from "../../config/search.constants.js";
 import { getKnowledgeBaseIndexName } from "../../utils/index-name.js";
@@ -123,6 +126,16 @@ export interface DatabaseRowsSearchResponseBody {
   vectorSearch?: boolean;
   warning?: string;
   filteredCount?: number;
+  execution?: {
+    strategy: "sql-filter" | "semantic" | "keyword" | "hybrid" | "none";
+    recallStage?: string;
+    fusionMethod?: RowsSearchRequest["fusionMethod"];
+    hybridWeight?: { semantic: number; keyword: number };
+    branchResults?: Partial<Record<"semantic" | "keyword", number>>;
+    fusionApplied?: boolean;
+    vectorStrategy?: string;
+    searchFields?: string[];
+  };
 }
 
 /**
@@ -194,6 +207,53 @@ export async function runDatabaseRowsSearch(
   const embeddingModelName =
     ds.embeddingModel || "openai/text-embedding-3-small";
   const pgVectorMerged = mergePgVectorConfig(validated);
+  // F09：默认过滤零相关（score > 0），请求显式 minScore 优先——无关查询返回空结果而非满页 0 分行
+  if (pgVectorMerged.minScore === undefined) {
+    pgVectorMerged.minScore = 0;
+  }
+
+  // searchFields：仅 field / row+field 向量化策略 + plain semantic 支持
+  const vectorStrategy = ds.vectorStrategy ?? "row";
+  if (validated.searchFields?.length) {
+    if (vectorStrategy === "row") {
+      flushProfile(400, { reason: "search_fields_requires_field_strategy" });
+      return {
+        status: 400,
+        body: { message: "searchFields requires vectorStrategy 'field' or 'row+field' for this dataset" },
+      };
+    }
+    if (validated.searchType && validated.searchType !== "semantic") {
+      flushProfile(400, { reason: "search_fields_semantic_only" });
+      return {
+        status: 400,
+        body: { message: "searchFields currently requires searchType=semantic" },
+      };
+    }
+    const enhanced =
+      validated.recallConfig?.enableMultiStage === true ||
+      validated.recallConfig?.enableQueryExpansion === true ||
+      validated.hydeConfig?.enableHyDE === true ||
+      validated.multiQueryConfig?.enableMultiQuery === true;
+    if (enhanced) {
+      flushProfile(400, { reason: "search_fields_plain_semantic_only" });
+      return {
+        status: 400,
+        body: { message: "searchFields currently requires plain semantic search (no recall enhancements)" },
+      };
+    }
+    const colNames = new Set(ds.columnDefinitions.map((c) => c.name));
+    const unknown = validated.searchFields.filter((f) => !colNames.has(f));
+    if (unknown.length) {
+      flushProfile(400, { reason: "search_fields_unknown_column" });
+      return {
+        status: 400,
+        body: { message: `Unknown search field(s): ${unknown.join(", ")}` },
+      };
+    }
+  }
+  const searchFieldsFilter = validated.searchFields?.length
+    ? { field: { $in: validated.searchFields } }
+    : undefined;
 
   const hasQuery =
     validated.query != null && String(validated.query).trim().length > 0;
@@ -232,6 +292,7 @@ export async function runDatabaseRowsSearch(
         sqlFilter: true,
         mode: "filter",
         vectorSearch: false,
+        execution: { strategy: "sql-filter" },
       },
     };
   }
@@ -241,7 +302,8 @@ export async function runDatabaseRowsSearch(
   const enableRerank =
     validated.rerankConfig?.enableRerank ?? DEFAULT_ENABLE_RERANK;
   const enableMultiStage =
-    validated.recallConfig?.enableMultiStage ?? DEFAULT_ENABLE_MULTI_STAGE;
+    validated.recallConfig?.enableMultiStage ??
+    (searchType === "semantic" && DEFAULT_ENABLE_MULTI_STAGE);
   const enableMultiStageExplicitlySet =
     validated.recallConfig?.enableMultiStage !== undefined;
   const enableQueryExpansion =
@@ -250,13 +312,35 @@ export async function runDatabaseRowsSearch(
 
   validateRecallConfig(effectiveTopK, recallTopK);
 
-  if (enableMultiStage && searchType === "keyword") {
+  if (enableMultiStage && searchType !== "semantic") {
     flushProfile(400, { reason: "multi_stage_semantic_only" });
     return {
       status: 400,
       body: { message: SEARCH_ERROR_MESSAGES.MULTI_STAGE_SEMANTIC_ONLY },
     };
   }
+
+  if (searchType !== "semantic" && (
+    enableQueryExpansion || validated.hydeConfig?.enableHyDE ||
+    validated.multiQueryConfig?.enableMultiQuery
+  )) {
+    flushProfile(400, { reason: "query_enhancement_semantic_only" });
+    return { status: 400, body: {
+      message: "Query expansion, HyDE and multi-query currently require searchType=semantic",
+    } };
+  }
+
+  const semanticWeight = validated.hybridWeight?.semantic ?? DEFAULT_SEMANTIC_WEIGHT;
+  const keywordWeight = validated.hybridWeight?.keyword ?? DEFAULT_KEYWORD_WEIGHT;
+  if (searchType === "hybrid" && semanticWeight + keywordWeight === 0) {
+    flushProfile(400, { reason: "zero_hybrid_weights" });
+    return { status: 400, body: { message: "Hybrid weights must not both be zero" } };
+  }
+  const execution: NonNullable<DatabaseRowsSearchResponseBody["execution"]> = {
+    strategy: searchType,
+    vectorStrategy,
+    ...(validated.searchFields?.length ? { searchFields: validated.searchFields } : {}),
+  };
 
   let recallCount = calculateRecallTopK(effectiveTopK, enableRerank);
   if (hasFilter) {
@@ -299,6 +383,7 @@ export async function runDatabaseRowsSearch(
         mode: "combined",
         vectorSearch: true,
         warning: SEARCH_ERROR_MESSAGES.NO_RESULTS_FOUND,
+        execution: { strategy: "none" },
       };
       flushProfile(200, { allowedIds: 0, resultCount: 0 });
       return { status: 200, body: empty };
@@ -415,6 +500,7 @@ export async function runDatabaseRowsSearch(
         ? pgVectorMerged
         : undefined,
       embeddingModel: embeddingModelName,
+      filter: searchFieldsFilter,
     });
     results = applySqlFilter(results);
     recallStage = effectiveEnableMultiStage ? "multi-stage" : "single-stage";
@@ -429,10 +515,14 @@ export async function runDatabaseRowsSearch(
           datasetId,
           embedding,
           recallCount,
-          undefined,
+          searchFieldsFilter,
           Object.keys(pgVectorMerged).length ? pgVectorMerged : undefined,
         );
         results = formatVectorResults(vectorResults);
+        // 应用层双保险过滤（真实 vectorService.query 在 SQL 层亦有 score > minScore）
+        if (pgVectorMerged.minScore !== undefined) {
+          results = results.filter((r) => r.score > (pgVectorMerged.minScore as number));
+        }
         results = applySqlFilter(results);
         break;
       }
@@ -447,23 +537,37 @@ export async function runDatabaseRowsSearch(
         break;
       }
       case "hybrid": {
+        const fusionMethod = validated.fusionMethod ?? DEFAULT_FUSION_METHOD;
+        execution.fusionMethod = fusionMethod;
+        execution.hybridWeight = { semantic: semanticWeight, keyword: keywordWeight };
         results = await hybridSearchService.search(datasetId, queryText, {
-          semanticWeight: validated.hybridWeight?.semantic || 0.7,
-          keywordWeight: validated.hybridWeight?.keyword || 0.3,
+          semanticWeight,
+          keywordWeight,
           topK: recallCount,
           pgVectorConfig: Object.keys(pgVectorMerged).length
             ? pgVectorMerged
             : undefined,
           embeddingModel: embeddingModelName,
-          fusionMethod: validated.fusionMethod,
+          fusionMethod,
           rrfK: validated.rrfK,
+          debugCollector: ({ stage, results: hits }) => {
+            if (stage !== "semantic" && stage !== "keyword") return;
+            execution.branchResults ??= {};
+            execution.branchResults[stage] = hits.length;
+          },
         });
+        if (execution.branchResults?.semantic !== undefined &&
+            execution.branchResults?.keyword !== undefined) {
+          execution.fusionApplied = execution.branchResults.semantic > 0 &&
+            execution.branchResults.keyword > 0;
+        }
         results = applySqlFilter(results);
         break;
       }
     }
   }
   markStage("recall");
+  execution.recallStage = recallStage;
 
   if (enableRerank && results.length > 0) {
     results = await rerankService.rerank(queryText, results, {
@@ -507,7 +611,8 @@ export async function runDatabaseRowsSearch(
         reranked,
         sqlFilter: !!hasFilter,
         mode: hasFilter ? "combined" : "query",
-        vectorSearch: true,
+         vectorSearch: true,
+        execution,
       };
 
   if (!qualityCheck.isHighQuality && qualityCheck.message) {
@@ -526,6 +631,7 @@ export async function runDatabaseRowsSearch(
     reranked,
     resultCountBeforeLimit: results.length,
     resultCount: withVectorId.length,
+    execution,
   });
   return { status: 200, body: response };
 }

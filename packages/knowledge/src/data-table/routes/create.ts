@@ -15,14 +15,15 @@ export const createDatabase = new Hono().post('/', async (c) => {
       data
     })
   } catch (error: any) {
+    const status = error.code === 'INDEX_NAME_CONFLICT' ? 409 : 400
     return c.json(
       {
-        code: 400,
+        code: status,
         success: false,
         message: error.message || 'Failed to create dataset',
         data: null
       },
-      400
+      status
     )
   }
 })

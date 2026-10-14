@@ -46,10 +46,10 @@ export const listDatabaseRows = new Hono().get('/:id/rows', async (c) => {
       filter: parseFilterQuery(c.req.url)
     })
 
-    if (validated.page && validated.page < 1) {
+    if (validated.page < 1) {
       return c.json({ code: 400, success: false, message: 'page must be >= 1', data: null }, 400)
     }
-    if (validated.pageSize && (validated.pageSize < 1 || validated.pageSize > 200)) {
+    if (validated.pageSize < 1 || validated.pageSize > 200) {
       return c.json(
         { code: 400, success: false, message: 'pageSize must be between 1 and 200', data: null },
         400
