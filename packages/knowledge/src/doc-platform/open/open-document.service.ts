@@ -281,11 +281,12 @@ export class OpenDocumentService {
         bytes,
         sourceUrl,
       );
-      const upload = createPresignedPut({
+      const upload = await createPresignedPut({
         fileName: generatedResourceFileName(bytes, contentType),
         fileSize: bytes.length,
         contentType,
         contextId: uploadContextId,
+        envCode: params.context.envCode,
       });
       // v1: putResourceBytes(upload.uploadUrl, bytes) —— 本地签名直传同域,此处服务端直接 PUT
       const put = await fetch(upload.uploadUrl, {
@@ -842,11 +843,12 @@ export class OpenDocumentService {
       assertPermission(context, "create");
     }
 
-    const upload = createPresignedPut({
+    const upload = await createPresignedPut({
       fileName: input.fileName,
       fileSize: input.fileSize,
       contentType: input.contentType,
       contextId: input.docUniqueId ?? temporaryUploadContextId(currentRequestId),
+      envCode: context.envCode,
     });
     let readPath: string | undefined;
     if (upload.readUrl) {
