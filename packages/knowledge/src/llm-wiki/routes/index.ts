@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { wikiCompile } from './wiki-compile'
-import { wikiCompileStatus } from './wiki-compile-status'
+import { wikiCompileStatus, wikiCompileRetry, wikiCompileCancel } from './wiki-compile-status'
 import { wikiSearch } from './wiki-search'
 import { wikiCollectionCreate } from './wiki-collection-create'
 import { wikiCollectionList } from './wiki-collection-list'
@@ -9,6 +9,8 @@ import { wikiCollectionDelete } from './wiki-collection-delete'
 import { wikiConceptGet } from './wiki-concept-get'
 import { wikiNavigate, wikiNavigateConcepts, wikiNavigateGraphStats } from './wiki-navigate'
 import { wikiLintRun, wikiLintGet } from './wiki-lint'
+import { wikiRevisions } from './wiki-revisions'
+import { wikiActivity } from './wiki-activity'
 
 export { wikiCompile } from './wiki-compile'
 export { wikiCompileStatus } from './wiki-compile-status'
@@ -28,6 +30,8 @@ export { wikiLintRun, wikiLintGet } from './wiki-lint'
 export const llmWikiApp = new Hono()
   .route('/', wikiCompile)
   .route('/', wikiCompileStatus)
+  .route('/', wikiCompileRetry)
+  .route('/', wikiCompileCancel)
   .route('/', wikiSearch)
   .route('/', wikiCollectionCreate)
   .route('/', wikiCollectionList)
@@ -39,5 +43,7 @@ export const llmWikiApp = new Hono()
   .route('/', wikiNavigateGraphStats)
   .route('/', wikiLintRun)
   .route('/', wikiLintGet)
+  .route('/', wikiRevisions)
+  .route('/', wikiActivity)
 
 export type LlmWikiAppType = typeof llmWikiApp

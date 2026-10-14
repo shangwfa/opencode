@@ -17,6 +17,8 @@ mock.module('../../../providers/llm.js', () => ({
 }))
 
 mock.module('../../db/index.js', () => {
+  const mockPoolQuery = mock(async () => ({ rows: [], rowCount: 0 }))
+  const mockClientQuery = mock(async () => ({ rows: [], rowCount: 0 }))
   const mockDb = {
     insert: mock(),
     select: mock(),
@@ -67,6 +69,8 @@ mock.module('../../db/index.js', () => {
   }
 
   const mockWikiConcepts = {
+    revision: 'revision',
+    citationStatus: 'citation_status',
     id: 'id',
     collectionId: 'collection_id',
     conceptName: 'concept_name',
@@ -99,7 +103,8 @@ mock.module('../../db/index.js', () => {
     startedAt: 'started_at',
     completedAt: 'completed_at',
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at', documentId: 'document_id', workerId: 'worker_id', leaseExpiresAt: 'lease_expires_at',
+    heartbeatAt: 'heartbeat_at', attempt: 'attempt'
   }
 
   const mockWikiRelationships = {
@@ -114,20 +119,30 @@ mock.module('../../db/index.js', () => {
 
   return {
     db: mockDb,
-    pool: { query: mock(() => ({ rows: [] })) },
+    pool: {
+      query: mockPoolQuery,
+      connect: mock(async () => ({ query: mockClientQuery, release: mock() })),
+    },
+    __mockClientQuery: mockClientQuery,
     schemaName: 'test',
     documents: mockDocuments,
     wikiCollections: mockWikiCollections,
     wikiConcepts: mockWikiConcepts,
     wikiConceptSources: mockWikiConceptSources,
     wikiCompileTasks: mockWikiCompileTasks,
-    wikiRelationships: mockWikiRelationships
+    wikiRelationships: mockWikiRelationships,
+    wikiPageRevisions: {},
+    wikiActivityLog: {},
+    wikiSchemas: { id: 'id', collectionId: 'collection_id', version: 'version', config: 'config', createdAt: 'created_at' }
   }
 })
 
 mock.module('drizzle-orm', () => ({
   eq: mock((field: any, value: any) => ({ field, value, type: 'eq' })),
   and: mock((...conditions: any[]) => ({ conditions, type: 'and' })),
+  inArray: mock((field: any, values: any[]) => ({ field, values, type: 'inArray' })),
+  or: mock((...conditions: any[]) => ({ conditions, type: 'or' })),
+  desc: mock((field: any) => ({ field, type: 'desc' })),
   sql: mock((template: any, ...params: any[]) => ({ template, params }))
 }))
 
@@ -135,8 +150,12 @@ mock.module('drizzle-orm', () => ({
 const { WikiCompilerService } = await import('../../services/wiki-compiler.service.js')
 const dbMod: any = await import('../../db/index.js')
 const db = dbMod.db
+const mockPoolQuery: any = dbMod.pool.query
+const mockClientQuery: any = dbMod.__mockClientQuery
 // mock.module('ai') 后运行时是 mock 函数，断言用 any 规避真实类型
 const generateText: any = (await import('ai')).generateText
+const { buildSourceManifest } = await import('../../services/wiki-provenance.js')
+const unitManifest = buildSourceManifest({ id: 'unit-doc', knowledgeBaseId: 'kb', type: 'markdown', content: '机器学习是一种 AI 技术。' })
 
 describe('WikiCompilerService', () => {
   let service: any
@@ -154,6 +173,8 @@ describe('WikiCompilerService', () => {
 
   beforeEach(() => {
     mock.clearAllMocks()
+    mockPoolQuery.mockResolvedValue({ rows: [], rowCount: 0 })
+    mockClientQuery.mockResolvedValue({ rows: [], rowCount: 0 })
 
     mockWikiCollectionService = {
       getOrCreateCollection: mock().mockResolvedValue(mockCollection),
@@ -167,67 +188,30 @@ describe('WikiCompilerService', () => {
 
   describe('compileKnowledgeBase', () => {
     it('应该成功创建编译任务并返回 taskId', async () => {
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([])
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
-
-      const mockInsertChain = {
-        values: mock().mockResolvedValue([])
-      }
-      db.insert.mockReturnValue(mockInsertChain as any)
+      // 此处只验证任务创建契约，后台编译由独立用例验证。
+      service.runCompilation = mock().mockResolvedValue(undefined)
 
       const taskId = await service.compileKnowledgeBase('kb_test_123')
 
       expect(taskId).toMatch(/^wiki_task_/)
       expect(mockWikiCollectionService.getOrCreateCollection).toHaveBeenCalledWith('kb_test_123')
-      expect(db.insert).toHaveBeenCalled()
-      expect(mockInsertChain.values).toHaveBeenCalledWith(
-        expect.objectContaining({
-          collectionId: mockCollection.id,
-          knowledgeBaseId: 'kb_test_123',
-          status: 'running'
-        })
-      )
+      expect(mockClientQuery.mock.calls.some(([query]: any[]) => String(query).includes('INSERT INTO test.wiki_compile_tasks'))).toBe(true)
     })
 
     it('当有正在运行的任务时应该抛出错误', async () => {
-      const mockRunningTask = {
-        id: 'wiki_task_existing',
-        collectionId: mockCollection.id,
-        status: 'running'
-      }
-
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([mockRunningTask])
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
+      mockClientQuery.mockImplementation(async (query: string) => String(query).includes('SELECT id FROM test.wiki_compile_tasks')
+        ? { rows: [{ id: 'wiki_task_existing' }], rowCount: 1 } : { rows: [], rowCount: 0 })
 
       await expect(service.compileKnowledgeBase('kb_test_123')).rejects.toThrow(
         'already has a running compile task'
       )
 
-      expect(db.insert).not.toHaveBeenCalled()
+      expect(mockClientQuery.mock.calls.some(([query]: any[]) => String(query).includes('INSERT INTO test.wiki_compile_tasks'))).toBe(false)
     })
 
     it('应该立即返回 taskId（不等待后台编译完成）', async () => {
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([])
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
-
-      const mockInsertChain = {
-        values: mock().mockResolvedValue([])
-      }
-      db.insert.mockReturnValue(mockInsertChain as any)
-
       const startTime = Date.now()
+      service.runCompilation = mock().mockResolvedValue(undefined)
       const taskId = await service.compileKnowledgeBase('kb_test_123')
       const elapsed = Date.now() - startTime
 
@@ -238,18 +222,7 @@ describe('WikiCompilerService', () => {
 
   describe('hasRunningTask', () => {
     it('当有正在运行的任务时应该返回 true', async () => {
-      const mockRunningTask = {
-        id: 'wiki_task_running',
-        collectionId: mockCollection.id,
-        status: 'running'
-      }
-
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([mockRunningTask])
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }], rowCount: 1 })
 
       const result = await service.hasRunningTask(mockCollection.id)
 
@@ -257,25 +230,13 @@ describe('WikiCompilerService', () => {
     })
 
     it('当没有正在运行的任务时应该返回 false', async () => {
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([])
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
-
       const result = await service.hasRunningTask(mockCollection.id)
 
       expect(result).toBe(false)
     })
 
     it('数据库查询失败时应该抛出错误', async () => {
-      const mockSelectChain = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockRejectedValue(new Error('DB connection failed'))
-      }
-      db.select.mockReturnValue(mockSelectChain as any)
+      mockPoolQuery.mockRejectedValueOnce(new Error('DB connection failed'))
 
       await expect(service.hasRunningTask(mockCollection.id)).rejects.toThrow(
         'Failed to check running task'
@@ -334,6 +295,47 @@ describe('WikiCompilerService', () => {
   })
 
   describe('extractConceptsWithRetry', () => {
+    it('截断时记录失败原因与用量，最终返回 null', async () => {
+      const truncated = { text: '{"concepts":[{"concept":"A"', finishReason: 'length', usage: { outputTokens: 2000, reasoningTokens: 1812 } }
+      generateText.mockResolvedValueOnce(truncated as any)
+      generateText.mockResolvedValueOnce({ ...truncated, usage: { outputTokens: 2000, reasoningTokens: 1790 } } as any)
+
+      expect(await service.extractConceptsWithRetry('文档', [], 'doc_len')).toBeNull()
+
+      expect(service.getExtractionFailure('doc_len')).toMatchObject({
+        reason: 'truncated', finishReason: 'length', outputTokens: 2000, reasoningTokens: 1790, attempt: 2
+      })
+    })
+
+    it('无 JSON 与结构不合法分别归类', async () => {
+      generateText.mockResolvedValueOnce({ text: '没有任何结构化输出', finishReason: 'stop' } as any)
+      generateText.mockResolvedValueOnce({ text: '没有任何结构化输出', finishReason: 'stop' } as any)
+      await service.extractConceptsWithRetry('文档', [], 'doc_nojson')
+      expect(service.getExtractionFailure('doc_nojson')?.reason).toBe('no_json')
+
+      generateText.mockResolvedValueOnce({ text: '{"x":1}', finishReason: 'stop' } as any)
+      generateText.mockResolvedValueOnce({ text: '{"x":1}', finishReason: 'stop' } as any)
+      await service.extractConceptsWithRetry('文档', [], 'doc_schema')
+      expect(service.getExtractionFailure('doc_schema')?.reason).toBe('invalid_output')
+    })
+
+    it('重试成功后清除该文档此前的失败记录', async () => {
+      generateText.mockResolvedValueOnce({ text: '没有结构', finishReason: 'stop' } as any)
+      generateText.mockResolvedValueOnce({ text: JSON.stringify({ concepts: [] }), finishReason: 'stop' } as any)
+
+      expect(await service.extractConceptsWithRetry('文档', [], 'doc_ok')).toEqual([])
+      expect(service.getExtractionFailure('doc_ok')).toBeUndefined()
+    })
+
+    it('输出预算必须覆盖推理模型的推理 token（实测 1812 推理 token 时 2000 预算被截断）', async () => {
+      generateText.mockResolvedValueOnce({ text: JSON.stringify({ concepts: [] }) } as any)
+
+      await (service as any).extractConceptsWithRetry('文档内容', [], 'doc_budget')
+
+      const options = generateText.mock.calls.at(-1)[0]
+      expect(options.maxOutputTokens).toBeGreaterThanOrEqual(4000)
+    })
+
     it('LLM 首次返回有效概念时应该直接返回，不触发重试', async () => {
       const validResponse = JSON.stringify({
         concepts: [
@@ -388,8 +390,9 @@ describe('WikiCompilerService', () => {
       expect(result[0].concept).toBe('深度学习')
     })
 
-    it('两次 LLM 调用都失败时应该返回 null', async () => {
-      generateText.mockRejectedValue(new Error('API rate limit exceeded'))
+    it('两次 LLM 调用都失败时应该返回 null（限流错误除外，限流会透传中断批次）', async () => {
+      // 注意：不能使用含 "rate limit"/"速率限制" 的文案，那类错误会透传中断批次（见限流识别用例）。
+      generateText.mockRejectedValue(new Error('API server overloaded'))
 
       const result = await (service as any).extractConceptsWithRetry(
         '文档内容...',
@@ -417,94 +420,44 @@ describe('WikiCompilerService', () => {
       expect(generateText).toHaveBeenCalledTimes(2)
       expect(result).toEqual([])
     })
-  })
 
-  describe('storeConcept - 哈希比较和跳过逻辑', () => {
-    it('概念不存在时应该插入新概念和来源记录', async () => {
-      const mockSelectChainEmpty = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([]),
-      }
-
-      db.select        .mockReturnValueOnce(mockSelectChainEmpty as any)
-        .mockReturnValueOnce(mockSelectChainEmpty as any)
-
-      const mockInsertChain = {
-        values: mock().mockResolvedValue([])
-      }
-      db.insert.mockReturnValue(mockInsertChain as any)
-
-      const concept = {
-        concept: '测试概念',
-        summary: '这是测试概念的摘要',
-        is_new: true,
-        tags: ['测试'],
-        related_concepts: []
-      }
-
-      await (service as any).storeConcept(concept, mockCollection.id, 'doc_001', 'hash_abc123')
-
-      expect(db.insert).toHaveBeenCalledTimes(2)
+    it('合法空概念列表应直接返回，不执行额外重试', async () => {
+      generateText.mockResolvedValue({ text: '{"concepts":[]}' })
+      expect(await service.extractConceptsWithRetry('文档', [], 'doc-empty')).toEqual([])
+      expect(generateText).toHaveBeenCalledTimes(1)
     })
 
-    it('概念已存在时应该更新 occurrence_count 而不是插入新记录', async () => {
-      const existingConcept = {
-        id: 'wiki_concept_existing',
-        collectionId: mockCollection.id,
-        conceptName: '已有概念',
-        slug: 'existing-concept',
-        occurrenceCount: 3
-      }
-
-      const mockSelectChainWithConcept = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([existingConcept]),
-      }
-
-      const mockSelectChainEmpty = {
-        from: mock().mockReturnThis(),
-        where: mock().mockReturnThis(),
-        limit: mock().mockResolvedValue([]),
-      }
-
-      db.select        .mockReturnValueOnce(mockSelectChainWithConcept as any)
-        .mockReturnValueOnce(mockSelectChainEmpty as any)
-
-      const mockInsertChain = {
-        values: mock().mockResolvedValue([])
-      }
-      db.insert.mockReturnValue(mockInsertChain as any)
-
-      const mockUpdateChain = {
-        set: mock().mockReturnThis(),
-        where: mock().mockResolvedValue([])
-      }
-      db.update.mockReturnValue(mockUpdateChain as any)
-
-      const concept = {
-        concept: '已有概念',
-        summary: '这个概念已经存在',
-        is_new: false,
-        tags: [],
-        related_concepts: []
-      }
-
-      await (service as any).storeConcept(concept, mockCollection.id, 'doc_002', 'hash_def456')
-
-      expect(db.insert).toHaveBeenCalledTimes(1)
-      expect(db.update).toHaveBeenCalled()
-      expect(mockUpdateChain.set).toHaveBeenCalledWith(
-        expect.objectContaining({ occurrenceCount: 4 })
-      )
+    it('两次返回无效 JSON 时应返回 null，不撤销已有概念', async () => {
+      generateText.mockResolvedValue({ text: 'invalid' })
+      expect(await service.extractConceptsWithRetry('文档', [], 'doc-invalid')).toBeNull()
+      expect(generateText).toHaveBeenCalledTimes(2)
     })
   })
 
   describe('Phase 2 - 页面生成', () => {
-    it('generateConceptPage 成功时更新 content 字段', async () => {
+    it('页面输出预算必须覆盖推理 token 与带引文的长页面（实测 3000 预算下草稿被截断为无效）', async () => {
+      generateText.mockResolvedValueOnce({ text: JSON.stringify({ sections: [] }) } as any)
+
+      await (service as any).generatePageDraft('机器学习', [unitManifest], [])
+
+      const options = generateText.mock.calls.at(-1)[0]
+      expect(options.maxOutputTokens).toBeGreaterThanOrEqual(12000)
+    })
+
+    it('草稿解析失败时记录 finishReason 与用量，不再是无声 null', async () => {
+      generateText.mockResolvedValueOnce({ text: '{"sections":[{"heading":"a","content":"b', finishReason: 'length', usage: { outputTokens: 3000, reasoningTokens: 2400 } } as any)
+
+      const draft = await (service as any).generatePageDraft('机器学习', [unitManifest], [])
+
+      expect(draft).toBeNull()
+      expect(service.getPageFailure('机器学习')).toMatchObject({
+        reason: 'truncated', finishReason: 'length', outputTokens: 3000, reasoningTokens: 2400
+      })
+    })
+    it('页面先生成草稿，成功时也不提前写数据库', async () => {
       const validPageResponse = JSON.stringify({
-        sections: [{ heading: '概述', content: '机器学习是一种 AI 技术。', sourceRefs: [] }],
+        sections: [{ heading: '概述', content: '机器学习是一种 AI 技术。', sourceRefs: [unitManifest.blocks[0].refId],
+          claims: [{ statement: '机器学习是一种 AI 技术。', evidence: [{ refId: unitManifest.blocks[0].refId, quote: '机器学习是一种 AI 技术。' }] }] }],
         relatedConcepts: []
       })
 
@@ -512,37 +465,41 @@ describe('WikiCompilerService', () => {
 
       const mockUpdateChain = {
         set: mock().mockReturnThis(),
-        where: mock().mockResolvedValue([])
+        where: mock().mockReturnValue({ returning: mock().mockResolvedValue([{ id: 'wiki_task_test' }]) })
       }
       db.update.mockReturnValue(mockUpdateChain as any)
 
-      const result = await service.generateConceptPage(
-        'wiki_concept_001',
+      const result = await service.generatePageDraft(
         '机器学习',
-        ['文档内容：介绍机器学习的基本概念'],
-        []
+        [unitManifest],
+        [],
+        { sections: [{ heading: '旧页', content: '旧知识' }] },
       )
 
-      expect(result).toBe(true)
+      expect(result.sections[0].content).toBe('机器学习是一种 AI 技术。')
       expect(generateText).toHaveBeenCalledTimes(1)
-      expect(db.update).toHaveBeenCalled()
-      expect(mockUpdateChain.set).toHaveBeenCalledWith(
-        expect.objectContaining({ updatedAt: expect.any(Date) })
-      )
+      expect(generateText.mock.calls[0][0].system).toContain('旧知识')
+      expect(db.update).not.toHaveBeenCalled()
     })
 
-    it('generateConceptPage LLM 返回无效内容时返回 false', async () => {
+    it('页面生成失败不提前发布内容或来源哈希', async () => {
       generateText.mockResolvedValueOnce({ text: '这不是有效的 JSON 格式' } as any)
 
-      const result = await service.generateConceptPage(
-        'wiki_concept_002',
+      const result = await service.generatePageDraft(
         '深度学习',
-        ['文档内容'],
+        [unitManifest],
         []
       )
 
-      expect(result).toBe(false)
+      expect(result).toBeNull()
       expect(db.update).not.toHaveBeenCalled()
+      expect(db.insert).not.toHaveBeenCalled()
+    })
+
+    it('来源过长时拒绝静默截断', async () => {
+      const result = await service.generatePageDraft('长概念', [buildSourceManifest({ id: 'long', knowledgeBaseId: 'kb', content: '甲'.repeat(30001) })])
+      expect(result).toBeNull()
+      expect(generateText).not.toHaveBeenCalled()
     })
 
     it('buildRelationships 正确建立概念间关系', async () => {
@@ -630,11 +587,19 @@ describe('WikiCompilerService', () => {
 
       const mockUpdateChain = {
         set: mock().mockReturnThis(),
-        where: mock().mockResolvedValue([])
+        where: mock().mockReturnValue({ returning: mock().mockResolvedValue([{ id: 'wiki_task_test' }]) })
       }
       db.update.mockReturnValue(mockUpdateChain as any)
 
-      db.select        // 第1次：获取文档列表
+      db.select
+        // 第0次：用户可编辑 schema 读取（未配置 → 默认）
+        .mockReturnValueOnce({
+          from: mock().mockReturnThis(),
+          where: mock().mockReturnValue({
+            orderBy: mock().mockReturnValue({ limit: mock().mockResolvedValue([]) })
+          })
+        } as any)
+        // 第1次：获取文档列表
         .mockReturnValueOnce({
           from: mock().mockReturnThis(),
           where: mock().mockResolvedValue([mockDoc])
@@ -642,13 +607,12 @@ describe('WikiCompilerService', () => {
         // 第2次：获取已有概念名称（用于提示词去重）
         .mockReturnValueOnce({
           from: mock().mockReturnThis(),
-          where: mock().mockResolvedValue([])
+          where: mock().mockResolvedValue([{ id: 'wiki_concept_001', conceptName: '知识库', slug: '知识库', status: 'compiled', citationStatus: 'verified', revision: 1, updatedAt: new Date() }])
         } as any)
-        // 第3次：查询该文档的来源记录（判断哈希是否相同）
+        // 第3次：查询本集合的全部来源（判断哈希是否相同）
         .mockReturnValueOnce({
           from: mock().mockReturnThis(),
-          where: mock().mockReturnThis(),
-          limit: mock().mockResolvedValue([mockExistingSource])
+          where: mock().mockResolvedValue([mockExistingSource])
         } as any)
         // 第4次：Phase 2 查询集合中所有概念（allConceptsInCollection）
         .mockReturnValueOnce({
@@ -659,6 +623,108 @@ describe('WikiCompilerService', () => {
       await (service as any).runCompilation('wiki_task_test', mockCollection.id, 'kb_test_123')
 
       expect(generateText).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('限流识别与并发递减', () => {
+    it('识别中文速率限制、429 与 1302 错误码，且穿透 cause 与 errors 链', async () => {
+      const { isRateLimitError } = await import('../../services/wiki-compiler.service.js')
+      expect(isRateLimitError(new Error('Failed after 3 attempts. Last error: 您的账户已达到速率限制，请您控制请求频率'))).toBe(true)
+      expect(isRateLimitError(Object.assign(new Error('Too many requests'), { statusCode: 429 }))).toBe(true)
+      expect(isRateLimitError(Object.assign(new Error('provider error'), { data: { error: { code: '1302', message: '限流' } } }))).toBe(true)
+      expect(isRateLimitError({ message: 'outer', cause: new Error('rate limit exceeded') })).toBe(true)
+      expect(isRateLimitError({ message: 'retry', errors: [new Error('x'), Object.assign(new Error('y'), { statusCode: 429 })] })).toBe(true)
+      expect(isRateLimitError(new Error('受控提取失败'))).toBe(false)
+      expect(isRateLimitError(Object.assign(new Error('Invalid JSON'), { data: { error: { code: '400' } } }))).toBe(false)
+      expect(isRateLimitError(null)).toBe(false)
+    })
+
+    it('并发恒定：限流已由快速失败与任务中断保护，不再按 attempt 递减（曾致重试越跑越慢）', async () => {
+      const { resolveConcurrency, WikiCompilerService } = await import('../../services/wiki-compiler.service.js')
+      expect(resolveConcurrency(8, 1)).toBe(8)
+      expect(resolveConcurrency(8, 2)).toBe(8)
+      expect(resolveConcurrency(8, 5)).toBe(8)
+      expect(resolveConcurrency(2, 3)).toBe(2)
+      expect(WikiCompilerService.DEFAULT_PAGE_CONCURRENCY).toBe(2)
+    })
+
+    it('部分发布阈值：小批量不容忍失败；规模后容忍 ≤5%', async () => {
+      const { allowPartialPublish } = await import('../../services/wiki-compiler.service.js')
+      expect(allowPartialPublish(2, 1)).toBe(false)     // 小批量：1/2 失败整批拒绝（WM04 语义）
+      expect(allowPartialPublish(10, 1)).toBe(false)    // 10 页容忍度 0（floor(0.5)=0）
+      expect(allowPartialPublish(176, 3)).toBe(true)    // 1.7% 顽固页部分发布
+      expect(allowPartialPublish(200, 10)).toBe(true)   // 恰好 5%
+      expect(allowPartialPublish(176, 9)).toBe(false)   // 超阈值整批拒绝
+    })
+  })
+
+  describe('durable task 领取与重试上限', () => {
+    it('领取 SQL 必须带 attempt 上限条件，领取成功后执行编译', async () => {
+      service.runCompilation = mock().mockResolvedValue(undefined)
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ id: 'wiki_task_durable', collection_id: 'col', knowledge_base_id: 'kb', document_id: 'doc_a' }], rowCount: 1 })
+
+      await (service as any).claimTask('wiki_task_durable')
+
+      const claimSql = mockPoolQuery.mock.calls.map((call: any[]) => String(call[0])).find((sql: string) => sql.includes('worker_id=$2'))
+      expect(claimSql).toContain('attempt < $4')
+      expect(claimSql).toContain('lease_expires_at < NOW()')
+      expect(service.runCompilation).toHaveBeenCalledWith('wiki_task_durable', 'col', 'kb', 'doc_a', expect.stringContaining('wiki-worker'), expect.any(Number))
+    })
+
+    it('恢复扫描先把超限过期任务标 failed，再领取剩余任务', async () => {
+      await service.recoverAvailableTasks()
+
+      const markFailedSql = String(mockPoolQuery.mock.calls[0][0])
+      expect(markFailedSql).toContain("status='failed'")
+      expect(markFailedSql).toContain('attempt >= $1')
+      expect(markFailedSql).toContain('lease_expires_at < NOW()')
+      const scanSql = String(mockPoolQuery.mock.calls[1][0])
+      expect(scanSql).toContain('SELECT id')
+    })
+
+    it('getCompileTask 透传 documentId 与 attempt', async () => {
+      const mockTask = {
+        id: 'wiki_task_doc',
+        collectionId: mockCollection.id,
+        knowledgeBaseId: 'kb_test_123',
+        status: 'running',
+        progress: { total: 1, processed: 0, skipped: 0, failed: 0, extracted: 0 },
+        documentId: 'doc_a',
+        attempt: 2,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      db.select.mockReturnValue({
+        from: mock().mockReturnThis(),
+        where: mock().mockResolvedValue([mockTask])
+      } as any)
+
+      const result = await service.getCompileTask('wiki_task_doc')
+
+      expect(result?.documentId).toBe('doc_a')
+      expect(result?.attempt).toBe(2)
+    })
+  })
+
+  describe('失败任务重试', () => {
+    it('只重排失败且未超限、同集合无其它活跃任务的任务；人工重试重置 attempt（防毒丸上限仅约束自动恢复）', async () => {
+      service.claimTask = mock().mockResolvedValue(undefined)
+      mockPoolQuery.mockResolvedValueOnce({ rows: [{ collection_id: 'col' }], rowCount: 1 })
+
+      expect(await service.retryCompileTask('wiki_task_failed')).toBe(true)
+
+      const sql = String(mockPoolQuery.mock.calls[0][0])
+      expect(sql).toContain("status='failed'")
+      expect(sql).toContain("status='pending'")
+      expect(sql).toContain('attempt=0')
+      expect(sql).toContain("t2.status IN ('pending','running')")
+      expect(service.claimTask).toHaveBeenCalledWith('wiki_task_failed')
+    })
+
+    it('不是失败任务时返回 false 且不领取', async () => {
+      service.claimTask = mock().mockResolvedValue(undefined)
+      expect(await service.retryCompileTask('wiki_task_running')).toBe(false)
+      expect(service.claimTask).not.toHaveBeenCalled()
     })
   })
 })

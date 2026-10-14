@@ -163,16 +163,20 @@ export class WikiCollectionService {
   async listCollections(options?: {
     page?: number
     pageSize?: number
+    knowledgeBaseId?: string
   }): Promise<{ items: WikiCollection[]; total: number; page: number; pageSize: number; totalPages: number }> {
     try {
       const page = options?.page || 1
       const pageSize = options?.pageSize || 10
       const offset = (page - 1) * pageSize
+      // 越库隔离：显式传入 knowledgeBaseId 时必须过滤（曾因忽略该参数导致跨库集合泄漏）。
+      const where = options?.knowledgeBaseId ? eq(wikiCollections.knowledgeBaseId, options.knowledgeBaseId) : undefined
 
       // 获取总数
       const [countResult] = await db
         .select({ count: sql<number>`count(*)` })
         .from(wikiCollections)
+        .where(where)
 
       const total = countResult?.count || 0
 
@@ -180,6 +184,7 @@ export class WikiCollectionService {
       const results = await db
         .select()
         .from(wikiCollections)
+        .where(where)
         .orderBy(desc(wikiCollections.createdAt))
         .limit(pageSize)
         .offset(offset)

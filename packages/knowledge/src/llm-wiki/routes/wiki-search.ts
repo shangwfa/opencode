@@ -11,7 +11,8 @@ export const wikiSearch = new Hono().post('/search', async (c) => {
       const context = await wikiRetrievalService.retrieve(
         validated.knowledgeBaseId,
         validated.query,
-        { budgetTokens: validated.budgetTokens }
+        { budgetTokens: validated.budgetTokens, topK: validated.topK,
+          includeRelated: validated.includeRelated, depth: validated.depth }
       )
 
       return c.json({

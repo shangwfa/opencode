@@ -111,7 +111,7 @@ describe('WikiRetrievalService', () => {
       const seedConcept = { concept: { id: 'c1', conceptName: 'ML', slug: 'ml', summary: 'Machine Learning', definition: 'AI', occurrenceCount: 5, content: null }, score: 10, titleMatch: true, phraseMatch: false }
       mockSearchService.searchConceptsScored.mockResolvedValue([seedConcept])
 
-      const expanded = { id: 'c2', conceptName: 'DL', slug: 'dl', summary: 'Deep Learning', definition: 'Neural nets', occurrenceCount: 3, collectionId: 'col_123', status: 'compiled' as const, tags: [], createdAt: now, updatedAt: now }
+      const expanded = { id: 'c2', conceptName: 'DL', slug: 'dl', summary: 'Deep Learning', definition: 'Neural nets', occurrenceCount: 3, collectionId: 'col_123', status: 'compiled' as const, citationStatus: 'verified' as const, tags: [], createdAt: now, updatedAt: now }
       mockSearchService.getRelatedConcepts.mockResolvedValue([expanded])
       mockNavigateService.getOverview.mockResolvedValue({
         conceptCount: 3, relationshipCount: 2, tagDistribution: [], recentConcepts: [], topConcepts: [], relationshipTypeDistribution: []
@@ -122,6 +122,47 @@ describe('WikiRetrievalService', () => {
       expect(mockSearchService.getRelatedConcepts).toHaveBeenCalledWith('c1', expect.any(Number))
       const dlPage = result.citedPages.find((p: any) => p.conceptName === 'DL')
       expect(dlPage).toBeDefined()
+      expect(dlPage.summary).toBe('Deep Learning')
+      expect(dlPage.slug).toBe('dl')
+      expect(mockSearchService.getConceptSources).toHaveBeenCalledWith('c2')
+    })
+
+    it('禁止把其他集合的关联页加入上下文', async () => {
+      mockCollectionService.getCollectionByKnowledgeBaseId.mockResolvedValue(mockCollection)
+      mockSearchService.searchConceptsScored.mockResolvedValue([
+        { concept: { id: 'c1', conceptName: '种子', slug: 'seed', summary: '本库知识' }, score: 10 },
+      ])
+      mockSearchService.getRelatedConcepts.mockResolvedValue([
+        { id: 'foreign', collectionId: 'other', conceptName: '外库', summary: '不应泄漏', status: 'compiled' },
+        { id: 'stale', collectionId: 'col_123', conceptName: '过时', summary: '不应返回', status: 'outdated' },
+      ])
+      mockNavigateService.getOverview.mockResolvedValue({ conceptCount: 1, relationshipCount: 0 })
+      const result = await service.retrieve('kb_123', '种子')
+      expect(result.citedPages.map((p: any) => p.conceptId)).toEqual(['c1'])
+    })
+
+    it('includeRelated=false 不执行图扩展', async () => {
+      mockCollectionService.getCollectionByKnowledgeBaseId.mockResolvedValue(mockCollection)
+      mockSearchService.searchConceptsScored.mockResolvedValue([
+        { concept: { id: 'c1', conceptName: '种子', slug: 'seed', summary: '知识' }, score: 1 },
+      ])
+      mockNavigateService.getOverview.mockResolvedValue({ conceptCount: 0, relationshipCount: 0 })
+      await service.retrieve('kb_123', 'test', { includeRelated: false, depth: 3, topK: 2 })
+      expect(mockSearchService.getRelatedConcepts).not.toHaveBeenCalled()
+      expect(mockSearchService.searchConceptsScored).toHaveBeenCalledWith('kb_123', 'test', { topK: 2 })
+    })
+
+    it('超大首个中文页面不能突破预算', async () => {
+      mockCollectionService.getCollectionByKnowledgeBaseId.mockResolvedValue(mockCollection)
+      mockSearchService.searchConceptsScored.mockResolvedValue([
+        { concept: { id: 'c1', conceptName: '大页面', slug: 'large', summary: '中文'.repeat(1000),
+          content: { sections: [{ heading: '正文', content: '真实知识'.repeat(2000), sourceRefs: ['doc-a'] }] } }, score: 10 },
+      ])
+      mockSearchService.getRelatedConcepts.mockResolvedValue([])
+      mockNavigateService.getOverview.mockResolvedValue({ conceptCount: 3, relationshipCount: 2, topConcepts: [] })
+      const result = await service.retrieve('kb_123', 'test', { budgetTokens: 300 })
+      expect(result.totalEstimatedTokens).toBeLessThanOrEqual(300)
+      expect(result.context).not.toContain('(no content)')
     })
 
     it('预算控制应该限制返回的概念数量', async () => {

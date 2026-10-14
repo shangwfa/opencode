@@ -8,6 +8,7 @@
 import { createOpenAI } from "@ai-sdk/openai"
 import { getChatEndpoint, getEmbeddingEndpoint, normalizeModelId } from "../config/env"
 import { createInnerEmbeddingFetch, isInnerEmbeddingProxyEnabled } from "./inner-proxy"
+import { createConversationProxyFetch, isConversationProxyEnabled, resolveChannelModel, type OpenAICompatibleChannel } from "./conversation-proxy"
 
 const providerCache = new Map<string, ReturnType<typeof createOpenAI>>()
 
@@ -28,13 +29,31 @@ function getProvider(kind: "chat" | "embedding") {
   return provider
 }
 
+/** 内网会话代理 chat provider：按渠道路由（鉴权由 xybot-user header 接管，apiKey 占位）。 */
+function getInnerChatProvider(channel: OpenAICompatibleChannel) {
+  const cacheKey = `chat|inner|${channel}`
+  let provider = providerCache.get(cacheKey)
+  if (!provider) {
+    provider = createOpenAI({
+      apiKey: 'unused',
+      fetch: createConversationProxyFetch(channel) as unknown as typeof fetch,
+    })
+    providerCache.set(cacheKey, provider)
+  }
+  return provider
+}
+
 /** 清空 provider 缓存（测试或热更新配置时使用） */
 export function resetLLMProviderCache(): void {
   providerCache.clear()
 }
 
-/** OpenAI 兼容 chat 模型 */
+/** OpenAI 兼容 chat 模型：内网会话代理启用时按 provider/model-id 前缀路由渠道 */
 export function createChatModel(modelId: string) {
+  if (isConversationProxyEnabled()) {
+    const { channel, modelId: bareModelId } = resolveChannelModel(modelId)
+    return getInnerChatProvider(channel).chat(bareModelId)
+  }
   return getProvider("chat").chat(normalizeModelId(modelId))
 }
 

@@ -1,9 +1,9 @@
 import { WikiSearchService } from './wiki-search.service.js'
 import { WikiCollectionService } from './wiki-collection.service.js'
 import { WikiNavigateService } from './wiki-navigate.service.js'
-import { db, wikiConcepts, documents } from '../db/index.js'
-import { and, eq, inArray } from 'drizzle-orm'
-import type { WikiRetrievalContext, WikiCitedPage, WikiBudgetAllocation } from '../types/wiki.types.js'
+import { db, wikiConcepts, wikiConceptSources, documents } from '../db/index.js'
+import { and, eq, inArray, sql } from 'drizzle-orm'
+import type { WikiRetrievalContext, WikiCitedPage, WikiConcept } from '../types/wiki.types.js'
 
 export class WikiRetrievalService {
   constructor(
@@ -15,7 +15,7 @@ export class WikiRetrievalService {
   async retrieve(
     knowledgeBaseId: string,
     query: string,
-    options?: { budgetTokens?: number; topK?: number },
+    options?: { budgetTokens?: number; topK?: number; includeRelated?: boolean; depth?: number },
   ): Promise<WikiRetrievalContext> {
     const budgetTokens = options?.budgetTokens ?? 4000
     const topK = options?.topK ?? 10
@@ -32,7 +32,9 @@ export class WikiRetrievalService {
     )
 
     const seedIds = new Set(scoredResults.map(r => r.concept.id))
-    const expandedConcepts = await this.expandGraph(seedIds, scoredResults)
+    const expandedConcepts = options?.includeRelated === false
+      ? []
+      : await this.expandGraph(collection.id, seedIds, scoredResults, options?.depth ?? 2)
 
     const allCandidates = this.mergeResults(scoredResults, expandedConcepts)
 
@@ -49,12 +51,11 @@ export class WikiRetrievalService {
       indexOverview = `Wiki: ${collection.id} (${collection.conceptCount ?? 0} concepts)`
     }
 
+    const context = this.formatContext(citedPages)
     const totalEstimatedTokens =
-      citedPages.reduce((sum, p) => sum + this.estimatePageTokens(p), 0) +
+      this.estimateTokens(context) +
       this.estimateTokens(indexOverview) +
       systemBudget
-
-    const context = this.formatContext(citedPages)
 
     return {
       context,
@@ -71,22 +72,23 @@ export class WikiRetrievalService {
   }
 
   private async expandGraph(
+    collectionId: string,
     seedIds: Set<string>,
     scoredResults: Array<{ concept: { id: string }; score: number }>,
-  ): Promise<Array<{ conceptId: string; conceptName: string; depth: number; relevanceScore: number }>> {
-    const expanded: Array<{ conceptId: string; conceptName: string; depth: number; relevanceScore: number }> = []
+    depth: number,
+  ): Promise<Array<{ concept: WikiConcept; relevanceScore: number }>> {
+    const expanded: Array<{ concept: WikiConcept; relevanceScore: number }> = []
     const seen = new Set(seedIds)
 
     for (const seed of scoredResults.slice(0, 5)) {
       try {
-        const related = await this.wikiSearchService.getRelatedConcepts(seed.concept.id, 2)
+        const related = await this.wikiSearchService.getRelatedConcepts(seed.concept.id, depth)
         for (const concept of related) {
+          if (concept.collectionId !== collectionId || concept.status !== 'compiled' || concept.citationStatus !== 'verified') continue
           if (seen.has(concept.id)) continue
           seen.add(concept.id)
           expanded.push({
-            conceptId: concept.id,
-            conceptName: concept.conceptName,
-            depth: 1,
+            concept,
             relevanceScore: seed.score * 0.5,
           })
         }
@@ -98,7 +100,7 @@ export class WikiRetrievalService {
 
   private mergeResults(
     scoredResults: Array<{ concept: any; score: number; titleMatch: boolean; phraseMatch: boolean }>,
-    expanded: Array<{ conceptId: string; conceptName: string; depth: number; relevanceScore: number }>,
+    expanded: Array<{ concept: WikiConcept; relevanceScore: number }>,
   ): Array<{
     conceptId: string
     conceptName: string
@@ -125,11 +127,11 @@ export class WikiRetrievalService {
     }
 
     for (const e of expanded) {
-      if (!merged.has(e.conceptId)) {
-        merged.set(e.conceptId, {
-          conceptId: e.conceptId,
-          conceptName: e.conceptName,
-          concept: null,
+      if (!merged.has(e.concept.id)) {
+        merged.set(e.concept.id, {
+          conceptId: e.concept.id,
+          conceptName: e.concept.conceptName,
+          concept: e.concept,
           relevanceScore: e.relevanceScore,
           sourceDocumentIds: [],
         })
@@ -171,9 +173,6 @@ export class WikiRetrievalService {
         } catch {}
       }
 
-      const pageTokens = this.estimatePageTokensFromData(content, summary)
-      if (usedTokens + pageTokens > pagesBudget && selected.length > 0) break
-
       let sourceDocumentIds = candidate.sourceDocumentIds
       if (sourceDocumentIds.length === 0 && candidate.concept?.id) {
         try {
@@ -181,19 +180,28 @@ export class WikiRetrievalService {
         } catch {}
       }
 
-      selected.push({
+      const page: WikiCitedPage = {
         citationIndex: selected.length + 1,
         conceptId: candidate.conceptId,
         conceptName: candidate.conceptName,
         slug: candidate.concept?.slug ?? '',
+        revision: candidate.concept?.revision,
+        citationStatus: candidate.concept?.citationStatus,
         content,
         summary,
         relevanceScore: candidate.relevanceScore,
         sourceDocumentIds,
         sourceDocuments: [] as { docName: string; docPath?: string; docUrl?: string }[],
-      })
-
-      usedTokens += pageTokens
+      }
+      const remaining = pagesBudget - usedTokens - (selected.length > 0 ? 2 : 0)
+      if (this.estimateTokens(this.formatContext([page])) > remaining) {
+        if (selected.length > 0) break
+        this.trimPageToBudget(page, remaining)
+      }
+      const pageTokens = this.estimateTokens(this.formatContext([page]))
+      if (pageTokens > remaining || (!page.content && !page.summary)) continue
+      selected.push(page)
+      usedTokens += pageTokens + (selected.length > 1 ? 2 : 0)
     }
 
     const allDocIds = [...new Set(selected.flatMap(p => p.sourceDocumentIds))]
@@ -236,6 +244,61 @@ export class WikiRetrievalService {
     return Math.ceil(cjkCount / 1.5 + otherCount / 4)
   }
 
+  private trimTextToBudget(text: string, budget: number): string {
+    let low = 0
+    let high = text.length
+    while (low < high) {
+      const mid = Math.ceil((low + high) / 2)
+      if (this.estimateTokens(text.slice(0, mid)) <= budget) low = mid
+      else high = mid - 1
+    }
+    return text.slice(0, low)
+  }
+
+  private trimPageToBudget(page: WikiCitedPage, budget: number): void {
+    page.truncated = true
+    if (page.content && typeof page.content === 'object' && Array.isArray(page.content.sections)) {
+      const sections = page.content.sections
+      page.summary = undefined
+      page.content = { sections: [] }
+      for (const section of sections) {
+        if (section.claims?.length) {
+          const claims: NonNullable<typeof section.claims> = []
+          for (const claim of section.claims) {
+            const included = [...claims, claim]
+            const compact = { heading: section.heading, content: included.map(item => item.statement).join('\n'),
+              claims: included, sourceRefs: [...new Set(included.flatMap(item => item.evidence.map(proof => proof.refId)))] }
+            const trial = { ...page, content: { sections: [...page.content.sections, compact] } }
+            if (this.estimateTokens(this.formatContext([trial])) <= budget) claims.push(claim)
+          }
+          if (claims.length > 0) page.content.sections.push({ heading: section.heading,
+            content: claims.map(claim => claim.statement).join('\n'), claims,
+            sourceRefs: [...new Set(claims.flatMap(claim => claim.evidence.map(proof => proof.refId)))] })
+          continue
+        }
+        let low = 0
+        let high = section.content.length
+        while (low < high) {
+          const mid = Math.ceil((low + high) / 2)
+          const candidate = { ...section, content: section.content.slice(0, mid) }
+          const trial = { ...page, content: { sections: [...page.content.sections, candidate] } }
+          if (this.estimateTokens(this.formatContext([trial])) <= budget) low = mid
+          else high = mid - 1
+        }
+        if (low === 0) break
+        page.content.sections.push({ ...section, content: section.content.slice(0, low) })
+        if (low < section.content.length) break
+      }
+      if (page.content.sections.length === 0) page.content = null
+    } else {
+      const text = typeof page.content === 'string' ? page.content : page.summary || ''
+      page.content = null
+      page.summary = ''
+      const overhead = this.estimateTokens(this.formatContext([page]))
+      page.summary = this.trimTextToBudget(text, Math.max(0, budget - overhead - 1))
+    }
+  }
+
   private estimatePageTokens(page: WikiCitedPage): number {
     const contentStr = page.content ? JSON.stringify(page.content) : ''
     const summaryStr = page.summary || ''
@@ -257,20 +320,29 @@ export class WikiRetrievalService {
     const indexPage = await db
       .select({ content: wikiConcepts.content })
       .from(wikiConcepts)
-      .where(and(eq(wikiConcepts.collectionId, collectionId), eq(wikiConcepts.slug, '_index')))
+      .where(and(eq(wikiConcepts.collectionId, collectionId), eq(wikiConcepts.slug, '_index'), eq(wikiConcepts.status, 'compiled'), eq(wikiConcepts.citationStatus, 'derived'),
+        sql`NOT EXISTS (
+          SELECT 1 FROM ${wikiConceptSources} s
+          JOIN ${wikiConcepts} p ON p.id = s.concept_id
+          LEFT JOIN ${documents} d ON d.id = s.document_id
+          WHERE p.collection_id = ${collectionId} AND (
+            p.status = 'outdated' OR d.id IS NULL
+            OR s.content_hash != encode(sha256(convert_to(d.content, 'UTF8')), 'hex')
+          )
+        )`))
       .limit(1)
 
     if (indexPage[0]?.content) {
       const sections = (indexPage[0].content as any).sections ?? []
       const text = sections.map((s: any) => `${s.heading}:\n${s.content}`).join('\n\n')
       const tokens = this.estimateTokens(text)
-      return tokens > indexBudget ? text.slice(0, indexBudget * 4) : text
+      return tokens > indexBudget ? this.trimTextToBudget(text, indexBudget) : text
     }
 
     const overview = await this.wikiNavigateService.getOverview(collectionId)
     const fallback = this.formatIndexOverview(overview)
     const tokens = this.estimateTokens(fallback)
-    return tokens > indexBudget ? fallback.slice(0, indexBudget * 4) : fallback
+    return tokens > indexBudget ? this.trimTextToBudget(fallback, indexBudget) : fallback
   }
 
   private emptyContext(budgetTokens: number): WikiRetrievalContext {
@@ -298,7 +370,7 @@ export class WikiRetrievalService {
         ? (typeof page.content === 'string' ? page.content : JSON.stringify(page.content))
         : ''
       const body = contentStr || summary || '(no content)'
-      parts.push(`[${page.citationIndex}] ${page.conceptName}: ${body}`)
+      parts.push(`[${page.citationIndex}] ${page.conceptName}${page.truncated ? '【内容已裁剪】' : ''}: ${body}`)
     }
     return parts.join('\n\n')
   }

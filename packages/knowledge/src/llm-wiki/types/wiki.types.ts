@@ -2,7 +2,8 @@ import { z } from 'zod'
 
 // 枚举类型
 export type WikiCollectionStatus = 'active' | 'building' | 'failed'
-export type WikiConceptStatus = 'pending' | 'compiled' | 'failed' | 'no_concepts' | 'outdated'
+export type WikiConceptStatus = 'pending' | 'compiled' | 'failed' | 'no_concepts' | 'outdated' | 'needs_review' | 'archived'
+export type WikiCitationStatus = 'legacy' | 'verified' | 'derived'
 export type WikiCompileTaskStatus = 'pending' | 'running' | 'completed' | 'failed'
 export type WikiRelationshipType = 'related' | 'prerequisite' | 'parent-child'
 
@@ -10,11 +11,33 @@ export interface WikiSection {
   heading: string
   content: string
   sourceRefs?: string[]
+  claims?: WikiClaim[]
+}
+
+export interface WikiEvidence {
+  refId: string
+  quote: string
+}
+
+export interface WikiClaim {
+  statement: string
+  evidence: WikiEvidence[]
+}
+
+export interface WikiConflict {
+  topic: string
+  statements: WikiClaim[]
 }
 
 export interface WikiPageContent {
   sections: WikiSection[]
   relatedConcepts?: string[]
+  definition?: string
+  summary?: string
+  tags?: string[]
+  definitionEvidence?: WikiEvidence[]
+  summaryEvidence?: WikiEvidence[]
+  conflicts?: WikiConflict[]
 }
 
 // Wiki 集合实体
@@ -31,6 +54,8 @@ export interface WikiCollection {
 
 // Wiki 概念实体
 export interface WikiConcept {
+  revision?: number
+  citationStatus?: WikiCitationStatus
   id: string
   collectionId: string
   conceptName: string
@@ -83,7 +108,12 @@ export interface WikiCompileProgress {
   extracted: number
   phase?: WikiCompilePhase
   pagesGenerated?: number
+  pagesAttempted?: number
+  pagesFailed?: number
+  pagesPublished?: number
+  warnings?: string[]
   pagesToGenerate?: number
+  schemaVersion?: number
   lintResults?: WikiLintResult[]
 }
 
@@ -95,6 +125,8 @@ export interface WikiCompileTask {
   status: WikiCompileTaskStatus
   progress: WikiCompileProgress
   error?: string
+  documentId?: string | null
+  attempt?: number
   startedAt?: Date
   completedAt?: Date
   createdAt: Date
@@ -142,7 +174,7 @@ export interface WikiSearchResponse {
   total: number
 }
 
-export type WikiLintType = 'orphan' | 'broken_link' | 'no_outlinks' | 'contradiction' | 'stale' | 'missing_page' | 'suggestion'
+export type WikiLintType = 'orphan' | 'broken_link' | 'no_outlinks' | 'contradiction' | 'stale' | 'missing_page' | 'suggestion' | 'skipped'
 export type WikiLintSeverity = 'warning' | 'info'
 
 export interface WikiLintResult {
@@ -192,6 +224,9 @@ export interface WikiBudgetAllocation {
 }
 
 export interface WikiCitedPage {
+  revision?: number
+  citationStatus?: WikiCitationStatus
+  truncated?: boolean
   citationIndex: number
   conceptId: string
   conceptName: string

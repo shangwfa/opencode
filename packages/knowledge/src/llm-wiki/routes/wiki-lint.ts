@@ -7,6 +7,18 @@ export const wikiLintRun = new Hono().post('/collections/:collectionId/lint', as
     const body = await c.req.json().catch(() => ({}))
     const includeSemantic = body.includeSemantic === true
 
+    if (includeSemantic) {
+      // 手动全量语义审查是页面级逐页调用：大库同步 HTTP 必超时，限 50 页；更大规模走编译自动增量巡检（autoSemanticLint）。
+      const { pool, schemaName } = await import('../db/index.js')
+      const count = await pool.query(`SELECT count(*)::int AS n FROM ${schemaName}.wiki_concepts
+        WHERE collection_id=$1 AND status IN ('compiled','needs_review')`, [collectionId])
+      if ((count.rows[0]?.n ?? 0) > 50) {
+        return c.json({ code: 400, success: false,
+          message: `Manual full semantic lint limited to 50 pages (got ${count.rows[0].n}); enable schema autoSemanticLint for incremental review per compile`,
+          data: null }, 400)
+      }
+    }
+
     const results = await wikiLintService.runLint(collectionId, includeSemantic)
 
     return c.json({

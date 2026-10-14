@@ -434,11 +434,12 @@ describe('WikiCollectionService', () => {
       ]
 
       const mockCountChain = {
-        from: mock().mockResolvedValue([{ count: 2 }])
+        from: mock().mockReturnValue({ where: mock().mockResolvedValue([{ count: 2 }]) })
       }
 
       const mockSelectChain = {
         from: mock().mockReturnThis(),
+        where: mock().mockReturnThis(),
         orderBy: mock().mockReturnThis(),
         limit: mock().mockReturnThis(),
         offset: mock().mockResolvedValue(mockCollections)
@@ -458,11 +459,12 @@ describe('WikiCollectionService', () => {
 
     it('应该使用默认分页参数', async () => {
       const mockCountChain = {
-        from: mock().mockResolvedValue([{ count: 0 }])
+        from: mock().mockReturnValue({ where: mock().mockResolvedValue([{ count: 0 }]) })
       }
 
       const mockSelectChain = {
         from: mock().mockReturnThis(),
+        where: mock().mockReturnThis(),
         orderBy: mock().mockReturnThis(),
         limit: mock().mockReturnThis(),
         offset: mock().mockResolvedValue([])

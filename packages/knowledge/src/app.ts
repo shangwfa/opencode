@@ -49,6 +49,8 @@ export async function createKnowledgeApp(options: KnowledgeAppOptions = {}): Pro
     await initDatabase()
     await initDatabaseModule()
     await initWikiTables()
+    const { wikiCompilerService } = await import('./llm-wiki/services/index.js')
+    wikiCompilerService.startRecovery()
   }
 
   const app = new Hono()

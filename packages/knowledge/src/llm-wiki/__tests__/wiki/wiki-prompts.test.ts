@@ -23,7 +23,7 @@ describe('wiki-prompts', () => {
       })
       const result = parseAndValidateExtraction(validOutput)
       expect(result).toHaveLength(2)
-      expect(result[0].concept).toBe('RPA自动化')
+      expect(result![0].concept).toBe('RPA自动化')
     })
 
     it('包含额外文本的 JSON 应能提取', () => {
@@ -32,25 +32,29 @@ describe('wiki-prompts', () => {
       expect(result).toHaveLength(1)
     })
 
-    it('超过 20 个概念应被截断', () => {
+    it('超过 20 个概念应拒绝，不误判为空提取', () => {
       const concepts = Array.from({ length: 25 }, (_, i) => ({
         concept: `概念${i}`, summary: `摘要${i}`, is_new: true
       }))
       const output = JSON.stringify({ concepts })
       const result = parseAndValidateExtraction(output)
-      expect(result.length).toBeLessThanOrEqual(20)
+      expect(result).toBeNull()
     })
 
-    it('畸形 JSON 应返回空数组', () => {
-      expect(parseAndValidateExtraction('not json')).toEqual([])
-      expect(parseAndValidateExtraction('')).toEqual([])
-      expect(parseAndValidateExtraction('{}')).toEqual([])
+    it('畸形 JSON 应返回 null', () => {
+      expect(parseAndValidateExtraction('not json')).toBeNull()
+      expect(parseAndValidateExtraction('')).toBeNull()
+      expect(parseAndValidateExtraction('{}')).toBeNull()
     })
 
-    it('缺少必填字段应返回空数组', () => {
+    it('缺少必填字段应返回 null', () => {
       const invalid = JSON.stringify({ concepts: [{ concept: '只有名称' }] })
       const result = parseAndValidateExtraction(invalid)
-      expect(result).toEqual([])
+      expect(result).toBeNull()
+    })
+
+    it('合法零概念结果与解析失败不同', () => {
+      expect(parseAndValidateExtraction('{"concepts":[]}')).toEqual([])
     })
   })
 

@@ -12,6 +12,10 @@
  *   KNOWLEDGE_EMBEDDING_API_KEY  默认同 KNOWLEDGE_LLM_API_KEY
  *   KNOWLEDGE_DEFAULT_CHAT_MODEL       默认 openai/gpt-5.6（代理已开通）
  *   KNOWLEDGE_DEFAULT_EMBEDDING_MODEL  默认 openai/text-embedding-3-small
+ *   KNOWLEDGE_LLM_CHANNEL              设为 "inner" 时 chat 走影刀内网会话代理
+ *                                      （需 XYBOT_AI_BASE_URL / XYBOT_USER_HEADER / PROXY_BIZ_CODE /
+ *                                      PROXY_BIZ_ID / PROXY_BIZ_TYPE，模型按 provider/model-id 前缀
+ *                                      路由渠道 openai/azure/deepseek/qwen/chatglm，见 providers/conversation-proxy.ts）
  *   KNOWLEDGE_EMBEDDING_CHANNEL        设为 "inner" 时 embedding 走影刀内网代理
  *                                      （需 XYBOT_AI_BASE_URL / XYBOT_USER_HEADER / PROXY_BIZ_CODE /
  *                                      PROXY_BIZ_ID / PROXY_BIZ_TYPE / PROXY_CONNECTOR_UUID，

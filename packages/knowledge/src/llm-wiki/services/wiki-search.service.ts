@@ -126,6 +126,9 @@ export class WikiSearchService {
 
       scoreCases.push(
         `CASE WHEN LOWER(c.concept_name) = $${likeParams.length + 3} THEN 200 ELSE 0 END`,
+        // 概念名作为问句连续子串：口语长句下整句匹配（+200）永不触发，分词也只出 bigram 与整段词；
+        // 概念名（≥2 字）完整出现在问句中时必须压过仅含该词的长名概念（Q07/WS13：'数据集' 被 '数据集API' 挤出前五）。
+        `CASE WHEN LENGTH(c.concept_name) >= 2 AND $${likeParams.length + 3} LIKE '%' || LOWER(c.concept_name) || '%' THEN 120 ELSE 0 END`,
         `COALESCE(ts_rank(
           setweight(to_tsvector('simple', COALESCE(c.concept_name, '')), 'A') ||
           setweight(to_tsvector('simple', COALESCE(c.summary, '')), 'B') ||
@@ -141,7 +144,16 @@ export class WikiSearchService {
           CASE WHEN LOWER(c.summary) LIKE '%' || $${likeParams.length + 3} || '%' ESCAPE '\\' THEN true ELSE false END AS phrase_match
         FROM ${schemaName}.wiki_concepts c
         WHERE c.collection_id = $1
-          AND c.status != 'failed'
+          AND c.status = 'compiled'
+          AND c.citation_status = 'verified'
+          AND NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.wiki_concept_sources s
+            LEFT JOIN ${schemaName}.documents d ON d.id = s.document_id
+            WHERE s.concept_id = c.id AND (
+              d.id IS NULL OR d.knowledge_base_id != (SELECT knowledge_base_id FROM ${schemaName}.wiki_collections WHERE id = $1)
+              OR s.content_hash != encode(sha256(convert_to(d.content, 'UTF8')), 'hex')
+            )
+          )
           AND (
             ${likeConditions.join('\n            OR ')}
             OR to_tsvector('simple', COALESCE(c.concept_name, '') || ' ' || COALESCE(c.summary, '') || ' ' || COALESCE(c.definition, ''))
@@ -183,6 +195,10 @@ export class WikiSearchService {
             ARRAY[r.source_concept_id]::text[] as path
           FROM ${schemaName}.wiki_relationships r
           WHERE r.source_concept_id = $1
+            AND r.origin != 'legacy'
+            AND r.source_revision = (SELECT revision FROM ${schemaName}.wiki_concepts WHERE id = r.source_concept_id)
+            AND r.collection_id = (SELECT collection_id FROM ${schemaName}.wiki_concepts WHERE id = $1)
+            AND r.target_concept_id IN (SELECT id FROM ${schemaName}.wiki_concepts WHERE collection_id = r.collection_id AND status = 'compiled')
           
           UNION ALL
           
@@ -194,13 +210,28 @@ export class WikiSearchService {
           JOIN concept_graph cg ON r.source_concept_id = cg.concept_id
           WHERE 
             cg.depth < $2
+            AND r.origin != 'legacy'
+            AND r.source_revision = (SELECT revision FROM ${schemaName}.wiki_concepts WHERE id = r.source_concept_id)
+            AND r.collection_id = (SELECT collection_id FROM ${schemaName}.wiki_concepts WHERE id = $1)
+            AND r.target_concept_id IN (SELECT id FROM ${schemaName}.wiki_concepts WHERE collection_id = r.collection_id AND status = 'compiled')
             AND r.target_concept_id <> ALL(cg.path)
             AND r.target_concept_id != $1
         )
         SELECT DISTINCT c.*
         FROM concept_graph cg
         JOIN ${schemaName}.wiki_concepts c ON c.id = cg.concept_id
-        WHERE c.status != 'failed'
+        WHERE c.status = 'compiled'
+          AND c.citation_status = 'verified'
+          AND c.collection_id = (SELECT collection_id FROM ${schemaName}.wiki_concepts WHERE id = $1)
+          AND NOT EXISTS (
+            SELECT 1 FROM ${schemaName}.wiki_concept_sources s
+            LEFT JOIN ${schemaName}.documents d ON d.id = s.document_id
+            WHERE s.concept_id = c.id AND (
+              d.id IS NULL
+              OR d.knowledge_base_id != (SELECT knowledge_base_id FROM ${schemaName}.wiki_collections WHERE id = c.collection_id)
+              OR s.content_hash != encode(sha256(convert_to(d.content, 'UTF8')), 'hex')
+            )
+          )
       `, [conceptId, maxDepth])
 
       return result.rows.map((row: Record<string, unknown>) => this.mapRowToConcept(row))
@@ -289,6 +320,8 @@ export class WikiSearchService {
       tags: (row.tags as string[]) || [],
       occurrenceCount: ((row.occurrenceCount ?? row.occurrence_count) as number) ?? 1,
       status: row.status as WikiConceptStatus,
+      revision: Number(row.revision ?? 0),
+      citationStatus: (row.citationStatus ?? row.citation_status ?? 'legacy') as WikiConcept['citationStatus'],
       createdAt: (row.createdAt ?? row.created_at) as Date,
       updatedAt: (row.updatedAt ?? row.updated_at) as Date
     }

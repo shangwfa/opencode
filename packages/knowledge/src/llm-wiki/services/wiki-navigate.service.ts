@@ -1,5 +1,5 @@
 import { db, wikiConcepts, wikiRelationships, pool, schemaName } from '../db/index.js'
-import { eq, desc, sql } from 'drizzle-orm'
+import { and, eq, desc, sql } from 'drizzle-orm'
 import { WikiCollectionService } from './wiki-collection.service.js'
 import type { WikiNavigateOverview, WikiGraphStats } from '../types/wiki.types.js'
 
@@ -10,14 +10,14 @@ export class WikiNavigateService {
     const conceptCountResult = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
 
     const conceptCount = conceptCountResult[0]?.count ?? 0
 
     const relationshipCountResult = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(wikiRelationships)
-      .where(eq(wikiRelationships.collectionId, collectionId))
+      .where(this.visibleRelationships(collectionId))
 
     const relationshipCount = relationshipCountResult[0]?.count ?? 0
 
@@ -27,7 +27,7 @@ export class WikiNavigateService {
         count: sql<number>`count(*)::int`,
       })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
       .groupBy(sql`jsonb_array_elements_text(tags)`)
       .orderBy(desc(sql`count(*)::int`))
       .limit(20)
@@ -39,7 +39,7 @@ export class WikiNavigateService {
         updatedAt: wikiConcepts.updatedAt,
       })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
       .orderBy(desc(wikiConcepts.updatedAt))
       .limit(10)
 
@@ -50,7 +50,7 @@ export class WikiNavigateService {
         occurrenceCount: wikiConcepts.occurrenceCount,
       })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
       .orderBy(desc(wikiConcepts.occurrenceCount))
       .limit(10)
 
@@ -60,7 +60,7 @@ export class WikiNavigateService {
         count: sql<number>`count(*)::int`,
       })
       .from(wikiRelationships)
-      .where(eq(wikiRelationships.collectionId, collectionId))
+      .where(this.visibleRelationships(collectionId))
       .groupBy(wikiRelationships.relationshipType)
       .orderBy(desc(sql`count(*)::int`))
 
@@ -86,7 +86,7 @@ export class WikiNavigateService {
       })
       .from(wikiConcepts)
       .where(
-        sql`${wikiConcepts.collectionId} = ${collectionId} AND ${wikiConcepts.tags} @> ${JSON.stringify([tag])}::jsonb`
+        and(this.visibleConcepts(collectionId), sql`${wikiConcepts.tags} @> ${JSON.stringify([tag])}::jsonb`)
       )
       .orderBy(desc(wikiConcepts.occurrenceCount))
   }
@@ -97,7 +97,7 @@ export class WikiNavigateService {
     const [countResult] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
 
     const concepts = await db
       .select({
@@ -110,7 +110,7 @@ export class WikiNavigateService {
         updatedAt: wikiConcepts.updatedAt,
       })
       .from(wikiConcepts)
-      .where(eq(wikiConcepts.collectionId, collectionId))
+      .where(this.visibleConcepts(collectionId))
       .orderBy(desc(wikiConcepts.occurrenceCount))
       .limit(pageSize)
       .offset(offset)
@@ -136,13 +136,21 @@ export class WikiNavigateService {
             COUNT(r.id) AS degree
           FROM ${schemaName}.wiki_concepts c
           LEFT JOIN ${schemaName}.wiki_relationships r ON (
-            r.source_concept_id = c.id OR r.target_concept_id = c.id
+            (r.source_concept_id = c.id OR r.target_concept_id = c.id)
+            AND r.collection_id = c.collection_id AND r.origin != 'legacy'
+            AND r.source_revision = (SELECT revision FROM ${schemaName}.wiki_concepts WHERE id = r.source_concept_id)
+            AND EXISTS (SELECT 1 FROM ${schemaName}.wiki_concepts t
+              WHERE t.id = r.target_concept_id AND t.collection_id = c.collection_id
+                AND t.status = 'compiled' AND t.citation_status = 'verified')
           )
-          WHERE c.collection_id = $1 AND c.status != 'failed'
+          WHERE c.collection_id = $1 AND c.status = 'compiled'
+            AND c.citation_status = 'verified' AND c.slug != '_index'
           GROUP BY c.id, c.concept_name
         ),
         total_edges AS (
-          SELECT COUNT(*) AS cnt FROM ${schemaName}.wiki_relationships WHERE collection_id = $1
+          SELECT COUNT(*) AS cnt FROM ${schemaName}.wiki_relationships r WHERE r.collection_id = $1
+            AND r.origin != 'legacy'
+            AND r.source_revision = (SELECT revision FROM ${schemaName}.wiki_concepts WHERE id = r.source_concept_id)
         )
         SELECT
           (SELECT AVG(degree)::float FROM degree_stats) AS average_degree,
@@ -169,5 +177,15 @@ export class WikiNavigateService {
     } finally {
       client.release()
     }
+  }
+
+  private visibleConcepts(collectionId: string) {
+    return and(eq(wikiConcepts.collectionId, collectionId), eq(wikiConcepts.status, 'compiled'),
+      eq(wikiConcepts.citationStatus, 'verified'), sql`${wikiConcepts.slug} != '_index'`)
+  }
+
+  private visibleRelationships(collectionId: string) {
+    return and(eq(wikiRelationships.collectionId, collectionId), sql`${wikiRelationships.origin} != 'legacy'`,
+      sql`${wikiRelationships.sourceRevision} = (SELECT revision FROM ${wikiConcepts} WHERE id = ${wikiRelationships.sourceConceptId})`)
   }
 }

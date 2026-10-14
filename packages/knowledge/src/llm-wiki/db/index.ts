@@ -5,6 +5,7 @@
  * 建表 SQL 见 initWikiTables()——由 app 装配统一 await（主 initDatabase 建好 knowledge_bases 后执行）。
  */
 import { pool, schemaName } from "../../db/index.js"
+import { migrateWikiProvenance } from './provenance-migration.js'
 
 export {
   db,
@@ -19,6 +20,9 @@ export {
   wikiConceptSources,
   wikiRelationships,
   wikiCompileTasks,
+  wikiPageRevisions,
+  wikiActivityLog,
+  wikiSchemas,
 } from "./schema.js"
 
 /**
@@ -159,7 +163,17 @@ export async function initWikiTables(): Promise<void> {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_wiki_compile_tasks_status
       ON ${schemaName}.wiki_compile_tasks(status)
-    `)  } finally {
+     `)
+    await client.query(`CREATE TABLE IF NOT EXISTS ${schemaName}.wiki_compile_checkpoints (
+      task_id VARCHAR(255) NOT NULL REFERENCES ${schemaName}.wiki_compile_tasks(id) ON DELETE CASCADE,
+      checkpoint_key VARCHAR(600) NOT NULL,
+      source_hash VARCHAR(64) NOT NULL,
+      payload JSONB NOT NULL,
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      PRIMARY KEY(task_id,checkpoint_key)
+    )`)
+    await migrateWikiProvenance(client, schemaName)
+  } finally {
     client.release()
   }
 }

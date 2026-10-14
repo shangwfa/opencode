@@ -4,14 +4,16 @@ import { z } from 'zod'
 
 const ListWikiCollectionsQuerySchema = z.object({
   page: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 1)),
-  pageSize: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 10))
+  pageSize: z.string().optional().transform((val) => (val ? parseInt(val, 10) : 10)),
+  knowledgeBaseId: z.string().optional()
 })
 
 export const wikiCollectionList = new Hono().get('/collections', async (c) => {
   try {
     const queryParams = {
       page: c.req.query('page'),
-      pageSize: c.req.query('pageSize')
+      pageSize: c.req.query('pageSize'),
+      knowledgeBaseId: c.req.query('knowledgeBaseId')
     }
 
     const validated = ListWikiCollectionsQuerySchema.parse(queryParams)
@@ -32,7 +34,8 @@ export const wikiCollectionList = new Hono().get('/collections', async (c) => {
 
     const result = await wikiCollectionService.listCollections({
       page: validated.page,
-      pageSize: validated.pageSize
+      pageSize: validated.pageSize,
+      knowledgeBaseId: validated.knowledgeBaseId
     })
 
     return c.json({
