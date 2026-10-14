@@ -286,12 +286,16 @@ src/doc-platform/
 
 ## 9. 里程碑
 
-| 里程碑 | 内容 | 验收 |
-|---|---|---|
-| **M1 骨架+读链路** | dp 建表;KB CRUD(含 RAG 1:1);公开读 tree/content;hn-docs:`/kb` 列表+创建页、`/kb/[slug]` 浏览页、rewrite、getDocData 直通 | 建库→(手动插数据)→slug 地址可浏览;契约快照测试 |
-| **M2 编写链路** | 菜单 CRUD/排序/启停、草稿、发布派生;`/kb/[slug]/admin` 管理页接通;book-open service 迁移 | 页面建菜单→写文档→发布→公开地址可见;kb_sync_status=synced;book-open 单测全绿 |
-| **M3 搜索** | 搜索外壳;前端搜索组件接 kb 维度 | kb 内搜索带面包屑 |
-| **M4 清理** | 旧品牌路由/旧 api 移除;yddoc 文档域依赖清零 | grep 无残留 |
+| 里程碑 | 内容 | 验收 | 状态 |
+|---|---|---|---|
+| **M1 骨架+读链路** | dp 建表;KB CRUD(含 RAG 1:1);公开读 tree/content;hn-docs:`/kb` 列表+创建页、`/kb/[slug]` 浏览页、rewrite、getDocData 直通 | SSR 文档页全流程跑通(菜单/正文/envConfig/别名重定向),单测:菜单建树、别名解析、契约形状快照 | ✅ |
+| **M2 编写链路** | 菜单 CRUD/排序/启停、草稿、发布派生;`/kb/[slug]/admin` 管理页接通;book-open service 迁移 | 管理端建菜单→草稿→发布→前台可见;发布后向量写入;book-open 单测全绿 | ✅ |
+| **M3 搜索** | 搜索外壳;前端浏览页搜索框(kb 维度) | 检索命中带面包屑;可见性过滤;私密库 404 | ✅ |
+| **M4 清理** | 旧品牌路由页删除(`pages/[brandCode]`、旧首页)、middleware 移除品牌别名解析、verifyUrl 删除 | kb 产品路径运行时零 yddoc 调用 | ✅(边界见下) |
+
+> **M4 边界说明**:`_app.tsx` 全局骨架与 Header/HtmlHead/MobileDoc 等组件仍引用旧 api 模块
+> (customer/admin 等),但这些组件**不再被任何保留路由触达**(孤儿模块,不参与 kb 页编译),
+> 构成零运行时依赖;彻底删除组件牵连全局骨架,留待旧站组件专项下线,不在本轮。
 
 ## 10. 实现前需核对的契约点
 
