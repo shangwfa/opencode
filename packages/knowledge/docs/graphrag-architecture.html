@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GraphRAG 全链路架构</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;   /* white-smoke */
+      --color-ink:     #2d3142;   /* jet-black */
+      --color-muted:   #4f5d75;   /* blue-slate */
+      --color-accent:  #bf4520;   /* burnt-tangerine */
+      --font-sans:     'Geist', 'Noto Sans SC', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+
+    .frame { max-width: 1240px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 1160px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · packages/knowledge · src/graph</p>
+    <h1>GraphRAG 全链路架构：从源文档到带引用的回答</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1160 656" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="graphrag-architecture-title graphrag-architecture-desc">
+        <title id="graphrag-architecture-title">GraphRAG 全链路架构：从源文档到 Agent 引用回答</title>
+        <desc id="graphrag-architecture-desc">源文档经摄入管线转换、分块、抽取与合并后写入 PostgreSQL 多存储面；HTTP 网关暴露摄入、删除、检索与关系浏览端点；检索管线产出三元组与原文证据；SaaS graph agent 经沙箱调用网关并生成带来源引用的回答。</desc>
+        <defs>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- ===================== zones（先于箭头与节点） ===================== -->
+        <rect x="32" y="96" width="200" height="304" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="88" y="100" width="88" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="132" y="109" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">数据源 SOURCES</text>
+
+        <rect x="544" y="96" width="232" height="304" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="596" y="100" width="128" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="660" y="109" fill="#5a6580" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">POSTGRESQL 存储</text>
+
+        <!-- ===================== arrows（先于节点） ===================== -->
+        <!-- 数据源 → 摄入管线（三条直行线） -->
+        <line x1="216" y1="176" x2="288" y2="176" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="216" y1="264" x2="288" y2="264" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <line x1="216" y1="352" x2="288" y2="352" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- 摄入管线 → PG 多存储面（写入） -->
+        <line x1="488" y1="264" x2="560" y2="264" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- PG → 检索管线（读取证据） -->
+        <path d="M 760,304 H 784 Q 792,304 792,312 V 332 Q 792,340 800,340 H 816" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="762" y="318" width="22" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="773" y="327" fill="#4f5d75" font-size="7.5" font-family="'Geist','Noto Sans SC',sans-serif" text-anchor="middle">读取</text>
+
+        <!-- HTTP → 摄入管线（顶部走廊，headline 路径用 accent） -->
+        <path d="M 880,140 V 80 Q 880,72 872,72 H 396 Q 388,72 388,80 V 140" fill="none" stroke="#bf4520" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <rect x="600" y="66" width="60" height="13" rx="2" fill="#f5f5f5"/>
+        <text x="630" y="76" fill="#bf4520" font-size="7.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">INGEST</text>
+
+        <!-- HTTP → 检索管线（垂直直连） -->
+        <line x1="952" y1="236" x2="952" y2="292" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="958" y="258" width="60" height="13" rx="2" fill="#f5f5f5"/>
+        <text x="962" y="268" fill="#4f5d75" font-size="7.5" font-family="'Geist Mono', monospace" letter-spacing="0.04em">SEARCH/BROWSE</text>
+
+        <!-- HTTP → PG（删除/替换，管理操作，虚线走底部走廊） -->
+        <path d="M 840,236 V 548 Q 840,556 832,556 H 708 Q 700,556 700,548 V 364" fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+        <rect x="725" y="538" width="90" height="13" rx="2" fill="#f5f5f5"/>
+        <text x="770" y="548" fill="#4f5d75" font-size="7.5" font-family="'Geist','Noto Sans SC',sans-serif" text-anchor="middle">删除 / 替换</text>
+
+        <!-- Agent → HTTP（右侧走廊，沙箱调用用 link 色） -->
+        <path d="M 1088,484 H 1096 Q 1104,484 1104,476 V 196 Q 1104,188 1096,188 H 1088" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+        <rect x="1110" y="330" width="42" height="13" rx="2" fill="#f5f5f5"/>
+        <text x="1114" y="340" fill="#2e5aa8" font-size="7.5" font-family="'Geist Mono', monospace" letter-spacing="0.08em">FETCH</text>
+
+        <!-- ===================== nodes ===================== -->
+        <!-- 数据源 1：文档 -->
+        <rect x="48" y="140" width="168" height="72" rx="6" fill="#f5f5f5" stroke="#bfc0c0" stroke-width="1"/>
+        <rect x="60" y="150" width="24" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="72" y="159" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">SRC</text>
+        <text x="60" y="182" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">文档</text>
+        <text x="60" y="198" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">markdown · tiptap</text>
+
+        <!-- 数据源 2：规格与代码 -->
+        <rect x="48" y="228" width="168" height="72" rx="6" fill="#f5f5f5" stroke="#bfc0c0" stroke-width="1"/>
+        <rect x="60" y="238" width="24" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="72" y="247" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">SRC</text>
+        <text x="60" y="270" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">规格与代码</text>
+        <text x="60" y="286" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">OpenAPI · source</text>
+
+        <!-- 数据源 3：结构化行 -->
+        <rect x="48" y="316" width="168" height="72" rx="6" fill="#f5f5f5" stroke="#bfc0c0" stroke-width="1"/>
+        <rect x="60" y="326" width="24" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="72" y="335" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">SRC</text>
+        <text x="60" y="358" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">结构化行</text>
+        <text x="60" y="374" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">rows · schema</text>
+
+        <!-- 摄入管线 -->
+        <rect x="288" y="164" width="200" height="200" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="300" y="176" width="46" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="323" y="185" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">PIPELINE</text>
+        <text x="300" y="208" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">摄入管线</text>
+        <text x="300" y="228" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">tiptap → md 转换</text>
+        <text x="300" y="244" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">章节分块 2000/50</text>
+        <text x="300" y="260" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">LLM 抽取 + fallback</text>
+        <text x="300" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">跨 chunk 合并去重</text>
+        <text x="300" y="292" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">本体硬校验</text>
+        <text x="300" y="308" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">RDF facts · 检查点</text>
+        <text x="300" y="324" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">append / replace</text>
+        <text x="300" y="348" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">document-pipeline.ts</text>
+
+        <!-- PG 多存储面 -->
+        <rect x="560" y="164" width="200" height="200" rx="6" fill="#ececec" stroke="#bfc0c0" stroke-width="1.2"/>
+        <rect x="572" y="176" width="20" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="582" y="185" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">PG</text>
+        <text x="572" y="208" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">多存储面</text>
+        <text x="572" y="228" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">graph_nodes / edges</text>
+        <text x="572" y="244" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">document_chunks</text>
+        <text x="572" y="260" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">entity_chunks</text>
+        <text x="572" y="276" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">relation_chunks</text>
+        <text x="572" y="292" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">rdf_quads</text>
+        <text x="572" y="308" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">ontology_versions</text>
+        <text x="572" y="348" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">溯源：doc→chunk→边</text>
+
+        <!-- HTTP 网关（焦点） -->
+        <rect x="816" y="140" width="272" height="96" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.6"/>
+        <rect x="828" y="150" width="28" height="12" rx="2" fill="#f5f5f5" stroke="#bf4520" stroke-width="0.6"/>
+        <text x="842" y="159" fill="#bf4520" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">HTTP</text>
+        <text x="828" y="180" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist Mono', monospace">/api/graph 网关</text>
+        <text x="828" y="198" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">ingest · delete · search · stats</text>
+        <text x="828" y="212" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">browse：关系·子图·路径·溯源</text>
+        <text x="828" y="226" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">KB 作用域 · 只读事务 · 预算</text>
+
+        <!-- 检索管线 -->
+        <rect x="816" y="292" width="272" height="96" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="828" y="302" width="48" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="852" y="311" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">RETRIEVAL</text>
+        <text x="828" y="332" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">graphSearch 检索</text>
+        <text x="828" y="350" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">嵌入 → 种子 → 子图扩展</text>
+        <text x="828" y="364" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">rerank · minScore · topK</text>
+        <text x="828" y="378" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">triplets·cards·chunks</text>
+
+        <!-- SaaS graph agent -->
+        <rect x="816" y="436" width="272" height="96" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="828" y="446" width="34" height="12" rx="2" fill="#f5f5f5" stroke="rgba(45,49,66,0.12)"/>
+        <text x="845" y="455" fill="#5a6580" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.1em">AGENT</text>
+        <text x="828" y="476" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">SaaS graph agent</text>
+        <text x="828" y="494" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">会话注册 · 沙箱 node fetch</text>
+        <text x="828" y="508" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">SSE 过程 · 自动代答</text>
+        <text x="828" y="522" fill="#5a6580" font-size="9" font-family="'Geist Mono', monospace">结论 + 来源引用</text>
+
+        <!-- 编辑性批注（≤2 条） -->
+        <rect x="48" y="552" width="20" height="2" fill="#bf4520"/>
+        <text x="76" y="559" fill="#4f5d75" font-size="12" font-style="italic" font-family="'Instrument Serif','Noto Serif SC',serif">回答中的每个事实，都应能回溯到本次执行实际可见的证据与来源文档。</text>
+
+        <!-- ===================== legend（底部横条） ===================== -->
+        <g font-family="'Geist','Noto Sans SC',sans-serif" font-size="8.5" fill="#4f5d75">
+          <rect x="48" y="618" width="12" height="12" rx="3" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+          <text x="66" y="628">HTTP 网关（焦点）</text>
+
+          <rect x="196" y="618" width="12" height="12" rx="3" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+          <text x="214" y="628">服务 / 管线</text>
+
+          <rect x="304" y="618" width="12" height="12" rx="3" fill="#ececec" stroke="#bfc0c0" stroke-width="1.2"/>
+          <text x="322" y="628">PostgreSQL 存储</text>
+
+          <line x1="448" y1="624" x2="472" y2="624" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"/>
+          <text x="480" y="628">删除 / 替换（管理）</text>
+
+          <line x1="612" y1="624" x2="636" y2="624" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+          <text x="648" y="628">沙箱调用</text>
+
+          <line x1="736" y1="624" x2="760" y2="624" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#arrow)"/>
+          <text x="772" y="628">数据流</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
