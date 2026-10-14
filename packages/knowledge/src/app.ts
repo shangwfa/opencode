@@ -19,8 +19,9 @@ import { mountMcpRoutes } from "./mcp/http.js"
 import { databaseApp } from "./data-table/routes/index.js"
 import { llmWikiApp } from "./llm-wiki/routes/index.js"
 import { graphApp } from "./graph/routes/index.js"
+import { docPlatformApp } from "./doc-platform/index.js"
 
-/** API 子应用：各业务域子应用按域前缀挂载（basePath 之下） */
+/** API 子应用:各业务域子应用按域前缀挂载（basePath 之下） */
 export const api = new Hono()
   // 浏览器侧测试/工具页面（docs/ui-demos）直连所需；生产按需收紧 allowOrigin
   .use("*", cors())
@@ -29,6 +30,7 @@ export const api = new Hono()
   .route("/database", databaseApp)
   .route("/llm-wiki", llmWikiApp)
   .route("/graph", graphApp)
+  .route("/doc-platform", docPlatformApp)
 
 /** RPC 客户端类型：`hc<AppType>('http://host/api')` */
 export type AppType = typeof api
@@ -54,6 +56,14 @@ export async function createKnowledgeApp(options: KnowledgeAppOptions = {}): Pro
     await initWikiTables()
     const { wikiCompilerService } = await import('./llm-wiki/services/index.js')
     wikiCompilerService.startRecovery()
+
+    // 文档平台:恢复残留的派生任务(进程崩溃/重启后 pending 任务重新消费)
+    try {
+      const { recoverPendingSyncTasks } = await import("./doc-platform/index.js")
+      await recoverPendingSyncTasks()
+    } catch (error: any) {
+      console.warn("[knowledge] doc-platform 派生任务恢复失败:", error.message)
+    }
   }
 
   const app = new Hono()

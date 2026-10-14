@@ -31,6 +31,10 @@ export const {
   knowledgeBases,
   documents,
   syncTasks,
+  menus,
+  kbAliases,
+  kbModes,
+  documentSyncTasks,
 } = schema
 export { schemaName, pool }
 
@@ -158,6 +162,118 @@ export async function initDatabase() {
         console.warn("[knowledge/db] 补齐 index 字段失败:", error.message)
       }
     }
+
+    // ── 文档平台（doc-platform）迁移：knowledge_bases/documents 产品化列 ──
+    try {
+      await client.query(`
+        ALTER TABLE ${schemaName}.knowledge_bases
+        ADD COLUMN IF NOT EXISTS slug VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS language_code VARCHAR(32),
+        ADD COLUMN IF NOT EXISTS is_public INTEGER DEFAULT 0,
+        ADD COLUMN IF NOT EXISTS owner_id VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS settings JSONB
+      `)
+      await client.query(`
+        ALTER TABLE ${schemaName}.documents
+        ADD COLUMN IF NOT EXISTS menu_id VARCHAR(64),
+        ADD COLUMN IF NOT EXISTS content_json JSONB,
+        ADD COLUMN IF NOT EXISTS draft_content_json JSONB,
+        ADD COLUMN IF NOT EXISTS published_at TIMESTAMP
+      `)
+    } catch (error: any) {
+      if (!error.message?.includes("already exists") && !error.message?.includes("duplicate column")) {
+        console.warn("[knowledge/db] 补齐 doc-platform 字段失败:", error.message)
+      }
+    }
+
+    // slug 唯一约束（允许 NULL：存量 RAG 库无 slug）
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uk_knowledge_bases_slug
+      ON ${schemaName}.knowledge_bases(slug) WHERE slug IS NOT NULL
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_documents_menu_id
+      ON ${schemaName}.documents(menu_id)
+    `)
+
+    // ── 菜单树 ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.menus (
+        id VARCHAR(64) PRIMARY KEY,
+        knowledge_base_id VARCHAR(255) NOT NULL REFERENCES ${schemaName}.knowledge_bases(id) ON DELETE CASCADE,
+        parent_id VARCHAR(64),
+        previous_id VARCHAR(64),
+        name VARCHAR(255) NOT NULL,
+        type VARCHAR(16) NOT NULL DEFAULT 'doc',
+        icon_url TEXT,
+        slug VARCHAR(255),
+        enable INTEGER NOT NULL DEFAULT 1,
+        doc_unique_id VARCHAR(64),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_menus_kb_parent
+      ON ${schemaName}.menus(knowledge_base_id, parent_id)
+    `)
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uk_menus_kb_slug
+      ON ${schemaName}.menus(knowledge_base_id, slug) WHERE slug IS NOT NULL
+    `)
+
+    // ── 别名 ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.kb_aliases (
+        alias VARCHAR(255) PRIMARY KEY,
+        knowledge_base_id VARCHAR(255) NOT NULL REFERENCES ${schemaName}.knowledge_bases(id) ON DELETE CASCADE,
+        menu_id VARCHAR(64) NOT NULL,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_kb_aliases_kb
+      ON ${schemaName}.kb_aliases(knowledge_base_id)
+    `)
+
+    // ── 知识库×检索模式 ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.kb_modes (
+        knowledge_base_id VARCHAR(255) NOT NULL REFERENCES ${schemaName}.knowledge_bases(id) ON DELETE CASCADE,
+        mode VARCHAR(16) NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        backend_id VARCHAR(255),
+        config JSONB,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (knowledge_base_id, mode)
+      )
+    `)
+
+    // ── 文档派生任务 ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.document_sync_tasks (
+        id VARCHAR(255) PRIMARY KEY,
+        knowledge_base_id VARCHAR(255) NOT NULL REFERENCES ${schemaName}.knowledge_bases(id) ON DELETE CASCADE,
+        document_id VARCHAR(255) NOT NULL,
+        mode VARCHAR(16) NOT NULL,
+        operation VARCHAR(16) NOT NULL,
+        published INTEGER NOT NULL DEFAULT 1,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        attempts INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_doc_sync_tasks_doc
+      ON ${schemaName}.document_sync_tasks(document_id)
+    `)
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_doc_sync_tasks_status
+      ON ${schemaName}.document_sync_tasks(status)
+    `)
 
   } finally {
     client.release()

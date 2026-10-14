@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>llm-wiki 概念编译架构</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif+SC:wght@400;600&family=Noto+Sans+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #bf4520;
+      --font-sans:     'Geist', 'Noto Sans SC', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif SC', serif;
+      --font-mono:     'Geist Mono', 'Noto Sans SC', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .diagram-container { width: 100%; overflow-x: auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+    svg { width: 100%; min-width: 1120px; display: block; }
+    @media print {
+      .diagram-container { overflow-x: visible; }
+      svg { min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Architecture · Knowledge Service</p>
+    <h1>llm-wiki 概念编译架构</h1>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1120 620" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="wiki-arch-title wiki-arch-desc">
+        <title id="wiki-arch-title">llm-wiki 概念编译架构</title>
+        <desc id="wiki-arch-desc">RAG 文档库经 LLM 概念提取、关系推断与页面草稿编译为概念 Wiki，单事务原子发布至 PostgreSQL；检索侧以词法与图扩展召回概念页，经 /llm-wiki HTTP API 供 Agent 与应用消费。</desc>
+        <defs>
+          <marker id="wiki-arch-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+          <marker id="wiki-arch-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#bf4520"/></marker>
+          <marker id="wiki-arch-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#2e5aa8"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f5f5f5"/>
+
+        <!-- ═══ Zones（先于箭头与节点）═══ -->
+        <rect x="32" y="48" width="1056" height="136" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="464" y="52" width="192" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="560" y="61" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">COMPILE · 编译管道</text>
+
+        <rect x="32" y="240" width="1056" height="136" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="452" y="244" width="216" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="560" y="253" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">STORAGE &amp; MODEL · 存储与模型</text>
+
+        <rect x="32" y="432" width="1056" height="136" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+        <rect x="464" y="436" width="192" height="12" rx="2" fill="#f5f5f5"/>
+        <text x="560" y="445" fill="#4f5d75" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.14em">SERVE · 检索与消费</text>
+
+        <!-- ═══ Arrows（先于节点，位于底层）═══ -->
+        <!-- N1→N3 读取源文档（共 y 直线） -->
+        <line x1="268" y1="124" x2="320" y2="124" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <!-- N3→N4 租约执行 -->
+        <line x1="540" y1="124" x2="592" y2="124" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <!-- N4→N5 页面草稿+证据 -->
+        <line x1="812" y1="124" x2="864" y2="124" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <!-- N4→N2 LLM 调用（link 色，下行肘形） -->
+        <path d="M 702,160 V 196 Q 702,204 694,204 H 268 Q 260,204 260,212 V 280" fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#wiki-arch-arrow-link)"/>
+        <!-- N5→N6 单事务写入（accent 主链路，与 N4→N2 水平段错开 20px） -->
+        <path d="M 968,160 V 216 Q 968,224 960,224 H 796 Q 788,224 788,232 V 280" fill="none" stroke="#bf4520" stroke-width="1.4" marker-end="url(#wiki-arch-arrow-accent)"/>
+        <!-- N6→N7 词法+图扩展检索（下行肘形） -->
+        <path d="M 480,352 V 408 Q 480,416 472,416 H 230 Q 222,416 222,424 V 472" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <!-- N7→N8 检索结果（共 y 直线） -->
+        <line x1="396" y1="508" x2="436" y2="508" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <!-- N8→N9 REST / RPC -->
+        <line x1="688" y1="508" x2="728" y2="508" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+
+        <!-- ═══ Nodes ═══ -->
+        <!-- N1 源文档库 -->
+        <rect x="48" y="88" width="220" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="64" y="96" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="90" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">INPUT</text>
+        <text x="64" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">源文档库</text>
+        <text x="64" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">DOCUMENTS 表 · RAG 域</text>
+
+        <!-- N3 编译任务调度 -->
+        <rect x="320" y="88" width="220" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="336" y="96" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="358" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">TASK</text>
+        <text x="336" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">编译任务调度</text>
+        <text x="336" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">LEASE · CHECKPOINT · RETRY≤5</text>
+
+        <!-- N4 LLM 概念编译（accent 焦点） -->
+        <rect x="592" y="88" width="220" height="72" rx="6" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.4"/>
+        <rect x="608" y="96" width="44" height="12" rx="2" fill="#bf4520"/>
+        <text x="630" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">PIPE</text>
+        <text x="608" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">LLM 概念编译</text>
+        <text x="608" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">EXTRACT · RELATE · DRAFT</text>
+
+        <!-- N5 原子发布 -->
+        <rect x="864" y="88" width="208" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="880" y="96" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="902" y="105" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">STEP</text>
+        <text x="880" y="130" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">原子发布</text>
+        <text x="880" y="148" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">FENCING · 单事务 · 快照</text>
+
+        <!-- N2 LLM Provider（外部服务，虚线边界） -->
+        <rect x="48" y="280" width="244" height="72" rx="6" fill="#f5f5f5" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <rect x="64" y="288" width="36" height="12" rx="2" fill="#4f5d75"/>
+        <text x="82" y="297" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">LLM</text>
+        <text x="64" y="322" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">LLM Provider</text>
+        <text x="64" y="340" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">OPENAI 兼容 · 限流保护</text>
+
+        <!-- N6 Wiki 表族（store） -->
+        <rect x="324" y="280" width="560" height="72" rx="6" fill="#ececec" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="340" y="288" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="366" y="297" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">STORE</text>
+        <text x="340" y="322" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">Wiki 表族</text>
+        <text x="340" y="340" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">CONCEPTS · RELATIONSHIPS · REVISIONS · SOURCES · TASKS</text>
+
+        <!-- N7 检索与导航 -->
+        <rect x="48" y="472" width="348" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="64" y="480" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="86" y="489" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">API</text>
+        <text x="64" y="514" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">检索与导航</text>
+        <text x="64" y="532" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">2-GRAM 词法 · CTE 图扩展 · 预算裁剪</text>
+
+        <!-- N8 HTTP API -->
+        <rect x="436" y="472" width="252" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="452" y="480" width="44" height="12" rx="2" fill="#2d3142"/>
+        <text x="474" y="489" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">EDGE</text>
+        <text x="452" y="514" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">HTTP API</text>
+        <text x="452" y="532" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">/LLM-WIKI · HONO RPC</text>
+
+        <!-- N9 消费方 -->
+        <rect x="728" y="472" width="344" height="72" rx="6" fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+        <rect x="744" y="480" width="52" height="12" rx="2" fill="#2d3142"/>
+        <text x="770" y="489" fill="#f5f5f5" font-size="7" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.12em">AGENT</text>
+        <text x="744" y="514" fill="#2d3142" font-size="13" font-weight="600" font-family="'Geist','Noto Sans SC',sans-serif">消费方</text>
+        <text x="744" y="532" fill="#4f5d75" font-size="9" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.04em">SAAS AGENT · 应用</text>
+
+        <!-- ═══ Arrow labels（最后绘制，mask 压线，避开节点）═══ -->
+        <rect x="457" y="196" width="48" height="14" fill="#f5f5f5"/>
+        <text x="481" y="206" fill="#2e5aa8" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">LLM 调用</text>
+        <rect x="311" y="408" width="80" height="14" fill="#f5f5f5"/>
+        <text x="351" y="418" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" text-anchor="middle" letter-spacing="0.08em">词法 + 图扩展</text>
+
+        <!-- ═══ Annotation callouts（italic serif，指向 Wiki 表族）═══ -->
+        <line x1="896" y1="300" x2="884" y2="300" stroke="#4f5d75" stroke-width="1"/>
+        <circle cx="884" cy="300" r="1.5" fill="#4f5d75"/>
+        <text x="900" y="296" fill="#4f5d75" font-size="10.5" font-family="'Instrument Serif','Noto Serif SC',serif" font-style="italic">检索时实时比对源文档 hash，</text>
+        <text x="900" y="310" fill="#4f5d75" font-size="10.5" font-family="'Instrument Serif','Noto Serif SC',serif" font-style="italic">过期概念自动下线</text>
+        <line x1="896" y1="340" x2="884" y2="340" stroke="#4f5d75" stroke-width="1"/>
+        <circle cx="884" cy="340" r="1.5" fill="#4f5d75"/>
+        <text x="900" y="336" fill="#4f5d75" font-size="10.5" font-family="'Instrument Serif','Noto Serif SC',serif" font-style="italic">引文逐字 provenance 校验，</text>
+        <text x="900" y="350" fill="#4f5d75" font-size="10.5" font-family="'Instrument Serif','Noto Serif SC',serif" font-style="italic">任一页失败整体不发布</text>
+
+        <!-- ═══ Legend（底部横条）═══ -->
+        <line x1="48" y1="592" x2="88" y2="592" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#wiki-arch-arrow)"/>
+        <text x="96" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">数据流</text>
+        <line x1="168" y1="592" x2="208" y2="592" stroke="#bf4520" stroke-width="1.4" marker-end="url(#wiki-arch-arrow-accent)"/>
+        <text x="216" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">发布主链路</text>
+        <line x1="296" y1="592" x2="336" y2="592" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#wiki-arch-arrow-link)"/>
+        <text x="344" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">LLM 调用</text>
+        <rect x="424" y="587" width="10" height="10" rx="2" fill="#f5f5f5" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="4,3"/>
+        <text x="440" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">外部服务</text>
+        <rect x="524" y="587" width="10" height="10" rx="2" fill="rgba(191,69,32,0.08)" stroke="#bf4520" stroke-width="1.2"/>
+        <text x="540" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">编译焦点</text>
+        <rect x="624" y="587" width="10" height="10" rx="2" fill="#ececec" stroke="#2d3142" stroke-width="1.2"/>
+        <text x="640" y="596" fill="#4f5d75" font-size="8" font-family="'Geist Mono','Noto Sans SC',monospace" letter-spacing="0.08em">Wiki 存储</text>
+      </svg>
+    </div>
+  </div>
+</body>
+</html>
