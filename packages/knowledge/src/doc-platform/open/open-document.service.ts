@@ -39,7 +39,13 @@ import type {
   UpdateDocumentInput,
 } from "./schemas.js";
 import type { DocumentRecord, MenuNode, OpenContext } from "./types.js";
-import { createPresignedPut, ossPublicDomain } from "./oss.service.js";
+import {
+  createPresignedPut,
+  objectPath,
+  ossPublicDomain,
+  putResource,
+  uploadMode,
+} from "./oss.service.js";
 
 interface OperationState {
   requestId: string;
@@ -85,11 +91,14 @@ function generatedResourceFileName(bytes: Buffer, contentType: string): string {
 
 function uploadResourcePath(upload: { key: string; readUrl?: string }): string {
   if (upload.readUrl) {
+    // 完整可读 URL(如 Vercel Blob)直接保留;OSS 相对路径语义则截取 pathname
     try {
-      return new URL(upload.readUrl).pathname;
+      const url = new URL(upload.readUrl);
+      if (url.protocol === "http:" || url.protocol === "https:") return url.toString().replace(/\/$/, "");
     } catch {
-      return upload.readUrl;
+      /* 非合法 URL,按 key 处理 */
     }
+    return upload.readUrl;
   }
   return upload.key;
 }
@@ -281,14 +290,28 @@ export class OpenDocumentService {
         bytes,
         sourceUrl,
       );
+      const fileName = generatedResourceFileName(bytes, contentType);
+
+      // Vercel Blob:服务端上传模型,直接 put(无预签名直传)
+      if (uploadMode() === "vercel-blob") {
+        const uploaded = await putResource({
+          bytes,
+          contentType,
+          fileName,
+          contextId: uploadContextId,
+          envCode: params.context.envCode,
+        });
+        return uploadResourcePath({ key: uploaded.key, readUrl: uploaded.readUrl });
+      }
+
       const upload = await createPresignedPut({
-        fileName: generatedResourceFileName(bytes, contentType),
+        fileName,
         fileSize: bytes.length,
         contentType,
         contextId: uploadContextId,
         envCode: params.context.envCode,
       });
-      // v1: putResourceBytes(upload.uploadUrl, bytes) —— 本地签名直传同域,此处服务端直接 PUT
+      // 服务端直传(v1 行为:服务端完成 OSS PUT)
       const put = await fetch(upload.uploadUrl, {
         method: "PUT",
         body: new Uint8Array(bytes),
@@ -301,7 +324,9 @@ export class OpenDocumentService {
     };
 
     return normalizeDocumentResources(params.content, {
-      getOssDomain: async () => ossPublicDomain(),
+      // Vercel Blob:托管域后缀(已上传资源的 URL hostname 命中即保留,不重搬运)
+      getOssDomain: async () =>
+        uploadMode() === "vercel-blob" ? ".public.blob.vercel-storage.com" : ossPublicDomain(),
       importResource,
     });
   }
@@ -843,11 +868,35 @@ export class OpenDocumentService {
       assertPermission(context, "create");
     }
 
+    const contextId = input.docUniqueId ?? temporaryUploadContextId(currentRequestId);
+
+    // Vercel Blob:服务端上传模型 —— 返回上传代理端点,调用方 PUT 文件字节后从响应读取最终 URL
+    if (uploadMode() === "vercel-blob") {
+      const fileName = input.fileName;
+      const query = new URLSearchParams({
+        fileName,
+        contentType: input.contentType,
+        contextId,
+        ...(context.envCode && context.envCode !== "default"
+          ? { envCode: context.envCode }
+          : {}),
+      });
+      return {
+        status: "ready",
+        requestId: currentRequestId,
+        uploadUrl: `/api/doc-platform/open/${encodeURIComponent(input.kb)}/oss/blob-upload?${query.toString()}`,
+        method: "PUT",
+        ossKey: objectPath(contextId, fileName),
+        verification: "client_put_2xx_read_response",
+        note: "Vercel Blob 模式:PUT 文件字节到 uploadUrl,响应 data.url 为最终资源地址",
+      };
+    }
+
     const upload = await createPresignedPut({
       fileName: input.fileName,
       fileSize: input.fileSize,
       contentType: input.contentType,
-      contextId: input.docUniqueId ?? temporaryUploadContextId(currentRequestId),
+      contextId,
       envCode: context.envCode,
     });
     let readPath: string | undefined;

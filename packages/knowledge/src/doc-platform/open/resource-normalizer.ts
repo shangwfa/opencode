@@ -102,6 +102,12 @@ function standardOssPath(
   sourceUrl: URL,
   ossDomain: string,
 ): string | undefined {
+  // 以 "." 开头视为托管域后缀匹配(无统一域名的存储,如 Vercel Blob 的
+  // *.public.blob.vercel-storage.com):hostname 后缀命中即视为已托管资源,
+  // 保留完整 URL(Blob 的读地址就是完整 URL,无统一域名可拼接)
+  if (ossDomain.startsWith(".")) {
+    return sourceUrl.hostname.endsWith(ossDomain) ? sourceUrl.toString() : undefined;
+  }
   let domainUrl: URL;
   try {
     domainUrl = new URL(ossDomain);

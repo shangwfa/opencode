@@ -17,6 +17,8 @@ const RESOURCE_ATTRS: Record<string, string[]> = {
 const FORBIDDEN_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const FORBIDDEN_SCHEMES = /^(?:javascript|data|blob|file):/i;
 const EXTERNAL_URL = /^(?:https?:)?\/\//i;
+/** Vercel Blob 托管域(平台资源直传后的完整 URL 视为已托管,放行) */
+const TRUSTED_RESOURCE_HOST_SUFFIX = ".public.blob.vercel-storage.com";
 
 export interface ContentInspection {
   content: TiptapDocument;
@@ -29,6 +31,17 @@ function normalizeResourceRef(value: string): string {
   const normalized = value.trim();
   if (!normalized) return "";
   if (FORBIDDEN_SCHEMES.test(normalized) || EXTERNAL_URL.test(normalized)) {
+    // Vercel Blob 托管资源:保留完整 URL(去 query/hash)
+    if (EXTERNAL_URL.test(normalized)) {
+      try {
+        const url = new URL(normalized);
+        if (url.hostname.endsWith(TRUSTED_RESOURCE_HOST_SUFFIX)) {
+          return `${url.origin}${url.pathname}`;
+        }
+      } catch {
+        /* 落入下方统一报错 */
+      }
+    }
     throw new BookOpenError(
       "VALIDATION_ERROR",
       "文档资源只允许使用 book-v3 OSS 相对路径",

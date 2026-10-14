@@ -6,6 +6,7 @@ export type BookOpenErrorCode =
   | "VALIDATION_ERROR"
   | "UPSTREAM_ERROR"
   | "CONFIG_ERROR"
+  | "NOT_IMPLEMENTED"
   | "PARTIAL_SUCCESS";
 
 const HTTP_STATUS_BY_CODE: Record<BookOpenErrorCode, number> = {
@@ -16,6 +17,7 @@ const HTTP_STATUS_BY_CODE: Record<BookOpenErrorCode, number> = {
   VALIDATION_ERROR: 422,
   UPSTREAM_ERROR: 502,
   CONFIG_ERROR: 500,
+  NOT_IMPLEMENTED: 501,
   PARTIAL_SUCCESS: 502,
 };
 

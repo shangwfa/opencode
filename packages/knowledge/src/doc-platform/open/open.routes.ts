@@ -27,6 +27,7 @@ import {
   CreateResourceUploadInputSchema,
 } from "./schemas.js"
 import { OpenDocumentService } from "./open-document.service.js"
+import { putResource } from "./oss.service.js"
 
 const service = new OpenDocumentService()
 
@@ -141,6 +142,22 @@ export const openApp = new Hono()
     )
     const data = await service.deleteDocument(input)
     return c.json({ code: 200, success: true, message: "ok", data })
+  })
+  // 客户端直传代理(Vercel Blob 模式):PUT 文件字节 → 服务端 put 到 Blob
+  .put("/open/:kb/oss/blob-upload", async (c) => {
+    const kb = c.req.param("kb")
+    const fileName = c.req.query("fileName") || "upload.bin"
+    const contentType = c.req.header("content-type") || "application/octet-stream"
+    const contextId = c.req.query("contextId") || "adhoc"
+    const body = await c.req.arrayBuffer()
+    const uploaded = await putResource({
+      bytes: new Uint8Array(body),
+      contentType,
+      fileName,
+      contextId,
+      envCode: c.req.query("envCode"),
+    })
+    return c.json({ code: 200, success: true, message: "ok", data: uploaded })
   })
   .post("/open/:kb/resource-upload-sessions", async (c) => {
     const body = await c.req.json()
