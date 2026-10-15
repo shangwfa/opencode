@@ -15,6 +15,26 @@ import { Hono } from 'hono'
 process.env['KNOWLEDGE_DATABASE_URL'] =
   process.env['KNOWLEDGE_DATABASE_URL'] || 'postgresql://localhost:5432/knowledge_mcp_smoke'
 
+const docPlatformOperations = {
+  listDocuments: mock(async () => ({ items: [] })),
+  getDocument: mock(async () => ({ docUniqueId: 'doc-1' })),
+  getBlock: mock(async () => ({ blockId: 'blk_123456789abc' })),
+  createDocument: mock(async () => ({ docUniqueId: 'doc-created' })),
+  updateDocument: mock(async () => ({ docUniqueId: 'doc-1' })),
+  updateBlock: mock(async () => ({ docUniqueId: 'doc-1' })),
+  setDocumentEnabled: mock(async () => ({ docUniqueId: 'doc-1', enabled: true })),
+  deleteDocument: mock(async () => ({ docUniqueId: 'doc-1' })),
+  createResourceUpload: mock(async () => ({ resourcePath: 'resource.png' }))
+}
+
+mock.module('../doc-platform/index.js', () => ({
+  OpenDocumentService: class {
+    constructor() {
+      Object.assign(this, docPlatformOperations)
+    }
+  }
+}))
+
 // 检索链路依赖在 smoke 中不触库：mock services/index（单例构造即连 PG）
 mock.module('../rag/knowledge-base/index.js', () => ({
   vectorService: {},
@@ -41,7 +61,7 @@ const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
 const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
 
 describe('kb-document-search mcp server', () => {
-  test('initialize + tools/list 返回 search_yddoc_documents 工具清单', async () => {
+  test('initialize + tools/list 返回搜索与文档平台工具', async () => {
     const server = createKbDocumentSearchMcpServer()
     const client = new Client({ name: 'smoke-client', version: '1.0.0' })
 
@@ -51,22 +71,71 @@ describe('kb-document-search mcp server', () => {
     try {
       const tools = await client.listTools()
 
-      expect(tools.tools).toHaveLength(1)
-      const tool = tools.tools[0]!
-      expect(tool.name).toBe('search_yddoc_documents')
-      expect(tool.description).toBe(
+      expect(tools.tools).toHaveLength(10)
+      const searchTool = tools.tools.find((entry) => entry.name === 'search_yddoc_documents')!
+      expect(searchTool.description).toBe(
         '搜索 YYDoc 知识库并返回文档片段、来源元数据和媒体 URL；可按调用请求动态指定知识库与返回字段。'
       )
 
       // 入参 schema 与源对齐：query 必填，outputOptions 裁剪选项存在
-      const properties = (tool.inputSchema as any).properties ?? {}
+      const properties = (searchTool.inputSchema as any).properties ?? {}
       expect(Object.keys(properties).sort()).toEqual(
         ['knowledgeBaseIds', 'knowledgeBaseNames', 'outputOptions', 'query', 'topK'].sort()
       )
-      expect((tool.inputSchema as any).required).toEqual(['query'])
+      expect((searchTool.inputSchema as any).required).toEqual(['query'])
       expect(Object.keys(properties.outputOptions?.properties ?? {}).sort()).toEqual(
         ['includeMedia', 'includeMetadata', 'includeRetrievalDebug', 'includeText', 'metadataFields'].sort()
       )
+      expect(tools.tools.map((entry) => entry.name)).toContain('create_document')
+      expect(tools.tools.map((entry) => entry.name)).toContain('create_resource_upload')
+    } finally {
+      await client.close()
+      await server.close()
+    }
+  })
+
+  test('create_document 调用无身份校验的文档服务并返回结构化结果', async () => {
+    const server = createKbDocumentSearchMcpServer()
+    const client = new Client({ name: 'smoke-client', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+
+    try {
+      const result = await client.callTool({
+        name: 'create_document',
+        arguments: {
+          kb: 'ruomu-001',
+          name: 'MCP 测试文档',
+          content: { type: 'doc', content: [] },
+          publishMode: 'publish'
+        }
+      })
+      expect(docPlatformOperations.createDocument).toHaveBeenCalledWith({
+        kb: 'ruomu-001',
+        name: 'MCP 测试文档',
+        content: { type: 'doc', content: [] },
+        publishMode: 'publish'
+      })
+      expect((result as any).structuredContent).toEqual({ docUniqueId: 'doc-created' })
+    } finally {
+      await client.close()
+      await server.close()
+    }
+  })
+
+  test('delete_document 必须显式确认目标文档', async () => {
+    const server = createKbDocumentSearchMcpServer()
+    const client = new Client({ name: 'smoke-client', version: '1.0.0' })
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)])
+
+    try {
+      const result = await client.callTool({
+        name: 'delete_document',
+        arguments: { kb: 'ruomu-001', docUniqueId: 'doc-1' }
+      })
+      expect((result as any).isError).toBe(true)
+      expect(docPlatformOperations.deleteDocument).not.toHaveBeenCalled()
     } finally {
       await client.close()
       await server.close()

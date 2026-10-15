@@ -25,5 +25,6 @@ export async function recoverPendingSyncTasks(): Promise<number> {
 export { KbService } from "./services/kb.service.js"
 export { MenuService } from "./services/menu.service.js"
 export { DocumentService } from "./services/document.service.js"
+export { OpenDocumentService } from "./open/open-document.service.js"
 export { DocPlatformError } from "./types.js"
 export { buildMenuTree, extractPlainText, validateKbSlug } from "./utils.js"

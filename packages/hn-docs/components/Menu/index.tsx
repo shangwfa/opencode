@@ -52,7 +52,6 @@ export default (props) => {
   const [menuData, setMenuData] = useState([] as TreeNode[]);
   const [expandedKeys, setExpandedKeys] = useState<(string | undefined)[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
-  const [permissions, setPermissions] = useState<boolean>(false);
   const initStatus = useRef(true);
   const isMobile = usePcMobile();
   const router = useRouter();
@@ -75,7 +74,6 @@ export default (props) => {
     const currentSelectedId = menuId || (id as string) || menuParamId;
     let result: ResBasic<TreeNode[]>;
     if (from === RequestSource.BOSS) {
-      setPermissions(true);
       result = await getAdminMenuTree({
         brandCode: code,
         languageCode: languageCode as string,
@@ -256,7 +254,6 @@ export default (props) => {
           brandCode={brandCode as string}
           languageCode={languageCode as string}
           onUpdateMenu={(menuId?: string) => getMenuData(menuId)}
-          permissions={permissions}
         />
       )}
       <DirectoryTree

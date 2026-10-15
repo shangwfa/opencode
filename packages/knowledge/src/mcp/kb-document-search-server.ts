@@ -14,11 +14,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { z } from 'zod'
 import { createMultiKbDocumentSearchTool } from '../tools/multi-kb-document-search-tool.js'
 import { getMcpKbDocumentSearchDefaultKbs } from '../config/env.js'
+import { registerDocPlatformTools } from './doc-platform-tools.js'
 
 export const KB_DOCUMENT_SEARCH_SERVER_INFO = {
-  name: '文档知识库搜索',
-  version: '1.0.0',
-  description: '搜索文档知识库并返回文档片段、源元数据和媒体 URL'
+  name: '文档知识库',
+  version: '1.1.0',
+  description: '文档知识库检索与文档平台读写工具'
 } as const
 
 /**
@@ -210,6 +211,8 @@ export function createKbDocumentSearchMcpServer(): McpServer {
       }
     }
   )
+
+  registerDocPlatformTools(server)
 
   return server
 }

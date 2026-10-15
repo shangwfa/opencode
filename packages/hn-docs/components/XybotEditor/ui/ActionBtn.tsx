@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button, message, Modal, Dropdown, Space } from "antd";
 import { ExclamationCircleOutlined, DownOutlined } from "@ant-design/icons";
 
@@ -64,6 +64,9 @@ export default function ActionBtn({
     menus,
   } = sharedData;
   const [draftId, setDraftId] = useState<string>("");
+  const draftIdRef = useRef("");
+  const draftSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [isSynchronizeDocModel, setIsSynchronizeDocModel] = useState(false);
   const [isShareModel, setIsShareModel] = useState(false);
 
@@ -166,9 +169,64 @@ export default function ActionBtn({
       return;
     }
 
+    const serializedContent = JSON.stringify(newDocData);
+
+    if (type === DocActionTypes.SAVE_DRAFT) {
+      const saveDraftOperation = draftSaveQueue.current.then(async () => {
+        setIsSavingDraft(true);
+        try {
+          const uploadInfo = await getUploadAddress(
+            `${docUniqueId}_draft`,
+            serializedContent.length,
+            FileType.DOC,
+            envCode,
+            docUniqueId,
+          );
+          if (!uploadInfo?.uploadUrl || !uploadInfo.key) {
+            throw new Error("草稿上传地址或文件标识为空");
+          }
+
+          const response = await fetch(uploadInfo.uploadUrl, {
+            method: "put",
+            headers: { contentType: "" },
+            body: serializedContent,
+            signal: new AbortController().signal,
+          });
+          if (!response.ok) {
+            throw new Error(`草稿内容上传失败: HTTP ${response.status}`);
+          }
+
+          const params = {
+            menuId: id,
+            contentType: ContentType.OSS,
+            content: uploadInfo.key,
+          };
+          const currentDraftId = draftIdRef.current || draftId;
+          const result = await (currentDraftId ? updateDraft : addDraft)(params);
+          if (result.code !== 200) {
+            throw new Error(result.message || "草稿保存失败");
+          }
+
+          const savedDraftId = result.data?.id || currentDraftId || String(id);
+          draftIdRef.current = savedDraftId;
+          setDraftId(savedDraftId);
+          if (isButtonClick) message.success("保存成功");
+        } catch (error) {
+          console.error("保存草稿失败:", error);
+          message.error(error instanceof Error ? error.message : "草稿保存失败");
+        } finally {
+          setIsSavingDraft(false);
+        }
+      });
+      // 自动保存和手动保存串行执行，避免较早的请求最后返回并覆盖新内容。
+      draftSaveQueue.current = saveDraftOperation.catch(() => undefined);
+      await saveDraftOperation;
+      return;
+    }
+
     const uploadInfo = await getUploadAddress(
-      DocActionTypes.SAVE_DRAFT === type ? `${docUniqueId}_draft` : docUniqueId,
-      (newDocData as any).length ?? 0,
+      docUniqueId,
+      serializedContent.length,
       FileType.DOC,
       envCode,
       docUniqueId,
@@ -180,7 +238,7 @@ export default function ActionBtn({
         headers: {
           contentType: "",
         },
-        body: JSON.stringify(newDocData),
+        body: serializedContent,
         signal: new AbortController().signal,
       });
 
@@ -208,24 +266,6 @@ export default function ActionBtn({
             }
           });
         }
-
-        if (type === DocActionTypes.SAVE_DRAFT && !draftId) {
-          const params = {
-            menuId: id,
-            contentType: ContentType.OSS,
-            content: uploadInfo.key || "",
-          };
-          addDraft(params).then((res) => {
-            if (res.code === 200) {
-              setDraftId(res.data.id);
-              if (isButtonClick) {
-                message.success("保存成功");
-              }
-            }
-          });
-        } else if (type === DocActionTypes.SAVE_DRAFT && isButtonClick) {
-          message.success("保存成功");
-        }
       }
     }
   };
@@ -238,6 +278,7 @@ export default function ActionBtn({
 
   const onReEdit = () => {
     deleteByMenuIdDraft({ menuId: docInfo.menuId }).then(() => {
+      draftIdRef.current = "";
       setDraftId("");
       updateDocInfo(DocActionTypes.EDIT);
       modalInfo.destroy();
@@ -270,11 +311,14 @@ export default function ActionBtn({
           };
           queryAdminDraftContent(params).then((res) => {
             onAction(DocActionTypes.EDIT_DRAFT, res.data);
-            setDraftId(res.data.id);
+            const loadedDraftId = res.data?.id || res.data?.draftId || String(docInfo.menuId);
+            draftIdRef.current = loadedDraftId;
+            setDraftId(loadedDraftId);
           });
         },
       });
     } else {
+      draftIdRef.current = "";
       setDraftId("");
       onAction(DocActionTypes.EDIT, docInfo);
     }
@@ -398,6 +442,7 @@ export default function ActionBtn({
             <Button
               type="primary"
               onClick={() => onSave(DocActionTypes.SAVE_DRAFT, true)}
+              loading={isSavingDraft}
               data-bury-id="f0d8b1c2-3e4a-4c5b-9f6d-7c8e1b2f3a4b"
             >
               保存草稿

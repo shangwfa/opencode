@@ -15,7 +15,6 @@ import { getLang } from "@/utils/getLang";
 interface Props {
   languageCode: string;
   brandCode: string;
-  permissions: boolean;
   onUpdateMenu: (id?: string) => void;
 }
 
@@ -23,7 +22,6 @@ export default ({
   brandCode,
   languageCode,
   onUpdateMenu,
-  permissions,
 }: Props) => {
   const [isDirectVisible, setIsDirectVisible] = useState(false);
   const [actionData, setActionData] = useState({
@@ -36,7 +34,6 @@ export default ({
   const router = useRouter();
   const { from } = router.query;
   const { sharedData, updateSharedData } = useSharedData();
-  const { docEnvConfigReference } = sharedData;
 
   const onCancel = (status: boolean, type: MenuItemType, id?: string) => {
     if (type === MenuItemType.FOLDER) {
@@ -113,23 +110,21 @@ export default ({
             {getLang("quick_start")}
           </a>
         </span>
-        {permissions && docEnvConfigReference && (
-          <span
-            className="cursor-pointer flex items-center justify-center w-[24px] h-[24px] text-base text-primary transition duration-350 ease-in-out rounded-lg hover:bg-gray-300 mr-[2px]"
-            onClick={(e) => e.stopPropagation()}
-            data-bury-id="0a0faf17-8122-4611-87ec-317310710f4d"
+        <span
+          className="cursor-pointer flex items-center justify-center w-[24px] h-[24px] text-base text-primary transition duration-350 ease-in-out rounded-lg hover:bg-gray-300 mr-[2px]"
+          onClick={(e) => e.stopPropagation()}
+          data-bury-id="0a0faf17-8122-4611-87ec-317310710f4d"
+        >
+          <Dropdown
+            menu={{
+              items,
+            }}
+            placement="bottom"
+            trigger={["click"]}
           >
-            <Dropdown
-              menu={{
-                items,
-              }}
-              placement="bottom"
-              trigger={["click"]}
-            >
-              <MoreOutlined />
-            </Dropdown>
-          </span>
-        )}
+            <MoreOutlined />
+          </Dropdown>
+        </span>
       </div>
       <DirectAdd
         isVisible={isDirectVisible}

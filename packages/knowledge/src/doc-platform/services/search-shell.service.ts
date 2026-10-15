@@ -35,7 +35,7 @@ function toSnippet(text: string): string {
 export class SearchShellService {
   async searchPublic(
     kbSlug: string,
-    params: { q: string; page?: number; pageSize?: number },
+    params: { q: string; page?: number; pageSize?: number; allowPrivate?: boolean },
   ): Promise<SearchPublicResult & { kb: string; kbName: string }> {
     const q = params.q?.trim()
     const page = Math.max(1, params.page ?? 1)
@@ -50,7 +50,7 @@ export class SearchShellService {
       .from(knowledgeBases)
       .where(eq(knowledgeBases.slug, kbSlug))
       .limit(1)
-    if (!kb || kb.isPublic !== 1) {
+    if (!kb || (kb.isPublic !== 1 && !params.allowPrivate)) {
       throw Object.assign(new Error(`知识库不存在或未公开: ${kbSlug}`), { statusCode: 404 })
     }
 

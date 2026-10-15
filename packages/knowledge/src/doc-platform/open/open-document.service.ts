@@ -370,7 +370,6 @@ export class OpenDocumentService {
       })
       .where(and(eq(documents.id, params.docUniqueId), eq(documents.knowledgeBaseId, params.context.kbId)));
 
-    await syncWorkerService.enqueueDocumentSync(params.context.kbId, params.docUniqueId, "upsert", true);
     return {
       contentKey: `dp://${params.docUniqueId}`,
       plainTextContent: inspection.plainTextContent,

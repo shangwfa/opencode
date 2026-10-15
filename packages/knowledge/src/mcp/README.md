@@ -1,14 +1,24 @@
-# kb-document-search MCP Server
+# Knowledge MCP Server
 
-影刀文档知识库检索的 MCP 服务（迁移自源工程 `mastra/mcp/kb-document-search-server.ts`，
-基于 `@modelcontextprotocol/sdk`，无 mastra 依赖）。检索逻辑复用
-`src/tools/multi-kb-document-search-tool.ts`。
+提供文档知识库检索及文档平台管理工具，基于 `@modelcontextprotocol/sdk`。
+文档 CRUD 复用 `doc-platform` 的 `OpenDocumentService`，MCP 层只做参数校验、响应适配和删除确认。
 
 ## 工具
 
 | 名称 | 描述 |
 | --- | --- |
 | `search_yddoc_documents` | 搜索 YYDoc 知识库并返回文档片段、来源元数据和媒体 URL；可按调用请求动态指定知识库与返回字段 |
+| `list_documents` | 查询知识库文档目录树 |
+| `get_document` | 获取文档 published/draft/effective 版本 |
+| `get_block` | 按 blockId 获取一级内容块 |
+| `create_document` | 创建草稿或发布文档 |
+| `update_document` | 更新元数据或正文 |
+| `update_block` | 更新一级内容块 |
+| `set_document_enabled` | 启用或禁用文档 |
+| `delete_document` | 删除文档；必须显式确认 `confirmDocUniqueId` |
+| `create_resource_upload` | 创建图片、视频、附件或画板上传会话 |
+
+文档工具使用 `kb`（知识库 slug 或 ID）作为作用域。当前阶段不校验用户身份；知识库 Open API 的权限策略由 `OpenDocumentService` 统一执行。
 
 入参：`query`（必填）、`topK`、`knowledgeBaseIds`、`knowledgeBaseNames`、`outputOptions`
 （`includeRetrievalDebug` / `includeMetadata` / `metadataFields` / `includeMedia` / `includeText`）。

@@ -8,6 +8,7 @@ import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test'
 /** vi.mocked 的 bun 等价物：仅做类型断言，便于对 mock 函数调用 mock* 方法 */
 const mocked = (fn: unknown): any => fn as any
 type DocumentService = import('./document.service').DocumentService
+let markdownChunkOutput = [{ text: 'chunk 1', metadata: { chunkIndex: 0 } }]
 
 // Mock 依赖
 mock.module('./vector.service', () => ({
@@ -31,9 +32,7 @@ mock.module('@mastra/rag', () => ({
     }),
     fromMarkdown: mock().mockReturnValue({
       metadata: {},
-      chunk: mock().mockResolvedValue([
-        { text: 'chunk 1', metadata: { chunkIndex: 0 } }
-      ])
+      chunk: mock(async () => markdownChunkOutput)
     }),
     fromHTML: mock().mockReturnValue({
       metadata: {},
@@ -93,6 +92,7 @@ describe('DocumentService', () => {
   let mockVectorService: any
 
   beforeEach(() => {
+    markdownChunkOutput = [{ text: 'chunk 1', metadata: { chunkIndex: 0 } }]
     mockVectorService = {
       indexChunks: mock().mockResolvedValue({ success: true, indexed: 5 }),
       query: mock().mockResolvedValue([]),
@@ -211,6 +211,21 @@ describe('DocumentService', () => {
       )
 
       expect(result).toBeDefined()
+    })
+
+    it('分块后必须保留 MDocument 返回的完整正文，不按估算位置截取原 Markdown', async () => {
+      const content = '# 标题\n\n第一段完整内容，包含不可丢失的校验词甲。\n\n第二段也必须完整保留，校验词乙。'
+      markdownChunkOutput = [
+        { text: '标题 第一段完整内容，包含不可丢失的校验词甲。', metadata: { chunkIndex: 0 } },
+        { text: '第二段也必须完整保留，校验词乙。', metadata: { chunkIndex: 1 } }
+      ]
+
+      await documentService.processDocument('kb1', content, 'doc1', 'markdown')
+
+      const embeddedValues = mocked(embedMany).mock.calls.at(-1)?.[0].values
+      expect(embeddedValues).toEqual(markdownChunkOutput.map((chunk) => chunk.text))
+      expect(embeddedValues.join('\n')).toContain('校验词甲')
+      expect(embeddedValues.join('\n')).toContain('校验词乙')
     })
   })
 

@@ -33,6 +33,7 @@ import {
   menus,
 } from "../../db/index.js"
 import { syncWorkerService } from "../services/sync-worker.service.js"
+import { SearchShellService } from "../services/search-shell.service.js"
 import { putResource, uploadMode } from "../open/oss.service.js"
 import { getCompatUpload, putCompatUpload, compatUploadKey } from "./uploads.js"
 
@@ -148,9 +149,25 @@ compatApp.get("/yddoc/menus/getMenuTreeByBrandCode", async (c) => {
 compatApp.get("/yddoc/menus/:menuId/contents", async (c) => {
   const menuId = c.req.param("menuId")
   const [doc] = await db.select().from(documents).where(eq(documents.id, menuId)).limit(1)
+  const [menu] = await db.select({ name: menus.name }).from(menus).where(eq(menus.id, menuId)).limit(1)
   // v1 契约:{ content } —— content 原为 OSS docUrl;v2 直出内联 JSON(前端 getDocData 已支持直通)
-  const content = doc?.contentJson ? JSON.stringify(doc.contentJson) : ""
-  return c.json({ code: 200, success: true, message: "ok", data: { content } })
+  // 无正文或正文非有效 TipTap 文档(如残留空对象)时返回空串,前端渲染为空页
+  const contentJson = doc?.contentJson as { type?: string } | undefined
+  const content =
+    contentJson && contentJson.type === "doc" ? JSON.stringify(doc.contentJson) : ""
+  return c.json({
+    code: 200,
+    success: true,
+    message: "ok",
+    data: {
+      menuId,
+      docUniqueId: doc?.id ?? menuId,
+      name: menu?.name ?? "",
+      content,
+      contentType: doc?.type ?? "text",
+      hasDraft: !!doc?.draftContentJson,
+    },
+  })
 })
 
 compatApp.get("/yddoc/oss/domain", async (c) => {
@@ -180,7 +197,7 @@ compatApp.get("/yddoc/envConfig/queryByBrandCodeAndLanguageCode", async (c) => {
   const kb = await resolveKb(c.req.query("brandCode") || "")
   const settings = (kb.settings as Record<string, unknown>) ?? {}
   const extraInfo = JSON.stringify({
-    languages: { [kb.languageCode || "zh-cn"]: { name: "简体中文" } },
+    languages: {},
     title: kb.name,
     logo: "",
   })
@@ -471,26 +488,38 @@ compatApp.post("/boss/helpdoc/draft/add", async (c) => {
   const body = await c.req.json().catch(() => ({}))
   const upload = await getCompatUpload(body.content)
   const [doc] = await db.select().from(documents).where(eq(documents.id, String(body.menuId))).limit(1)
-  if (doc && upload?.payload) {
-    await db
+  if (!doc || !upload?.payload) {
+    return c.json({ code: 404, success: false, message: "文档或草稿内容不存在", data: null }, 404)
+  }
+  await db
       .update(documents)
       .set({ draftContentJson: upload.payload as object, type: body.contentType || doc.type, updatedAt: new Date() })
       .where(eq(documents.id, String(body.menuId)))
-  }
-  return c.json({ code: 200, success: true, message: "ok", data: null })
+  return c.json({
+    code: 200,
+    success: true,
+    message: "ok",
+    data: { id: doc.id, menuId: doc.menuId ?? doc.id },
+  })
 })
 
 compatApp.post("/boss/helpdoc/draft/update", async (c) => {
   const body = await c.req.json().catch(() => ({}))
   const upload = await getCompatUpload(body.content)
   const [doc] = await db.select().from(documents).where(eq(documents.id, String(body.menuId))).limit(1)
-  if (doc && upload?.payload) {
-    await db
+  if (!doc || !upload?.payload) {
+    return c.json({ code: 404, success: false, message: "文档或草稿内容不存在", data: null }, 404)
+  }
+  await db
       .update(documents)
       .set({ draftContentJson: upload.payload as object, type: body.contentType || doc.type, updatedAt: new Date() })
       .where(eq(documents.id, String(body.menuId)))
-  }
-  return c.json({ code: 200, success: true, message: "ok", data: null })
+  return c.json({
+    code: 200,
+    success: true,
+    message: "ok",
+    data: { id: doc.id, menuId: doc.menuId ?? doc.id },
+  })
 })
 
 compatApp.delete("/boss/helpdoc/draft/delete", async (c) => {
@@ -665,6 +694,111 @@ compatApp.post("/knowledge-base/sync-from-doc-platform", async (c) => {
 
 compatApp.get("/oem/query", async (c) => {
   return c.json({ code: 200, success: true, message: "ok", data: { title: "", iconUrl: "", configValue: null } })
+})
+
+// ── 原 sys 服务兼容(门户页 QuickStart/搜索等组件) ──
+
+compatApp.get("/sys/sceneDataSource/listBySceneCode", async (c) => {
+  // 无场景数据源配置:返回空,QuickStart 组件不渲染
+  return c.json({ code: 200, success: true, message: "ok", data: [] })
+})
+
+compatApp.get("/sys/fullIndex/tips", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: [] })
+})
+
+async function searchHelpDocuments(c: any) {
+  const productCode = c.req.query("productCode") || ""
+  const query = c.req.query("key") || ""
+  const page = Math.max(1, Number(c.req.query("page") || 1))
+  const size = Math.min(50, Math.max(1, Number(c.req.query("size") || 20)))
+  const source = c.req.query("source")
+
+  // 论坛结果由外部系统提供；此兼容服务只承载帮助文档检索。
+  if (!query.trim() || source === "forum") {
+    return c.json({ code: 200, success: true, message: "ok", data: [], page: { page, pages: 0, total: 0 } })
+  }
+
+  const candidates = await db.select().from(knowledgeBases)
+  const kb = candidates.find((candidate) => {
+    const settings = candidate.settings as Record<string, unknown> | null
+    return candidate.slug === productCode || candidate.id === productCode || settings?.envCode === productCode
+  }) ?? (candidates.length === 1 ? candidates[0] : undefined)
+  if (!kb?.slug) {
+    return c.json({ code: 200, success: true, message: "ok", data: [], page: { page, pages: 0, total: 0 } })
+  }
+
+  const result = await new SearchShellService().searchPublic(kb.slug, {
+    q: query,
+    page,
+    pageSize: size,
+    // 原帮助中心路由本身面向公开页面，文档菜单 enable 状态仍由检索服务过滤。
+    allowPrivate: true,
+  })
+
+  // 旧全站搜索不能把只有向量相似、正文却完全不含查询词的结果展示出来。
+  // 中文按词分段后至少命中一半词；英文/数字按完整词匹配。
+  const segmenter = new Intl.Segmenter("zh-CN", { granularity: "word" })
+  const queryTerms = [...segmenter.segment(query.toLocaleLowerCase())]
+    .filter((part) => part.isWordLike)
+    .map((part) => part.segment.trim())
+    .filter((term) => term.length > 1)
+  const relevantItems = result.items.filter((item) => {
+    const searchableText = `${item.name} ${item.path.join(" ")} ${item.snippet}`.toLocaleLowerCase()
+    if (queryTerms.length === 0) return searchableText.includes(query.toLocaleLowerCase())
+    const matchedTerms = queryTerms.filter((term) => searchableText.includes(term)).length
+    return matchedTerms >= Math.ceil(queryTerms.length / 2)
+  })
+
+  const data = relevantItems.map((item) => ({
+    id: item.menuId,
+    menuId: item.menuId,
+    title: item.name,
+    body: item.snippet.replace(/!?\[[^\]]*\]\([^)]*\)/g, "").replace(/[*_`#]/g, "").trim(),
+    url: `/${result.kb}/${kb.languageCode || "zh-cn"}/${item.menuId}`,
+    source: "yd_doc",
+    sourceName: result.kbName,
+    tag: "",
+    score: item.score,
+    officialTag: true,
+    isAccept: false,
+  }))
+  const pages = relevantItems.length ? Math.ceil(relevantItems.length / size) : 0
+  return c.json({
+    code: 200,
+    success: true,
+    message: "ok",
+    data,
+    page: { page, pages, total: relevantItems.length },
+  })
+}
+
+compatApp.get("/sys/fullIndex/search", searchHelpDocuments)
+compatApp.get("/sys/fullIndex/searchNew", searchHelpDocuments)
+
+compatApp.post("/sys/spm/record/log", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: null })
+})
+
+// hn-docs 的 recordLogs 实际以 GET 方式发送埋点参数。
+compatApp.get("/sys/spm/record/log", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: null })
+})
+
+compatApp.get("/user/info/rich", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: null })
+})
+
+compatApp.post("/user/token/createJumpToken", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: { token: "" } })
+})
+
+compatApp.post("/proxy/token", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: { token: "" } })
+})
+
+compatApp.get("/sys/sceneDataSource/listBySceneCode", async (c) => {
+  return c.json({ code: 200, success: true, message: "ok", data: [] })
 })
 
 compatApp.onError((error: any, c) => {

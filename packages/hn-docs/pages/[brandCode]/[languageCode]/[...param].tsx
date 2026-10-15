@@ -195,7 +195,14 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
     if (menuData?.id) {
       const { data } = await queryDocContent({ menuId: menuData.id });
-      content = data;
+      // 兼容接口可能只返回 content；旧文档页用 docInfo.menuId 判断是否挂载编辑器，
+      // 因此从菜单树补齐稳定的标识与标题，避免正文有数据但页面仍空白。
+      content = {
+        ...data,
+        menuId: data?.menuId || menuData.id,
+        docUniqueId: data?.docUniqueId || menuData.docUniqueId || menuData.id,
+        name: data?.name || menuData.name || "",
+      };
     }
     const contentJson = await getDocData(content?.content);
     return {

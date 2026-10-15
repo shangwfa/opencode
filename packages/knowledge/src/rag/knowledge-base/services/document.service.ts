@@ -119,25 +119,12 @@ async processDocument(
         throw new Error(`chunkDocument returned no chunks for markdown document (content length: ${actualContent.length})`)
       }
       
-      // 检查MDocument.chunk()返回的chunk是否已经是markdown格式
-      // 如果第一个chunk包含markdown标记，说明已经是markdown格式，直接使用
-      // 否则需要从原始markdown中提取
-      const firstChunkText = chunked[0]?.text || ''
-      const isAlreadyMarkdown = /^#{1,6}\s|^\*\*|^\*[^*]|\[.*?\]\(|`|!\[|<video/i.test(firstChunkText)
-      
-      if (isAlreadyMarkdown) {
-        // 已经是markdown格式，直接使用
-        console.log(`[分块] MDocument.chunk()返回的chunk已经是markdown格式，直接使用`)
-        chunks = chunked.map((chunk) => ({
-          text: chunk.text || '',
-          metadata: chunk.metadata || {}
-        }))
-      } else {
-        // 不是markdown格式，从原始markdown中提取
-        console.log(`[分块] MDocument.chunk()返回的chunk是纯文本格式，从原始markdown中提取`)
-        chunks = this.extractMarkdownChunks(actualContent, chunked)
-        console.log(`[分块] extractMarkdownChunks 返回了 ${chunks.length} 个chunks`)
-      }
+      // MDocument.chunk() 的 chunk.text 是分块后的正文。用归一化文本反推
+      // 原 Markdown 字符区间会因标题/列表/空白折叠而错位并丢字，直接保留 chunk.text。
+      chunks = chunked.map((chunk) => ({
+        text: chunk.text || '',
+        metadata: chunk.metadata || {}
+      }))
       
       console.log(`[分块] 生成了 ${chunks.length} 个chunks`)
       
@@ -574,133 +561,4 @@ async processDocument(
     }
   }
 
-  /**
-   * 从原始markdown内容中提取对应位置的markdown chunk
-   * 当MDocument.chunk()返回纯文本时，需要从原始markdown中提取对应位置的markdown格式内容
-   * 
-   * 策略：通过文本匹配找到chunk在原始markdown中的位置，然后提取该位置的markdown内容
-   */
-  private extractMarkdownChunks(
-    originalMarkdown: string,
-    textChunks: Array<{ text: string; metadata: Record<string, any> }>
-  ): Array<{ text: string; metadata: Record<string, any> }> {
-    const markdownChunks: Array<{ text: string; metadata: Record<string, any> }> = []
-    let searchStartPos = 0
-
-    for (let i = 0; i < textChunks.length; i++) {
-      const textChunk = textChunks[i]
-      const chunkText = textChunk.text || ''
-      
-      if (!chunkText.trim()) {
-        // 跳过空chunk，不添加到结果中
-        console.warn(`[extractMarkdownChunks] 跳过空的 textChunk ${i + 1}/${textChunks.length}`)
-        continue
-      }
-
-      // 方法1: 尝试在原始markdown中查找chunk文本的纯文本部分
-      // 移除markdown标记，只保留文本内容进行匹配
-      const normalizeText = (text: string): string => {
-        // 移除markdown标记，保留文本内容
-        return text
-          .replace(/#{1,6}\s+/g, '') // 标题标记
-          .replace(/\*\*([^*]+)\*\*/g, '$1') // 粗体
-          .replace(/\*([^*]+)\*/g, '$1') // 斜体
-          .replace(/`([^`]+)`/g, '$1') // 行内代码
-          .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // 链接
-          .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '') // 图片
-          .replace(/<[^>]+>/g, '') // HTML标签
-          .replace(/\s+/g, ' ') // 规范化空白字符
-          .trim()
-      }
-
-      const normalizedChunkText = normalizeText(chunkText)
-      const normalizedMarkdown = normalizeText(originalMarkdown)
-      
-      // 在规范化后的markdown中查找chunk位置
-      let foundIndex = normalizedMarkdown.indexOf(normalizedChunkText, searchStartPos)
-      
-      if (foundIndex === -1 && i > 0) {
-        // 如果找不到，尝试从文档开头查找（可能是第一个chunk）
-        foundIndex = normalizedMarkdown.indexOf(normalizedChunkText, 0)
-      }
-
-      if (foundIndex === -1) {
-        // 如果还是找不到，使用更宽松的匹配：只匹配前30个字符
-        const chunkPrefix = normalizedChunkText.substring(0, Math.min(30, normalizedChunkText.length))
-        foundIndex = normalizedMarkdown.indexOf(chunkPrefix, searchStartPos)
-      }
-
-      if (foundIndex === -1) {
-        // 如果完全找不到，使用估算位置（基于之前chunk的位置和长度）
-        if (i > 0 && markdownChunks[i - 1]) {
-          const prevChunk = markdownChunks[i - 1]
-          // 估算：假设前一个chunk在原始markdown中的位置
-          // 这里我们使用一个简单的策略：按比例估算
-          const estimatedPos = Math.floor((originalMarkdown.length * i) / textChunks.length)
-          foundIndex = estimatedPos
-        } else {
-          foundIndex = 0
-        }
-      }
-
-      // 将规范化位置映射回原始markdown位置
-      // 由于规范化会改变长度，我们需要近似映射
-      let originalStartPos = foundIndex
-      if (foundIndex < normalizedMarkdown.length) {
-        // 尝试找到原始markdown中对应的位置
-        // 通过计算规范化前后的字符数差异来估算
-        const beforeNormalized = normalizedMarkdown.substring(0, foundIndex)
-        const beforeOriginal = originalMarkdown.substring(0, Math.min(originalStartPos * 2, originalMarkdown.length))
-        
-        // 简单估算：规范化后的位置 * 1.2（考虑markdown标记会增加长度）
-        originalStartPos = Math.floor(foundIndex * 1.2)
-        originalStartPos = Math.min(originalStartPos, originalMarkdown.length - 1)
-      }
-
-      // 估算chunk的结束位置
-      // 考虑markdown标记，chunk的实际长度可能比纯文本长
-      const estimatedChunkLength = Math.min(
-        chunkText.length * 2, // markdown标记可能使长度翻倍
-        originalMarkdown.length - originalStartPos
-      )
-      
-      let chunkEndPos = originalStartPos + estimatedChunkLength
-
-      // 尝试在段落边界结束（\n\n）
-      const paragraphEnd = originalMarkdown.indexOf('\n\n', originalStartPos)
-      if (paragraphEnd !== -1 && paragraphEnd < chunkEndPos && paragraphEnd > originalStartPos) {
-        chunkEndPos = paragraphEnd + 2
-      } else {
-        // 尝试在行边界结束
-        const lineEnd = originalMarkdown.indexOf('\n', originalStartPos + chunkText.length)
-        if (lineEnd !== -1 && lineEnd < chunkEndPos) {
-          chunkEndPos = lineEnd + 1
-        }
-      }
-
-      // 确保不超过文档末尾
-      chunkEndPos = Math.min(chunkEndPos, originalMarkdown.length)
-
-      // 提取markdown chunk
-      let markdownChunk = originalMarkdown.substring(originalStartPos, chunkEndPos).trim()
-
-      // 验证提取的chunk是否包含chunk文本的主要内容
-      const extractedNormalized = normalizeText(markdownChunk)
-      if (!extractedNormalized.includes(normalizedChunkText.substring(0, Math.min(20, normalizedChunkText.length)))) {
-        // 如果提取的内容不匹配，尝试扩展范围
-        const extendedEnd = Math.min(originalStartPos + chunkText.length * 3, originalMarkdown.length)
-        markdownChunk = originalMarkdown.substring(originalStartPos, extendedEnd).trim()
-      }
-
-      markdownChunks.push({
-        text: markdownChunk || chunkText, // 如果提取失败，使用原始文本作为后备
-        metadata: textChunk.metadata || {}
-      })
-
-      // 更新搜索起始位置，用于下一个chunk的查找
-      searchStartPos = chunkEndPos
-    }
-
-    return markdownChunks
-  }
 }

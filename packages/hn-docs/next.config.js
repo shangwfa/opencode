@@ -49,6 +49,27 @@ const nextConfig = {
         basePath: false,
       },
       {
+        source: "/api/v1/sys/:path*",
+        destination: `${K}/sys/:path*`,
+        basePath: false,
+      },
+      {
+        // 原公开搜索 API 使用 noauth 前缀；映射到同一套 knowledge 兼容路由。
+        source: "/api/noauth/v1/sys/:path*",
+        destination: `${K}/sys/:path*`,
+        basePath: false,
+      },
+      {
+        source: "/api/v1/user/:path*",
+        destination: `${K}/sys/:path*`,
+        basePath: false,
+      },
+      {
+        source: "/api/v1/proxy/:path*",
+        destination: `${K}/sys/:path*`,
+        basePath: false,
+      },
+      {
         source: "/knowledge-base/sync-from-doc-platform",
         destination: `${K}/knowledge-base/sync-from-doc-platform`,
         basePath: false,
