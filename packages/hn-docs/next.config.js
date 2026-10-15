@@ -16,8 +16,10 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        // basePath:false:浏览器相对路径 /api/doc-platform/**(无 /yddoc 前缀)直达 knowledge
         source: "/api/doc-platform/:path*",
         destination: `${KNOWLEDGE_INTERNAL_URL}/api/doc-platform/:path*`,
+        basePath: false,
       },
     ];
   },
