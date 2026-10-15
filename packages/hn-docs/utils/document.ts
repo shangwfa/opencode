@@ -2,11 +2,21 @@
 // video/image/attachment/iframe 的 attrs.src；
 // rpaFlow 的 attrs["data-blocks"]；
 // board 的 attrs["preview-img"]、attrs["board-data"]（http(s) 整段 URL 才处理，内联 JSON 不动）
+const isVercelBlobUrl = (url) => {
+  try {
+    return new URL(url).hostname.endsWith(".blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
+};
+
 const assembleAttrUrl = (attrs, key, domain) => {
   if (!attrs || typeof attrs !== "object") return;
   const raw = attrs[key];
   if (!raw || typeof raw !== "string") return;
   const t = raw.trim();
+  // Vercel Blob 资源为完整可读 URL,无需(也不应)拼接本地域名
+  if (isVercelBlobUrl(t)) return;
   if (isUrlWithDomain(t)) {
     attrs[key] = domain + new URL(t).pathname;
     return;
@@ -29,6 +39,7 @@ export const docDomainAssemble = (doc, domain) => {
       ) {
         const raw = item.attrs?.src ?? item.src;
         if (raw && typeof raw === "string") {
+          if (isVercelBlobUrl(raw)) return; // blob 完整 URL 保留
           const path = isUrlWithDomain(raw) ? new URL(raw).pathname : raw;
           const fullUrl = domain + path;
           if (!item.attrs) item.attrs = {};

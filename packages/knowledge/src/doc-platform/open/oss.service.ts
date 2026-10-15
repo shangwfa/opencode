@@ -68,9 +68,11 @@ export async function putResource(params: {
   contextId: string
   /** 模式 A 上游接口所需 envCode */
   envCode?: string
+  /** 预生成 key(resource-upload 直传代理:调用方已从会话拿到确定性路径) */
+  keyOverride?: string
 }): Promise<ServerUploadResult> {
   const mode = uploadMode()
-  const key = objectPath(params.contextId, params.fileName)
+  const key = params.keyOverride ?? objectPath(params.contextId, params.fileName)
 
   if (mode === "vercel-blob") {
     const token = requiredEnv("BLOB_READ_WRITE_TOKEN")

@@ -35,6 +35,7 @@ export const {
   kbAliases,
   kbModes,
   documentSyncTasks,
+  compatUploads,
 } = schema
 export { schemaName, pool }
 
@@ -273,6 +274,20 @@ export async function initDatabase() {
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_doc_sync_tasks_status
       ON ${schemaName}.document_sync_tasks(status)
+    `)
+
+    // ── v1 兼容层:正文/草稿上传缓存(saveDoc/draft 的 content key → 内容) ──
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS ${schemaName}.compat_uploads (
+        key VARCHAR(255) PRIMARY KEY,
+        knowledge_base_id VARCHAR(255),
+        kind VARCHAR(16) NOT NULL DEFAULT 'doc',
+        content_type VARCHAR(128),
+        payload JSONB,
+        blob_url TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
     `)
 
   } finally {

@@ -8,12 +8,14 @@ import { Hono } from "hono"
 import { kbAdminApp } from "./routes/admin.routes.js"
 import { kbPublicApp } from "./routes/public.routes.js"
 import { openApp } from "./open/open.routes.js"
+import { compatApp } from "./compat/compat.routes.js"
 import { syncWorkerService } from "./services/sync-worker.service.js"
 
 export const docPlatformApp = new Hono()
   .route("/kb-admin", kbAdminApp)
   .route("/", kbPublicApp)
   .route("/", openApp)
+  .route("/compat", compatApp)
 
 /** 服务启动后调用:恢复残留的派生任务(幂等) */
 export async function recoverPendingSyncTasks(): Promise<number> {

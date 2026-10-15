@@ -19,6 +19,9 @@ export async function middleware(req: NextRequest) {
     url.pathname.startsWith("/_next/") ||
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/kb") || // 知识库产品路由:不经品牌别名解析
+    url.pathname.startsWith("/boss/") || // v1 兼容接口(rewrite → knowledge compat)
+    url.pathname.startsWith("/compat/") || // v1 兼容上传/读取端点
+    url.pathname.startsWith("/knowledge-base/") || // v1 兼容同步端点
     url.pathname === "/favicon.ico" ||
     url.pathname === "/logo.svg" ||
     url.pathname.startsWith("/.well-known/")

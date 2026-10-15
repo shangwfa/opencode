@@ -128,6 +128,20 @@ export function createSchema(schemaName: string) {
   })
 
   /**
+   * v1 兼容层上传缓存:content key → 内容(doc/草稿 JSON)
+   */
+  const compatUploads = schema.table("compat_uploads", {
+    key: varchar("key", { length: 255 }).primaryKey(),
+    knowledgeBaseId: varchar("knowledge_base_id", { length: 255 }),
+    kind: varchar("kind", { length: 16 }).notNull().default("doc"),
+    contentType: varchar("content_type", { length: 128 }),
+    payload: jsonb("payload"),
+    blobUrl: text("blob_url"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  })
+
+  /**
    * 同步任务表
    */
   const syncTasks = schema.table("sync_tasks", {
@@ -199,6 +213,7 @@ export function createSchema(schemaName: string) {
     kbAliases,
     kbModes,
     documentSyncTasks,
+    compatUploads,
     knowledgeBasesRelations,
     documentsRelations,
     syncTasksRelations,
