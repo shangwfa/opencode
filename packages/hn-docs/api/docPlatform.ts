@@ -35,7 +35,8 @@ export async function kbFetch<T = any>(
   }
 }
 
-const http = axios.create({ baseURL: "/api/doc-platform" });
+// 4xx/5xx 也进 unwrap 统一解析(取后端 message,而非 axios 默认错误文案)
+const http = axios.create({ baseURL: "/api/doc-platform", validateStatus: () => true });
 
 interface KbResponse<T = any> {
   code: number;
