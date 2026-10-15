@@ -123,8 +123,15 @@ export const ConnectorHandler = HttpApiBuilder.group(Api, "server.connector", (h
       Effect.fn(function* (ctx) {
         const connector = yield* Connector.Service
         return yield* connector
-          .catalog({ service: ctx.query.service, authType: ctx.query.authType })
+          .catalog({ service: ctx.query.service, authType: ctx.query.authType, category: ctx.query.category })
           .pipe(Effect.mapError(failure))
+      }),
+    )
+    .handle(
+      "connector.categories",
+      Effect.fn(function* (ctx) {
+        const connector = yield* Connector.Service
+        return yield* connector.categories().pipe(Effect.mapError(failure))
       }),
     )
     .handle(

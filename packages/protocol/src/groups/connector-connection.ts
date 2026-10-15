@@ -185,6 +185,7 @@ export const ConnectorGroup = HttpApiGroup.make("server.connector")
       query: Schema.Struct({
         service: Schema.String.pipe(Schema.optional),
         authType: ConnectorConnection.ProviderAuthType.pipe(Schema.optional),
+        category: Schema.String.pipe(Schema.optional),
       }),
       success: ConnectorConnection.ProviderCatalog,
       error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
@@ -193,7 +194,20 @@ export const ConnectorGroup = HttpApiGroup.make("server.connector")
         identifier: "connector.providers",
         summary: "List connectable providers",
         description:
-          "Admin-plane passthrough of the engine's provider directory; optional service/authType filters narrow the entries.",
+          "Admin-plane passthrough of the engine's provider directory; optional service/authType/category filters narrow the entries.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("connector.categories", "/api/connector/categories", {
+      success: ConnectorConnection.CategoryCatalog,
+      error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "connector.categories",
+        summary: "List connector category labels",
+        description:
+          "Aggregated category taxonomy of the engine's provider directory: every category label with its provider count, sorted alphabetically.",
       }),
     ),
   )

@@ -6,6 +6,7 @@ import { ConnectorConnection } from "@opencode/schema/connector-connection"
 import { SessionMcp } from "@opencode/schema/session-mcp"
 import { backoffDelayMs } from "./crypto.js"
 import { ConnectorEngine, EngineError } from "./engine.js"
+import { collectCategories, filterByCategory } from "../categories.js"
 
 export interface Row {
   readonly id: ConnectorConnection.ID
@@ -247,12 +248,18 @@ export interface Interface {
   }) => Effect.Effect<ConnectorEngine.EngineRunsPage, EngineError>
   /**
    * Lists connectable providers (the engine's provider directory). Not session-bound; optional
-   * `service`/`authType` filters narrow the returned entries.
+   * `service`/`authType`/`category` filters narrow the returned entries.
    */
   readonly catalog: (input?: {
     readonly service?: string
     readonly authType?: ConnectorConnection.ProviderAuthType
+    readonly category?: string
   }) => Effect.Effect<ConnectorConnection.ProviderCatalog, EngineError>
+  /**
+   * Aggregated category taxonomy of the engine's provider directory (not session-bound).
+   * Labels are deduplicated case-insensitively and sorted alphabetically.
+   */
+  readonly categories: () => Effect.Effect<ConnectorConnection.CategoryCatalog, EngineError>
   /** Service-scoped proxy passthrough; connection targeting follows the executeAction rules. */
   readonly proxy: (
     sessionID: string,
@@ -977,7 +984,17 @@ export const make = (
           if (input?.authType && !provider.authTypes.includes(input.authType)) return []
           return [provider]
         })
-        return ConnectorConnection.ProviderCatalog.make({ providers })
+        return ConnectorConnection.ProviderCatalog.make({ providers: filterByCategory(providers, input?.category) })
+      }),
+
+    categories: () =>
+      Effect.gen(function* () {
+        const decode = Schema.decodeUnknownOption(ConnectorConnection.ProviderSummary)
+        const providers = (yield* engine.providers()).flatMap((entry) => {
+          const decoded = decode(entry)
+          return Option.isNone(decoded) ? [] : [decoded.value]
+        })
+        return ConnectorConnection.CategoryCatalog.make({ categories: collectCategories(providers) })
       }),
 
     proxy: (sessionID, input) =>

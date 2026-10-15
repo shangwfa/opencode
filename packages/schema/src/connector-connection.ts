@@ -102,7 +102,21 @@ export const ProviderSummary = Schema.Struct({
   homepageUrl: Schema.String.pipe(optional),
 }).annotate({ identifier: "ConnectorConnection.ProviderSummary" })
 
-/** The connectable provider directory; `service`/`authType` filters narrow the entries server-side. */
+/** One aggregated category label from the engine's provider directory. */
+export interface ConnectorCategory extends Schema.Schema.Type<typeof ConnectorCategory> {}
+export const ConnectorCategory = Schema.Struct({
+  id: Schema.String,
+  displayName: Schema.String,
+  providerCount: Schema.Number,
+}).annotate({ identifier: "ConnectorConnection.ConnectorCategory" })
+
+/** The category taxonomy aggregated across the connectable provider directory. */
+export interface CategoryCatalog extends Schema.Schema.Type<typeof CategoryCatalog> {}
+export const CategoryCatalog = Schema.Struct({
+  categories: Schema.Array(ConnectorCategory),
+}).annotate({ identifier: "ConnectorConnection.CategoryCatalog" })
+
+/** The connectable provider directory; `service`/`authType`/`category` filters narrow the entries server-side. */
 export interface ProviderCatalog extends Schema.Schema.Type<typeof ProviderCatalog> {}
 export const ProviderCatalog = Schema.Struct({
   providers: Schema.Array(ProviderSummary),
