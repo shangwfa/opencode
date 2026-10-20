@@ -1,0 +1,18 @@
+# syntax=docker/dockerfile:1
+# 保留已部署镜像的预装环境，仅补齐与当前 SaaS 匹配的 Code Mode Runner。
+ARG BASE_IMAGE=crpi-hlpnu8kiweghie0r.cn-hangzhou.personal.cr.aliyuncs.com/shangwfa/opencode-sandbox:mise-preload-v1
+FROM oven/bun:1.3.14 AS codemode-runner
+WORKDIR /app
+COPY --from=repo package.json bun.lock bunfig.toml ./
+COPY --from=repo patches/ patches/
+COPY --from=repo packages/ packages/
+COPY opt/codemode-runner.ts /app/packages/codemode/codemode-runner.ts
+RUN bun install --ignore-scripts --filter '@opencode/codemode' \
+    && bun add ws@8.21.0 \
+    && bun build /app/packages/codemode/codemode-runner.ts --target=node --format=esm --outfile=/out/codemode-runner.mjs
+
+FROM ${BASE_IMAGE}
+USER root
+COPY --from=codemode-runner /out/codemode-runner.mjs /opt/opencode-codemode-runner.mjs
+RUN --mount=type=bind,source=opt/check-codemode-runner.mjs,target=/tmp/check-codemode-runner.mjs \
+    node --check /opt/opencode-codemode-runner.mjs && node /tmp/check-codemode-runner.mjs

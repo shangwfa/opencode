@@ -1,0 +1,57 @@
+{
+  "id": "default",
+  "label": "标准工作流",
+  "description": "需求讨论 → 方案规划 → 代码生成 → 代码审查",
+  "workspaceRoot": "{workspaceRoot}",
+  "projectDir": "{workspaceRoot}",
+  "sessionAgentNames": ["specer", "planner", "builder", "reviewer"],
+  "suggestStepPath": "analysis/{reqId}/suggest-step.json",
+  "stages": [
+    {
+      "id": "requirement-discussion",
+      "label": "需求讨论",
+      "agent": "specer",
+      "artifactPath": "analysis/{reqId}/spec/spec.md",
+      "description": "与 AI 讨论需求细节，产出需求文档",
+      "permission": { "edit": "deny", "bash": "deny" },
+      "emptyPrompt": "请直接在下方输入你想做的功能或改动",
+      "completion": { "vcsDiff": true }
+    },
+    {
+      "id": "plan",
+      "label": "方案规划",
+      "agent": "planner",
+      "artifactPath": "analysis/{reqId}/plan/plan.md",
+      "description": "基于需求文档规划技术方案和任务拆分",
+      "permission": { "edit": "deny", "bash": "ask" },
+      "enterPrompt": "开始「{stageLabel}」",
+      "completion": { "vcsDiff": true }
+    },
+    {
+      "id": "code-modification",
+      "label": "代码生成",
+      "agent": "builder",
+      "artifactPath": "analysis/{reqId}/build/build.md",
+      "description": "根据方案执行代码修改",
+      "permission": { "edit": "allow", "bash": "allow" },
+      "enterPrompt": "开始「{stageLabel}」",
+      "backwardEnterPrompt": "代码审查发现以下问题，请修复：{suggestStepReason}",
+      "completion": { "vcsDiff": true }
+    },
+    {
+      "id": "code-review",
+      "label": "代码审查",
+      "agent": "reviewer",
+      "artifactPath": "analysis/{reqId}/review/review.md",
+      "description": "对代码变更进行全面审查",
+      "permission": { "edit": "deny", "bash": "deny" },
+      "enterPrompt": "请对当前代码变更进行全面审查",
+      "commitButton": true,
+      "completion": {
+        "vcsDiff": true,
+        "completionPrompt": "代码已提交，可在部署发布面板继续部署或创建 MR",
+        "autoDetectSuggestStep": true
+      }
+    }
+  ]
+}

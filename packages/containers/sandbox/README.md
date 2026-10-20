@@ -102,6 +102,21 @@ pnpm install 时依赖 npm cache 中的 tarball 减少网络下载。
 
 ## 构建命令
 
+### 为现有 mise 镜像补齐 Runner
+
+保留原镜像的运行时和预装缓存，仅添加当前源码构建的 Runner。使用新标签，不覆盖基础镜像：
+
+```bash
+docker buildx build --platform linux/amd64 \
+  --provenance=false --sbom=false \
+  --build-context repo=../../.. \
+  -f Dockerfile.runner-fix \
+  -t <registry>/opencode-sandbox:mise-preload-v1-runner-<date> \
+  --push .
+```
+
+可通过 `--build-arg BASE_IMAGE=<原镜像>` 指定基础镜像。构建会实际启动 Runner 并检查 9911 端口就绪，不只检查文件存在。部署应更新 SaaS 的沙箱镜像配置；已有沙箱不会自动更换镜像。
+
 ```bash
 cd packages/containers/sandbox
 

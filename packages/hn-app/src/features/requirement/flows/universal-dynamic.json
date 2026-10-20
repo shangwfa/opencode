@@ -1,0 +1,75 @@
+{
+  "id": "universal-dynamic",
+  "label": "动态工作流",
+  "description": "dyn-orchestrator 入口判断 → 简单需求直接执行，复杂需求按需调度（dyn-spec/dyn-ui/dyn-build 主 agent + dyn-review 子 agent）",
+  "workspaceRoot": "{workspaceRoot}",
+  "projectDir": "{workspaceRoot}",
+  "sessionAgentNames": [
+    "dyn-orchestrator",
+    "dyn-spec",
+    "dyn-ui",
+    "dyn-build",
+    "dyn-review",
+    "dyn-designer",
+    "dyn-cdp-automation",
+    "api-detail-specer",
+    "full-stack-engineer",
+    "api-detail-matcher"
+  ],
+  "suggestStepPath": "",
+  "runtimeDecisionPath": "",
+  "artifactEventsPath": "analysis/{reqId}/events/artifact-events.jsonl",
+  "dynamicHarness": true,
+  "stages": [
+    {
+      "id": "dyn-orchestrator",
+      "label": "调度",
+      "agent": "dyn-orchestrator",
+      "artifactPath": "analysis/{reqId}/build/build.md",
+      "description": "入口判断；简单需求直接执行，复杂需求在对话中引导后分配",
+      "permission": { "edit": "allow", "bash": "allow", "task": "allow" },
+      "emptyPrompt": "请直接在下方输入你想做的功能或改动",
+      "stageKind": "conversation",
+      "artifactKind": "build_log",
+      "completion": {
+        "vcsDiff": true
+      },
+      "commitButton": true
+    },
+    {
+      "id": "dyn-spec",
+      "label": "需求",
+      "agent": "dyn-spec",
+      "artifactPath": "analysis/{reqId}/spec/spec.md",
+      "description": "需求澄清",
+      "permission": { "edit": "deny", "bash": "deny", "task": "allow" },
+      "enterPrompt": "开始「需求澄清」",
+      "artifactKind": "requirement_snapshot"
+    },
+    {
+      "id": "dyn-ui",
+      "label": "设计",
+      "agent": "dyn-ui",
+      "artifactPath": "analysis/{reqId}/design/design.md",
+      "description": "UI/UX 设计",
+      "permission": { "edit": "deny", "bash": "deny", "task": "allow" },
+      "enterPrompt": "开始「UI 设计」",
+      "artifactKind": "layout_design"
+    },
+    {
+      "id": "dyn-build",
+      "label": "实施",
+      "agent": "dyn-build",
+      "artifactPath": "analysis/{reqId}/build/build.md",
+      "description": "编码实施",
+      "permission": { "edit": "allow", "bash": "allow", "task": "allow" },
+      "enterPrompt": "开始代码实施。",
+      "backwardEnterPrompt": "代码审查发现以下问题，请修复：{suggestStepReason}",
+      "completion": {
+        "vcsDiff": true
+      },
+      "artifactKind": "build_log",
+      "commitButton": true
+    }
+  ]
+}

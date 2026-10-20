@@ -47,6 +47,8 @@ ENV NODE_ROOT=/opt/node
 COPY --from=node-dl /tmp/node-v24.19.0-linux-* $NODE_ROOT/24/
 ENV PATH="$NODE_ROOT/24/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
 COPY --from=codemode-runner /out/codemode-runner.mjs /opt/opencode-codemode-runner.mjs
+RUN --mount=type=bind,source=opt/check-codemode-runner.mjs,target=/tmp/check-codemode-runner.mjs \
+    node --check /opt/opencode-codemode-runner.mjs && node /tmp/check-codemode-runner.mjs
 
 # ── 3. npm/pnpm 淘宝源 + pnpm@10 ──
 RUN npm config set registry https://registry.npmmirror.com --global \
