@@ -1,5 +1,24 @@
 import { index, integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core"
 
+/** One application/account/tool policy and one shared, hash-only MCP credential. */
+export const ConnectorMcpTable = sqliteTable("connector_mcp_deployment", {
+  id: text().primaryKey(),
+  session_id: text().notNull(),
+  service: text().notNull(),
+  connection_id: text(),
+  name: text().notNull(),
+  status: text().notNull(),
+  revision: integer().notNull(),
+  tools: text("tools_json").notNull(),
+  token_hash: text().notNull(),
+  token_prefix: text().notNull(),
+  time_created: integer().notNull(),
+  time_updated: integer().notNull(),
+}, (table) => [
+  index("connector_mcp_owner_idx").on(table.session_id, table.status),
+  index("connector_mcp_connection_idx").on(table.connection_id),
+])
+
 /**
  * SaaS-side association between a session resource domain and an engine connection.
  * Credentials never live here: the engine stores them encrypted under its own schema,

@@ -105,6 +105,22 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`connector_mcp_deployment\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`service\` text NOT NULL,
+          \`connection_id\` text,
+          \`name\` text NOT NULL,
+          \`status\` text NOT NULL,
+          \`revision\` integer NOT NULL,
+          \`tools_json\` text NOT NULL,
+          \`token_hash\` text NOT NULL,
+          \`token_prefix\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`connector_oauth_request\` (
           \`connection_request_id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -563,6 +579,12 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         `CREATE UNIQUE INDEX \`connector_connection_engine_id_uq\` ON \`connector_connection\` (\`engine_connection_id\`);`,
       )
       yield* tx.run(`CREATE INDEX \`connector_connection_session_idx\` ON \`connector_connection\` (\`session_id\`);`)
+      yield* tx.run(
+        `CREATE INDEX \`connector_mcp_owner_idx\` ON \`connector_mcp_deployment\` (\`session_id\`,\`status\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`connector_mcp_connection_idx\` ON \`connector_mcp_deployment\` (\`connection_id\`);`,
+      )
       yield* tx.run(
         `CREATE INDEX \`connector_oauth_request_session_idx\` ON \`connector_oauth_request\` (\`session_id\`);`,
       )

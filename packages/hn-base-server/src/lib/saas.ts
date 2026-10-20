@@ -24,6 +24,18 @@ export async function saasFetch(path: string, init?: RequestInit): Promise<Respo
   }
 }
 
+/** Dedicated connector transport; caller credentials cannot reach arbitrary SaaS routes. */
+export async function saasMcpFetch(path: string, init: RequestInit): Promise<Response> {
+  if (!/^\/api\/connector\/mcp(?:\/cmcp_[a-f0-9]{32})?$/.test(path)) throw errors.invalid("无效的 MCP 地址")
+  const headers = new Headers(init.headers)
+  if (!/^Bearer \S+$/i.test(headers.get("authorization") ?? "")) throw errors.invalid("缺少 MCP 凭据")
+  try {
+    return await fetch(`${env.saasUrl.replace(/\/+$/, "")}${path}`, { ...init, headers, redirect: "manual" })
+  } catch {
+    throw errors.upstream(502, "无法连接 MCP 执行服务")
+  }
+}
+
 export async function saasJson<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await saasFetch(path, init)
   if (!res.ok) {

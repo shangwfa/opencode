@@ -200,7 +200,7 @@ function dispatch(
     }
     // The connector MCP passthrough carries its own session-scoped engine token and would
     // otherwise never satisfy Basic auth here; the handler enforces the engine-side check.
-    if (ready && url.pathname === "/api/connector/mcp") return yield* app.value
+    if (ready && (url.pathname === "/api/connector/mcp" || /^\/api\/connector\/mcp\/cmcp_[a-f0-9]{32}$/.test(url.pathname))) return yield* app.value
     // The OAuth provider callback is public in the engine (state-validated there).
     if (ready && url.pathname === "/connector/oauth/callback") return yield* app.value
     // Trigger webhook ingress is a public provider callback; the engine validates the

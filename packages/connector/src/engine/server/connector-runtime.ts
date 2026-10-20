@@ -4,6 +4,9 @@ import type { RuntimeLogger } from "../core/types.ts";
 import type { RuntimeJwtConfig } from "./api/runtime-jwt.ts";
 import type { S3TransitClientOptions } from "./files/s3-transit-files.ts";
 import type { IStagedTransitFileService } from "./files/transit-file-store.ts";
+import type { ScopedActionInput } from "./actions/scoped-action.ts";
+import type { ActionRunResult } from "./actions/action-runner.ts";
+import type { RuntimeActionDefinition } from "../catalog-store.ts";
 
 import { mkdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -104,6 +107,9 @@ export interface ConnectorRuntimeOptions {
 
 /** Standard web requests are the host boundary; credentials, databases and framework objects stay private. */
 export interface ConnectorRuntime {
+  getActions(service: string): readonly RuntimeActionDefinition[];
+  /** Trusted in-process host only; no corresponding public grant endpoint. */
+  executeScopedAction(input: ScopedActionInput): Promise<ActionRunResult | undefined>;
   readonly runtimeAuthConfigured: boolean;
   fetch(request: Request): Promise<Response>;
   /** Abort active requests, wait for their handlers, and close owned resources. Safe to call repeatedly. */
@@ -209,7 +215,7 @@ async function openRuntime(options: ConnectorRuntimeOptions): Promise<ConnectorR
     const tempDir = join(dataDir, "tmp/transit-files");
     await transitFiles.cleanupExpired();
     await cleanupStagedTransitFiles(tempDir, ttlSeconds * 1000);
-    const { app, runtimeAuthConfigured, saasCleanup, triggerMaintenance } = await createConnectApp({
+    const { app, runtimeAuthConfigured, saasCleanup, triggerMaintenance, executeScopedAction } = await createConnectApp({
       catalog,
       providerLoader: new ProviderLoader(executorModules),
       providerHttpDispatch: options.providerHttpDispatch,
@@ -230,10 +236,24 @@ async function openRuntime(options: ConnectorRuntimeOptions): Promise<ConnectorR
     saasCleanup.start();
     triggerMaintenance.start();
     const shutdown = new AbortController();
-    const pending = new Set<Promise<Response>>();
+    const pending = new Set<Promise<unknown>>();
     let closing: Promise<void> | undefined;
     return {
       runtimeAuthConfigured,
+      getActions(service) {
+        if (closing) throw new Error("Open Connector runtime is closing.");
+        return catalog.providers.find((provider) => provider.service === service)?.actions ?? [];
+      },
+      executeScopedAction(input) {
+        if (closing) return Promise.reject(new Error("Open Connector runtime is closing."));
+        const response = Promise.resolve().then(() => executeScopedAction({
+          ...input,
+          signal: input.signal ? AbortSignal.any([input.signal, shutdown.signal]) : shutdown.signal,
+        }));
+        pending.add(response);
+        void response.then(() => pending.delete(response), () => pending.delete(response));
+        return response;
+      },
       fetch(request) {
         if (closing) return Promise.resolve(Response.json({ error: "runtime_closed" }, { status: 503 }));
         const url = new URL(request.url);

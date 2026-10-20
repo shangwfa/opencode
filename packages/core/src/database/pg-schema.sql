@@ -85,12 +85,50 @@ CREATE TABLE "connector_connection" (
           "time_created" bigint NOT NULL,
           "time_updated" bigint NOT NULL
         );
+CREATE TABLE "connector_mcp_deployment" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "service" text NOT NULL,
+          "connection_id" text,
+          "name" text NOT NULL,
+          "status" text NOT NULL,
+          "revision" bigint NOT NULL,
+          "tools_json" text NOT NULL,
+          "token_hash" text NOT NULL,
+          "token_prefix" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "connector_oauth_request" (
           "connection_request_id" text PRIMARY KEY,
           "session_id" text NOT NULL,
           "service" text NOT NULL,
           "state" text NOT NULL,
           "alias" text,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "connector_trigger_event" (
+          "id" text PRIMARY KEY,
+          "schedule_id" text NOT NULL,
+          "delivery_key" text NOT NULL,
+          "payload_json" text NOT NULL,
+          "delivered_at" bigint,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "connector_trigger_receipt" (
+          "id" text PRIMARY KEY,
+          "schedule_id" text NOT NULL,
+          "received_at" bigint NOT NULL,
+          "dedup_key" text NOT NULL,
+          "body_base64" text NOT NULL,
+          "headers_json" text NOT NULL,
+          "state" text NOT NULL,
+          "engine_result_json" text,
+          "checkpoint_json" text,
+          "attempts" bigint DEFAULT 0 NOT NULL,
+          "next_retry_at" bigint NOT NULL,
           "time_created" bigint NOT NULL,
           "time_updated" bigint NOT NULL
         );
@@ -417,7 +455,13 @@ CREATE INDEX "snapshot_refresh_operation_session_idx" ON "snapshot_refresh_opera
 CREATE UNIQUE INDEX "snapshot_refresh_operation_active_uniq" ON "snapshot_refresh_operation" ("session_id","sandbox_id","kind") WHERE "snapshot_refresh_operation"."state" in ('pending', 'running');
 CREATE UNIQUE INDEX "connector_connection_engine_id_uq" ON "connector_connection" ("engine_connection_id");
 CREATE INDEX "connector_connection_session_idx" ON "connector_connection" ("session_id");
+CREATE INDEX "connector_mcp_owner_idx" ON "connector_mcp_deployment" ("session_id","status");
+CREATE INDEX "connector_mcp_connection_idx" ON "connector_mcp_deployment" ("connection_id");
 CREATE INDEX "connector_oauth_request_session_idx" ON "connector_oauth_request" ("session_id");
+CREATE UNIQUE INDEX "connector_trigger_event_delivery_uq" ON "connector_trigger_event" ("schedule_id","delivery_key");
+CREATE INDEX "connector_trigger_event_schedule_idx" ON "connector_trigger_event" ("schedule_id");
+CREATE UNIQUE INDEX "connector_trigger_receipt_dedup_uq" ON "connector_trigger_receipt" ("schedule_id","dedup_key");
+CREATE INDEX "connector_trigger_receipt_retry_idx" ON "connector_trigger_receipt" ("state","next_retry_at");
 CREATE INDEX "connector_trigger_schedule_session_idx" ON "connector_trigger_schedule" ("session_id");
 CREATE INDEX "connector_trigger_schedule_due_idx" ON "connector_trigger_schedule" ("next_run_at");
 CREATE UNIQUE INDEX "event_aggregate_seq_idx" ON "event" ("aggregate_id","seq");

@@ -37,6 +37,7 @@ BASE_DATABASE_SCHEMA=hn_base_test bun run src/server.ts
 | `BASE_DATABASE_SCHEMA` | `hn_base` | 独立 schema（避免与 SaaS 的 `account`/`user` 冲突） |
 | `BASE_PORT` / `BASE_HOST` | `3201` / `0.0.0.0` | 监听 |
 | `BETTER_AUTH_URL` | `http://localhost:3201` | better-auth baseURL |
+| `BASE_PUBLIC_URL` | 回退 `BETTER_AUTH_URL` | 沙箱可访问的基础服务地址；Connector MCP URL 使用它 |
 | `BETTER_AUTH_SECRET` | dev 占位 | 生产必须设置 |
 | `WEB_ORIGIN` | `http://localhost:3001` | CORS / trustedOrigins（CSRF） |
 | `OPENCODE_SAAS_URL` | `http://localhost:14096` | SaaS 内网地址 |

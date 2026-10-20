@@ -1,4 +1,5 @@
 import { ConnectorConnection } from "@opencode/schema/connector-connection"
+import { ConnectorMcp } from "@opencode/schema/connector-mcp"
 import { SessionMcp } from "@opencode/schema/session-mcp"
 import { PositiveInt } from "@opencode/schema/schema"
 import { Schema } from "effect"
@@ -13,6 +14,32 @@ import {
 } from "../errors.js"
 
 export const ConnectorGroup = HttpApiGroup.make("server.connector")
+  .add(HttpApiEndpoint.get("connector.appMcp.list", "/api/session/:sessionID/connector/mcp-deployments", {
+    params: { sessionID: Session.ID }, success: ConnectorMcp.List,
+    error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+  }))
+  .add(HttpApiEndpoint.post("connector.appMcp.create", "/api/session/:sessionID/connector/mcp-deployments", {
+    params: { sessionID: Session.ID }, payload: ConnectorMcp.Create, success: ConnectorMcp.Issued,
+    error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+  }))
+  .add(HttpApiEndpoint.patch("connector.appMcp.update", "/api/session/:sessionID/connector/mcp-deployments/:deploymentID", {
+    params: { sessionID: Session.ID, deploymentID: Schema.String }, payload: ConnectorMcp.Update, success: ConnectorMcp.Info,
+    error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+  }))
+  .add(HttpApiEndpoint.post("connector.appMcp.rotate", "/api/session/:sessionID/connector/mcp-deployments/:deploymentID/rotate-token", {
+    params: { sessionID: Session.ID, deploymentID: Schema.String }, payload: ConnectorMcp.Revision, success: ConnectorMcp.Issued,
+    error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+  }))
+  .add(HttpApiEndpoint.delete("connector.appMcp.remove", "/api/session/:sessionID/connector/mcp-deployments/:deploymentID", {
+    params: { sessionID: Session.ID, deploymentID: Schema.String }, success: HttpApiSchema.NoContent,
+    error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+  }))
+  .add(HttpApiEndpoint.post("connector.appMcp.call", "/api/connector/mcp/:deploymentID", {
+    params: { deploymentID: Schema.String }, success: Schema.Json,
+  }))
+  .add(HttpApiEndpoint.get("connector.appMcp.listen", "/api/connector/mcp/:deploymentID", {
+    params: { deploymentID: Schema.String }, success: Schema.Json,
+  }))
   .add(
     HttpApiEndpoint.post("connector.connection.create", "/api/session/:sessionID/connector/connections", {
       params: { sessionID: Session.ID },
@@ -195,6 +222,19 @@ export const ConnectorGroup = HttpApiGroup.make("server.connector")
         summary: "List connectable providers",
         description:
           "Admin-plane passthrough of the engine's provider directory; optional service/authType/category filters narrow the entries.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("connector.provider", "/api/connector/providers/:service", {
+      params: { service: Schema.String },
+      success: Schema.Json,
+      error: [ConflictError, ConnectorNotFoundError, InvalidRequestError, ServiceUnavailableError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "connector.provider",
+        summary: "Get one connectable provider",
+        description: "Provider details including auth definitions, actions, scopes, and triggers.",
       }),
     ),
   )

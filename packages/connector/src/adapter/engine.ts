@@ -1,6 +1,10 @@
 export * as ConnectorEngine from "./engine.js"
 
 import { Context, Effect, Layer } from "effect"
+import type { ConnectorRuntime } from "../engine/server/connector-runtime.js"
+import type { RuntimeActionDefinition } from "../engine/catalog-store.js"
+import type { ScopedActionInput } from "../engine/server/actions/scoped-action.js"
+import type { ActionRunResult } from "../engine/server/actions/action-runner.js"
 
 export interface EngineConnection {
   readonly id: string
@@ -54,6 +58,8 @@ export class EngineError extends Error {
 }
 
 export interface Interface {
+  readonly actionsForService: (service: string) => Effect.Effect<readonly RuntimeActionDefinition[], EngineError>
+  readonly executeScopedAction: (input: ScopedActionInput) => Effect.Effect<ActionRunResult | undefined, EngineError>
   readonly createConnection: (input: {
     readonly service: string
     readonly authType: "api_key" | "custom_credential"
@@ -112,6 +118,8 @@ export interface Interface {
   }) => Effect.Effect<EngineRunsPage, EngineError>
   /** Lists connectable providers (the engine's provider directory, admin scope). */
   readonly providers: () => Effect.Effect<ReadonlyArray<unknown>, EngineError>
+  /** One provider with its actions and auth definitions. */
+  readonly provider: (service: string) => Effect.Effect<unknown, EngineError>
   /** Service-scoped proxy passthrough with a runtime token; `path` is the relative provider endpoint. */
   readonly proxy: (input: {
     readonly token: string
@@ -147,6 +155,7 @@ export interface Interface {
     readonly clientSecret: string
     readonly extra?: Record<string, string>
     readonly requestedScopes?: ReadonlyArray<string>
+    readonly redirectUri?: string
   }) => Effect.Effect<void, EngineError>
   /** Raw GET passthrough for public OAuth endpoints (callback/completion), preserving redirects. */
   readonly oauthPassthrough: (url: string) =>
@@ -189,6 +198,8 @@ export interface Options {
 const noop = (feature: string): Interface =>
   Object.fromEntries(
     [
+      "actionsForService",
+      "executeScopedAction",
       "createConnection",
       "deleteConnection",
       "createRuntimeToken",
@@ -203,6 +214,7 @@ const noop = (feature: string): Interface =>
       "reconnect",
       "runs",
       "providers",
+      "provider",
       "proxy",
       "createFile",
       "readFile",
@@ -248,7 +260,7 @@ export const layer = (options: Options): Layer.Layer<Service> =>
     Service,
     Effect.gen(function* () {
       if (!options.enabled) return Service.of(noop("OPENCODE_CONNECTOR_ENABLED"))
-      let acquire: Promise<{ fetch(request: Request): Promise<Response>; close(): Promise<void> }> | undefined
+      let acquire: Promise<ConnectorRuntime> | undefined
       // Per-boot static runtime token: the engine leaves /mcp unauthenticated while the stored
       // token table is empty (session cleanup can empty it), so a secret nobody holds closes that
       // hole without affecting per-session stored tokens.
@@ -307,6 +319,14 @@ export const layer = (options: Options): Layer.Layer<Service> =>
       const envelope = (body: unknown) => (body as { data?: unknown }).data ?? body
 
       return Service.of({
+        actionsForService: (service) => Effect.tryPromise({
+          try: async () => (await runtime()).getActions(service),
+          catch: () => new EngineError("engine_unavailable", "Connector action catalog is unavailable."),
+        }),
+        executeScopedAction: (input) => Effect.tryPromise({
+          try: async () => (await runtime()).executeScopedAction(input),
+          catch: () => new EngineError("scoped_execution_failed", "Connector scoped execution failed."),
+        }),
         createConnection: (input) => {
           const values = { ...input.values }
           // Connection routes mount under /v1 (connect-server: app.route("/v1", createConnectionRoutes)).
@@ -446,6 +466,7 @@ export const layer = (options: Options): Layer.Layer<Service> =>
           )
         },
         // The provider directory answers a bare JSON array (no {success,data} envelope).
+        provider: (service) => call("GET", `/api/providers/${encodeURIComponent(service)}`),
         providers: () =>
           call("GET", "/api/providers").pipe(
             Effect.map((body): ReadonlyArray<unknown> => (Array.isArray(body) ? body : [])),
@@ -540,6 +561,7 @@ export const layer = (options: Options): Layer.Layer<Service> =>
             clientSecret: input.clientSecret,
             ...(input.extra ? { extra: input.extra } : {}),
             ...(input.requestedScopes ? { requestedScopes: [...input.requestedScopes] } : {}),
+            ...(input.redirectUri ? { redirectUri: input.redirectUri } : {}),
           }).pipe(Effect.asVoid),
         oauthPassthrough: (url) =>
           Effect.tryPromise({

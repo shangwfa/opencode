@@ -25,6 +25,7 @@ import { TriggerRunner } from "../triggers/trigger-runner.ts";
 import { ActionRunner } from "./actions/action-runner.ts";
 import { ConnectServer } from "./connect-server.ts";
 import { RuntimeTokenService } from "./storage/runtime-token-service.ts";
+import { createScopedActionExecutor } from "./actions/scoped-action.ts";
 
 export interface ConnectAppOptions {
   catalog: CatalogStore;
@@ -49,6 +50,7 @@ export interface ConnectAppOptions {
 }
 
 export interface ConnectApp {
+  executeScopedAction: ReturnType<typeof createScopedActionExecutor>;
   saasCleanup: SaasCleanupService;
   triggerMaintenance: TriggerMaintenance;
   app: Hono;
@@ -124,6 +126,13 @@ export async function createConnectApp(options: ConnectAppOptions): Promise<Conn
     logger: options.logger,
   });
   return {
+    executeScopedAction: createScopedActionExecutor({
+      catalog: options.catalog,
+      policy: options.actionPolicy ?? new ExecutionPolicyService(),
+      runtimePolicy: options.runtimeDatabase.runtimePolicyStore,
+      actions,
+      connections,
+    }),
     triggerMaintenance,
     saasCleanup: new SaasCleanupService({
       store: options.runtimeDatabase.saasProjectStore,

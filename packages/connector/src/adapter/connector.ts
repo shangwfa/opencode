@@ -260,6 +260,8 @@ export interface Interface {
    * Labels are deduplicated case-insensitively and sorted alphabetically.
    */
   readonly categories: () => Effect.Effect<ConnectorConnection.CategoryCatalog, EngineError>
+  /** One provider with its action catalog, for the provider detail page. */
+  readonly providerDetail: (service: string) => Effect.Effect<unknown, EngineError>
   /** Service-scoped proxy passthrough; connection targeting follows the executeAction rules. */
   readonly proxy: (
     sessionID: string,
@@ -340,6 +342,7 @@ export interface Interface {
     readonly clientSecret: string
     readonly extra?: Record<string, string>
     readonly requestedScopes?: ReadonlyArray<string>
+    readonly redirectUri?: string
   }) => Effect.Effect<void, EngineError>
   /**
    * Removes engine connections that no SaaS row references (crash between engine create and
@@ -996,6 +999,8 @@ export const make = (
         })
         return ConnectorConnection.CategoryCatalog.make({ categories: collectCategories(providers) })
       }),
+
+    providerDetail: (service) => engine.provider(service),
 
     proxy: (sessionID, input) =>
       Effect.gen(function* () {

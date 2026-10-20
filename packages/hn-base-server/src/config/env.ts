@@ -28,6 +28,10 @@ export const env = {
   get authUrl(): string {
     return readEnv("BETTER_AUTH_URL") || `http://localhost:${Number(readEnv("BASE_PORT") || 3201)}`
   },
+  /** 对外可达的基础服务地址；用于生成沙箱可访问的 Connector MCP URL。 */
+  get publicBaseUrl(): string {
+    return readEnv("BASE_PUBLIC_URL") || readEnv("PUBLIC_BASE_URL") || this.authUrl
+  },
   get authSecret(): string {
     return readEnv("BETTER_AUTH_SECRET") || "dev-only-secret-change-me-in-production"
   },

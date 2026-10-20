@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { saasCreateSession, saasRunShell } from "../src/lib/saas.js"
+import { saasCreateSession, saasRunShell, saasFetch, saasMcpFetch } from "../src/lib/saas.js"
 
 type Call = { url: string; init?: RequestInit }
 
@@ -84,5 +84,34 @@ describe("saasRunShell", () => {
 
     await expect(saasRunShell("ses_1", "git clone x")).rejects.toThrow("命令未执行")
     expect(calls).toHaveLength(1)
+  })
+})
+
+describe("MCP 专用凭据通道", () => {
+  test("普通服务调用始终使用服务身份，不信任传入的 Authorization", async () => {
+    mockFetch(() => json({}))
+    await saasFetch("/api/info", { headers: { authorization: "Bearer untrusted" } })
+    expect(new Headers(calls[0]?.init?.headers).get("authorization")).toStartWith("Basic ")
+  })
+  test("MCP 通道保留 Bearer 和协议头，禁止跟随重定向", async () => {
+    mockFetch(() => new Response(null, { status: 202 }))
+    const path = `/api/connector/mcp/cmcp_${"a".repeat(32)}`
+    const response = await saasMcpFetch(path, { method: "POST", headers: { authorization: "Bearer test", "mcp-protocol-version": "2025-06-18" }, body: "{}" })
+    expect(response.status).toBe(202)
+    expect(new Headers(calls[0]?.init?.headers).get("authorization")).toBe("Bearer test")
+    expect(new Headers(calls[0]?.init?.headers).get("mcp-protocol-version")).toBe("2025-06-18")
+    expect(calls[0]?.init?.redirect).toBe("manual")
+  })
+  test("拒绝将 MCP 凭据发往任意 API、查询参数或路径穿越地址", async () => {
+    mockFetch(() => json({}))
+    for (const path of ["/api/info", "/api/connector/mcp/../info", "/api/connector/mcp?url=https://evil.invalid", "https://evil.invalid/api/connector/mcp"]) {
+      await expect(saasMcpFetch(path, { headers: { authorization: "Bearer test" } })).rejects.toThrow("无效")
+    }
+    expect(calls).toHaveLength(0)
+  })
+  test("缺少 Bearer 时不向上游发请求", async () => {
+    mockFetch(() => json({}))
+    await expect(saasMcpFetch("/api/connector/mcp", { headers: { authorization: "Basic test" } })).rejects.toThrow("凭据")
+    expect(calls).toHaveLength(0)
   })
 })

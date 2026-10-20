@@ -11,6 +11,8 @@ import { ProjectIntakeSessionPage } from "@/pages/project-intake/ProjectIntakeSe
 import { DashboardPage } from "@/pages/dashboard"
 import { GitProvidersPage } from "@/pages/git-providers"
 import { AppsPage } from "@/pages/apps"
+import { ConnectorsPage } from "@/pages/connectors"
+import { ConnectorDetailPage } from "@/pages/connector-detail"
 import { RequirementsPage } from "@/pages/requirements"
 import { AppDetailPage } from "@/pages/app-detail"
 import { AgentRegistryPage } from "@/pages/agent-registry"
@@ -44,6 +46,8 @@ export function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/git-providers" element={<GitProvidersPage />} />
         <Route path="/apps" element={<AppsPage />} />
+        <Route path="/connectors" element={<ConnectorsPage />} />
+        <Route path="/connectors/:service" element={<ConnectorDetailPage />} />
         <Route path="/requirements" element={<RequirementsPage />} />
         <Route path="/agent-registry" element={<AgentRegistryPage />} />
         <Route path="/cdp" element={<CdpPage />} />

@@ -10,6 +10,7 @@ import { EventLogger } from "@opencode/core/event-logger"
 import { FileSystemSearch } from "@opencode/core/filesystem/search"
 import { Credential } from "@opencode/core/credential"
 import { ConnectorNode } from "@opencode/core/connector/node"
+import { ConnectorMcpNode } from "@opencode/core/connector/mcp-node"
 import { Log } from "@opencode/core/log"
 import { Config } from "@opencode/core/config"
 import { PermissionSaved } from "@opencode/core/permission/saved"
@@ -74,6 +75,7 @@ const applicationServiceNodes = [
   Credential.node,
   ConnectorNode.node,
   ConnectorNode.engineNode,
+  ConnectorMcpNode.node,
   ConnectorNode.cleanupNode,
   ConnectorNode.schedulerNode,
   WellKnown.node,

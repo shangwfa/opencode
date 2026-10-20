@@ -10,6 +10,7 @@ import {
   Home,
   Terminal,
   GitBranch,
+  Cable,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { UserMenu } from "@/components/user-menu"
@@ -23,6 +24,7 @@ const navGroups: { to: string; label: string; icon: typeof Home }[][] = [
   [
     { to: "/project-intake", label: "项目接入", icon: FolderInput },
     { to: "/apps", label: "应用", icon: Boxes },
+    { to: "/connectors", label: "连接器", icon: Cable },
     { to: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
     { to: "/git-providers", label: "Git 服务连接", icon: GitBranch },
     { to: "/agent-registry", label: "Agent 注册表", icon: Bot },

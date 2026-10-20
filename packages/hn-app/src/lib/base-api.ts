@@ -4,6 +4,7 @@
  */
 import { authEnabled, clearStoredToken, getStoredToken, hnBaseUrl } from "./auth"
 import type { HarnessConfig } from "./harness"
+import type { ConnectorCategory, ConnectorConnection, ConnectorProvider, ConnectorProviderDetail, ConnectorMcpDeployment, ConnectorMcpIssued } from "./connectors"
 
 export class BaseApiError extends Error {
   constructor(
@@ -304,5 +305,55 @@ export const hnApi = {
   gitBranches: (id: string, repo: string) =>
     baseFetch<{ repo: string; items: HnGitBranch[] }>(
       `/api/git-providers/${encodeURIComponent(id)}/branches?repo=${encodeURIComponent(repo)}`,
+    ),
+
+  // ---- 连接器 ----
+  connectorProviders: (input?: { service?: string; authType?: string; category?: string }) => {
+    const query = new URLSearchParams()
+    if (input?.service) query.set("service", input.service)
+    if (input?.authType) query.set("authType", input.authType)
+    if (input?.category) query.set("category", input.category)
+    return baseFetch<{ providers: ConnectorProvider[] }>(`/api/connectors/providers${query.size ? `?${query}` : ""}`)
+  },
+  connectorCategories: () => baseFetch<{ categories: ConnectorCategory[] }>("/api/connectors/categories"),
+  connectorProvider: (service: string) =>
+    baseFetch<ConnectorProviderDetail>(`/api/connectors/providers/${encodeURIComponent(service)}`),
+  connectorConnections: () => baseFetch<{ connections: ConnectorConnection[] }>("/api/connectors/connections"),
+  connectorMcp: () => baseFetch<{ name: string; config: Record<string, unknown> }>("/api/connectors/mcp", { method: "POST" }),
+  connectorMcpDeployments: () => baseFetch<{ deployments: ConnectorMcpDeployment[]; publicBaseUrl: string }>("/api/connectors/mcp-deployments"),
+  createConnectorMcp: (input: { name: string; service: string; connectionId?: string; actionIds: string[] }) =>
+    baseFetch<ConnectorMcpIssued>("/api/connectors/mcp-deployments", { method: "POST", body: JSON.stringify(input) }),
+  updateConnectorMcp: (id: string, input: { revision: number; name?: string; status?: "active" | "disabled"; actionIds?: string[]; confirmContracts?: boolean }) =>
+    baseFetch<ConnectorMcpDeployment>(`/api/connectors/mcp-deployments/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
+  rotateConnectorMcp: (id: string, revision: number) =>
+    baseFetch<ConnectorMcpIssued>(`/api/connectors/mcp-deployments/${encodeURIComponent(id)}/rotate-token`, { method: "POST", body: JSON.stringify({ revision }) }),
+  deleteConnectorMcp: (id: string) => baseFetch<void>(`/api/connectors/mcp-deployments/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  attachSessionMcp: (sessionId: string, input: { name: string; config: Record<string, unknown> }) =>
+    baseFetch<unknown>(`/api/sessions/${encodeURIComponent(sessionId)}/mcp`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    }),
+  createConnectorConnection: (input: {
+    service: string
+    authType: "api_key" | "custom_credential"
+    values: Record<string, string>
+    alias?: string
+  }) => baseFetch<ConnectorConnection>("/api/connectors/connections", { method: "POST", body: JSON.stringify(input) }),
+  deleteConnectorConnection: (id: string) =>
+    baseFetch<null>(`/api/connectors/connections/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  reconnectConnector: (id: string) =>
+    baseFetch<{ authorizationUrl: string; connectionRequestID: string }>(
+      `/api/connectors/connections/${encodeURIComponent(id)}/reconnect`,
+      { method: "POST", body: "{}" },
+    ),
+  startConnectorOAuth: (input: { service: string; alias?: string; authorizationOptionIds?: string[] }) =>
+    baseFetch<{ authorizationUrl: string; connectionRequestID: string; expiresAt: string }>(
+      "/api/connectors/oauth/start",
+      { method: "POST", body: JSON.stringify(input) },
+    ),
+  completeConnectorOAuth: (requestId: string, alias?: string) =>
+    baseFetch<{ status: string; errorCode?: string; connection?: ConnectorConnection }>(
+      `/api/connectors/oauth/${encodeURIComponent(requestId)}/complete`,
+      { method: "POST", body: JSON.stringify({ alias }) },
     ),
 }

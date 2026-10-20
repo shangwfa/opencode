@@ -197,6 +197,8 @@ export const OAuthClientPayload = Schema.Struct({
   clientSecret: Schema.String,
   extra: Schema.Record(Schema.String, Schema.String).pipe(optional),
   requestedScopes: Schema.Array(Schema.String).pipe(optional),
+  /** Optional override; defaults to the runtime /oauth/callback. */
+  redirectUri: Schema.String.pipe(optional),
 }).annotate({ identifier: "ConnectorConnection.OAuthClientPayload" })
 
 export interface McpCallResult extends Schema.Schema.Type<typeof McpCallResult> {}

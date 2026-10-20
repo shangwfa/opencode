@@ -1,7 +1,8 @@
 import { Connector, ConnectorEngine } from "@opencode/connector/adapter"
+import { AppMcp, AppMcpError } from "@opencode/connector/adapter/app-mcp"
 import { Effect } from "effect"
 import { HttpApiBuilder, HttpApiSchema } from "effect/unstable/httpapi"
-import { HttpServerResponse } from "effect/unstable/http"
+import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import {
   ConflictError,
   ConnectorNotFoundError,
@@ -28,8 +29,53 @@ const webhookFailure = (error: ConnectorEngine.EngineError | Connector.ConflictE
     ? new ConnectorNotFoundError({ connectionID: error.connectionID })
     : new UnknownError({ message: error.message })
 
+const appMcpFailure = (error: AppMcpError | ConnectorEngine.EngineError) => {
+  if (error instanceof AppMcpError) {
+    if (error.status === 404) return new ConnectorNotFoundError({ connectionID: "mcp" })
+    if (error.status === 409) return new ConflictError({ message: error.message })
+    if (error.status === 503) return new ServiceUnavailableError({ message: error.message })
+    return new InvalidRequestError({ message: error.message })
+  }
+  return failure(error)
+}
+const appMcpTransport = (id: string) => Effect.gen(function* () {
+  const service = yield* AppMcp.Service
+  const request = yield* HttpServerRequest.HttpServerRequest
+  const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.orDie)
+  return yield* service.handle(id, web).pipe(
+    Effect.map(HttpServerResponse.fromWeb),
+    Effect.catch((error) => Effect.succeed(HttpServerResponse.jsonUnsafe({ error: error.code, message: error.message }, {
+      status: error instanceof AppMcpError ? error.status : 503,
+      headers: error instanceof AppMcpError && error.status === 401 ? { "www-authenticate": "Bearer" } : undefined,
+    }))),
+  )
+})
+
 export const ConnectorHandler = HttpApiBuilder.group(Api, "server.connector", (handlers) =>
   handlers
+    .handle("connector.appMcp.list", Effect.fn(function* (ctx) {
+      const service = yield* AppMcp.Service
+      return { deployments: yield* service.list(ctx.params.sessionID).pipe(Effect.mapError(appMcpFailure)) }
+    }))
+    .handle("connector.appMcp.create", Effect.fn(function* (ctx) {
+      const service = yield* AppMcp.Service
+      return yield* service.create(ctx.params.sessionID, ctx.payload).pipe(Effect.mapError(appMcpFailure))
+    }))
+    .handle("connector.appMcp.update", Effect.fn(function* (ctx) {
+      const service = yield* AppMcp.Service
+      return yield* service.update(ctx.params.sessionID, ctx.params.deploymentID, ctx.payload).pipe(Effect.mapError(appMcpFailure))
+    }))
+    .handle("connector.appMcp.rotate", Effect.fn(function* (ctx) {
+      const service = yield* AppMcp.Service
+      return yield* service.rotate(ctx.params.sessionID, ctx.params.deploymentID, ctx.payload.revision).pipe(Effect.mapError(appMcpFailure))
+    }))
+    .handle("connector.appMcp.remove", Effect.fn(function* (ctx) {
+      const service = yield* AppMcp.Service
+      yield* service.remove(ctx.params.sessionID, ctx.params.deploymentID).pipe(Effect.mapError(appMcpFailure))
+      return HttpApiSchema.NoContent.make()
+    }))
+    .handleRaw("connector.appMcp.call", (ctx) => appMcpTransport(ctx.params.deploymentID))
+    .handleRaw("connector.appMcp.listen", (ctx) => appMcpTransport(ctx.params.deploymentID))
     .handle(
       "connector.connection.create",
       Effect.fn(function* (ctx) {
@@ -125,6 +171,13 @@ export const ConnectorHandler = HttpApiBuilder.group(Api, "server.connector", (h
         return yield* connector
           .catalog({ service: ctx.query.service, authType: ctx.query.authType, category: ctx.query.category })
           .pipe(Effect.mapError(failure))
+      }),
+    )
+    .handle(
+      "connector.provider",
+      Effect.fn(function* (ctx) {
+        const connector = yield* Connector.Service
+        return (yield* connector.providerDetail(ctx.params.service).pipe(Effect.mapError(failure))) as never
       }),
     )
     .handle(

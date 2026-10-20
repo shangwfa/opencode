@@ -204,6 +204,14 @@ const DDL = (s: string) => String.raw`
   CREATE INDEX IF NOT EXISTS app_owner_idx ON "${s}"."app" (owner_id);
   CREATE INDEX IF NOT EXISTS app_org_idx ON "${s}"."app" (org_id);
 
+  -- 用户级连接器作用域（隐藏会话承载个人连接）
+  CREATE TABLE IF NOT EXISTS "${s}"."connector_scope" (
+    user_id text PRIMARY KEY REFERENCES "${s}"."user"(id) ON DELETE CASCADE,
+    session_id text NOT NULL,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL
+  );
+
   -- 4. Git
   CREATE TABLE IF NOT EXISTS "${s}"."git_provider_instance" (
     id text PRIMARY KEY,

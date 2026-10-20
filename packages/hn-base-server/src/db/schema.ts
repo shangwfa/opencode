@@ -298,6 +298,17 @@ export const bizApp = hnBase.table("app", {
   timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
 })
 
+/**
+ * 用户级连接器作用域。现有 Connector 服务按会话归属连接；
+ * 连接器板块用一个隐藏会话承载个人连接，不向会话列表暴露。
+ */
+export const connectorScope = hnBase.table("connector_scope", {
+  userId: text("user_id").primaryKey(),
+  sessionId: text("session_id").notNull(),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+})
+
 // ---------------------------------------------------------------------------
 // 4. 业务：Git Provider 与凭据
 // ---------------------------------------------------------------------------

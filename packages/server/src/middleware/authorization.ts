@@ -54,7 +54,7 @@ export const authorizationLayer = Layer.effect(
         if (hasPtyConnectTicketURL(url) || hasPersistentPtyConnectTicketURL(url)) return yield* effect
         // The connector MCP passthrough authenticates with a session-scoped engine token
         // forwarded to the embedded engine; Basic auth does not apply to this endpoint.
-        if (url.pathname === "/api/connector/mcp") return yield* effect
+        if (url.pathname === "/api/connector/mcp" || /^\/api\/connector\/mcp\/cmcp_[a-f0-9]{32}$/.test(url.pathname)) return yield* effect
         // The OAuth provider callback is public in the engine (state-validated there).
         if (url.pathname === "/connector/oauth/callback") return yield* effect
         // Trigger webhook ingress is a public provider callback; the engine validates the

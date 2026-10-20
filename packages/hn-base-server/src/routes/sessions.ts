@@ -196,6 +196,25 @@ sessionRoutes.post("/", async (c) => {
   return c.json({ session: createdSession }, 201)
 })
 
+const mcpBody = z.object({
+  name: z.string().trim().min(1).max(64),
+  config: z.record(z.string(), z.unknown()),
+})
+
+/** 注册会话 MCP；供连接器接入指南等平台内集成使用。 */
+sessionRoutes.post("/:id/mcp", async (c) => {
+  const id = c.req.param("id")
+  await assertSession(c.get("userId"), id, "run", c)
+  const parsed = mcpBody.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) throw errors.invalid("MCP 配置不正确", parsed.error.issues[0]?.path?.join("."))
+  const res = await saasJsonOr(`/api/session/${encodeURIComponent(id)}/mcps`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(parsed.data),
+  })
+  return c.json(await res.json(), 201)
+})
+
 /** 发送消息（阻塞式；流式请用 /message/stream 或 SSE）。PromptInput：text。 */
 sessionRoutes.post("/:id/message", async (c) => {
   const id = c.req.param("id")

@@ -16,6 +16,7 @@ import { encryptSecret } from "../lib/crypto.js"
 import { createGitClient } from "../lib/git/client.js"
 import { authorizeUrl, exchangeToken, gitOAuthEnabled, signState, verifyState } from "../lib/git/oauth.js"
 import type { GitProviderType } from "../lib/git/types.js"
+import { saasFetch } from "../lib/saas.js"
 import { errors } from "../lib/errors.js"
 import { requireAuth, type AppEnv } from "../middleware/auth.js"
 
@@ -77,6 +78,23 @@ gitOAuthRoutes.get("/callback/:provider", async (c) => {
   const code = c.req.query("code")
   const stateRaw = c.req.query("state")
   const oauthError = c.req.query("error")
+
+  // Connector 复用 GitHub App：Connector state 是 UUID，Git state 是 base64url.signature。
+  // 只有 Connector 回调转发给 SaaS；Git 授权仍走本服务的签名校验。
+  if (provider === "github" && stateRaw && !stateRaw.includes(".")) {
+    try {
+      const query = new URLSearchParams(c.req.query()).toString()
+      const forwarded = await saasFetch(`/connector/oauth/callback?${query}`, { redirect: "manual" })
+      const headers = new Headers()
+      for (const name of ["content-type", "location", "cache-control"]) {
+        const value = forwarded.headers.get(name)
+        if (value) headers.set(name, value)
+      }
+      return new Response(await forwarded.text(), { status: forwarded.status, headers })
+    } catch {
+      return c.text("连接器授权回调失败，请关闭页面后重试", 502)
+    }
+  }
 
   if (oauthError) {
     return c.redirect(frontendRedirect({ error: c.req.query("error_description") ?? oauthError }))

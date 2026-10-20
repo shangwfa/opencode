@@ -58,6 +58,8 @@ const makeEngine = (
   let connection = 0
   let token = 0
   const engine: ConnectorEngine.Interface = {
+    actionsForService: () => Effect.succeed([]),
+    executeScopedAction: () => Effect.succeed(undefined),
     createConnection: (input) =>
       Effect.sync(() => {
         calls.push({ method: "createConnection", input })
@@ -148,6 +150,14 @@ const makeEngine = (
           authTypes: ["oauth2"],
         },
       ]),
+    provider: (service) =>
+      Effect.succeed({
+        service,
+        displayName: service,
+        categories: ["developer"],
+        authTypes: ["api_key", "oauth2"],
+        actions: [{ id: `${service}.list`, name: "list", operationType: "read" }],
+      }),
     proxy: (input) =>
       Effect.sync(() => {
         calls.push({ method: "proxy", input })

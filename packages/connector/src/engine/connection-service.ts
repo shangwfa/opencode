@@ -485,6 +485,13 @@ export class ConnectionService {
     id: string | undefined,
   ): Promise<StoredConnection | undefined> {
     if (!id) return this.store.get(service, normalizeConnectionName(name));
+    // A public connection has a stable virtual ID, not a row in the credential store.
+    // Resolve that exact identity without falling back to a newly configured default account.
+    if (
+      id === `${service}:${defaultConnectionName}` &&
+      (name === undefined || normalizeConnectionName(name) === defaultConnectionName) &&
+      this.supportsAuth(this.getProvider(service), "no_auth")
+    ) return undefined;
     const connection = await this.getStoredConnection(id);
     if (
       connection.service !== service ||

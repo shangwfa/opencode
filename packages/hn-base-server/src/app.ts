@@ -17,7 +17,8 @@ import { publicFsRoutes } from "./routes/public-fs.js"
 import { auditRoutes } from "./routes/audit.js"
 import { requirementRoutes } from "./routes/requirements.js"
 import { sessionRoutes } from "./routes/sessions.js"
-import { saasJson } from "./lib/saas.js"
+import { connectorRoutes } from "./routes/connectors.js"
+import { saasFetch, saasJson, saasMcpFetch } from "./lib/saas.js"
 
 export function createApp() {
   const app = new Hono<AppEnv>()
@@ -70,8 +71,51 @@ export function createApp() {
     }),
   )
 
+  /**
+   * Connector MCP 网关：沙箱携带会话级 Bearer token 访问基础服务，
+   * 基础服务转发到 SaaS 的 /api/connector/mcp（不能把 SaaS 内网地址暴露给沙箱）。
+   */
+  app.post("/api/connector/mcp", async (c) => {
+    const authorization = c.req.header("authorization")
+    if (!authorization?.startsWith("Bearer ")) return c.json({ code: "unauthorized", message: "缺少 Connector Bearer token" }, 401)
+    const response = await saasMcpFetch("/api/connector/mcp", {
+      method: "POST",
+      headers: {
+        authorization,
+        "content-type": c.req.header("content-type") ?? "application/json",
+        accept: c.req.header("accept") ?? "application/json, text/event-stream",
+      },
+      body: await c.req.text(),
+    })
+    const headers = new Headers()
+    const contentType = response.headers.get("content-type")
+    if (contentType) headers.set("content-type", contentType)
+    return new Response(await response.text(), { status: response.status, headers })
+  })
+
   app.route("/api/requirements", requirementRoutes)
+  app.on(["GET", "POST"], "/api/connector/mcp/:deploymentId", async (c) => {
+    const id = c.req.param("deploymentId")
+    if (!/^cmcp_[a-f0-9]{32}$/.test(id)) return c.json({ code: "not_found" }, 404)
+    const authorization = c.req.header("authorization")
+    if (!/^Bearer ocm_[A-Za-z0-9_-]{43}$/i.test(authorization ?? "")) return c.json({ code: "unauthorized" }, 401)
+    const headers = new Headers({ authorization: authorization ?? "", accept: c.req.header("accept") ?? "application/json, text/event-stream" })
+    for (const key of ["content-type", "mcp-protocol-version", "mcp-session-id", "origin", "last-event-id"]) {
+      const value = c.req.header(key)
+      if (value) headers.set(key, value)
+    }
+    const response = await saasMcpFetch(`/api/connector/mcp/${id}`, {
+      method: c.req.method, headers, body: c.req.method === "POST" ? await c.req.text() : undefined, signal: c.req.raw.signal,
+    })
+    const outgoing = new Headers({ "cache-control": "no-store" })
+    for (const key of ["content-type", "mcp-session-id", "mcp-protocol-version", "www-authenticate", "retry-after"]) {
+      const value = response.headers.get(key)
+      if (value) outgoing.set(key, value)
+    }
+    return new Response(response.body, { status: response.status, headers: outgoing })
+  })
   app.route("/api/sessions", sessionRoutes)
+  app.route("/api/connectors", connectorRoutes)
   app.route("/api/git-providers/oauth", gitOAuthRoutes)
   app.route("/api/git-providers", gitProviderRoutes)
   app.route("/api/orgs", orgRoutes)

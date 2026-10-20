@@ -4,7 +4,6 @@ import type { MigrationSource } from "./migration-source.ts";
 import type { RuntimeDatabase } from "./runtime-database.ts";
 
 import { migratePostgresDatabase } from "./postgres/migrations.ts";
-import { SqliteRuntimeDatabase } from "./sqlite/runtime-store.ts";
 
 export interface NodeRuntimeDatabase extends RuntimeDatabase {
   close(): void | Promise<void>;
@@ -42,6 +41,9 @@ export interface MigratePostgresRuntimeDatabaseOptions {
 
 export async function createNodeRuntimeDatabase(options: NodeRuntimeDatabaseOptions): Promise<NodeRuntimeDatabase> {
   if (options.backend === "sqlite") {
+    // Keep the SQLite runtime out of the PostgreSQL path: Bun < 1.4 cannot resolve node:sqlite,
+    // and a static import fails the whole engine before PG configuration is read.
+    const { SqliteRuntimeDatabase } = await import("./sqlite/runtime-store.ts");
     return new SqliteRuntimeDatabase(options.path, options);
   }
 
