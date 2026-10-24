@@ -1,5 +1,6 @@
 import { describe, expect } from "bun:test"
 import { OpenAIChat } from "@opencode/ai/protocols"
+import { LLMRequest, Message } from "@opencode/ai"
 import { Agent } from "@opencode/schema/agent"
 import { Money } from "@opencode/schema/money"
 import { Session } from "@opencode/schema/session"
@@ -9,6 +10,8 @@ import { PluginHooks } from "@opencode/core/plugin/hooks"
 import { Project } from "@opencode/core/project"
 import { AbsolutePath } from "@opencode/core/schema"
 import { SessionModelRequest } from "@opencode/core/session/model-request"
+import { SessionContextInsights } from "@opencode/core/session/context-insights"
+import { SessionContextInsights as ContextContract } from "@opencode/schema/session-context-insights"
 import { SessionModelTransport } from "@opencode/core/session/model-transport"
 import { SessionRunnerModel } from "@opencode/core/session/runner/model"
 import { DateTime, Effect, Stream } from "effect"
@@ -40,6 +43,62 @@ const transport = SessionModelTransport.Service.of({
 })
 
 describe("SessionModelRequest HTTP hooks", () => {
+  it.effect("captures every request kind only at invocation, including post-prepare changes", () =>
+    Effect.gen(function* () {
+      const hooks = yield* PluginHooks.Service
+      const seen: SessionContextInsights.CaptureInput[] = []
+      yield* hooks.register("session", "context", (event) =>
+        Effect.sync(() => {
+          event.system.push({ type: "text", text: "post-hook system" })
+        }),
+      )
+      const insights = SessionContextInsights.Service.of({
+        capture: (input) =>
+          Effect.sync(() => {
+            seen.push(input)
+            return ContextContract.Request.make({
+              id: ContextContract.RequestID.create(),
+              sessionID: input.sessionID,
+              kind: input.kind,
+              agent: input.agent,
+              model: input.model,
+              time: 0,
+              boundary: "model-call-semantic-request",
+              estimation: "text-characters-div-4",
+              estimatedTokens: 0,
+              incomplete: false,
+              itemCount: 0,
+              composition: { system: 0, tools: 0, user: 0, inject: 0, assistant: 0, tool: 0 },
+            })
+          }),
+        summary: () => Effect.die("unused"),
+        list: () => Effect.die("unused"),
+        detail: () => Effect.die("unused"),
+        content: () => Effect.die("unused"),
+      })
+      const requests = yield* SessionModelRequest.Service.pipe(Effect.provide(SessionModelRequest.layer))
+      yield* Effect.gen(function* () {
+        for (const kind of KINDS) {
+          const prepared = yield* requests[kind]({
+            session,
+            agent: Agent.ID.make("build"),
+            model,
+            system: [],
+            messages: [],
+          })
+          expect(seen).toHaveLength(KINDS.indexOf(kind))
+          const actual = LLMRequest.update(prepared.request, { messages: [Message.user("final execution prompt")] })
+          yield* (prepared.capture?.(actual) ?? Effect.void)
+          expect(seen.at(-1)?.request).toBe(actual)
+          expect(prepared.request.messages).toEqual([])
+        }
+      }).pipe(Effect.provideService(SessionContextInsights.Service, insights))
+      expect(seen.map((input) => input.kind)).toEqual(Array.from(KINDS))
+      expect(seen[0]?.request.system).toContainEqual({ type: "text", text: "post-hook system" })
+      expect(seen[0]?.contextWindow).toBe(200_000)
+    }).pipe(Effect.provideService(SessionModelTransport.Service, transport)),
+  )
+
   it.effect("tags every Session request kind on http.request and http.response", () =>
     Effect.gen(function* () {
       const hooks = yield* PluginHooks.Service

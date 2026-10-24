@@ -204,7 +204,14 @@ const layer = Layer.effect(
         const all = Array.from(byProvider.values())
           .flatMap((models) => Array.from(models.values()))
           .sort((left, right) => right.time.released - left.time.released)
-        cached = freeze({ data, all, available: all.filter((model) => model.enabled), byProvider }, true)
+        // Only providers that are actually usable (connection present, or configured without an
+        // integration) may contribute to the advertised list: a model whose provider has no
+        // credential cannot be called, so listing it would offer a guaranteed failure.
+        const usable = new Set(current.available.map((record) => record.provider.id))
+        cached = freeze(
+          { data, all, available: all.filter((model) => model.enabled && usable.has(model.providerID)), byProvider },
+          true,
+        )
         return cached
       }
     })

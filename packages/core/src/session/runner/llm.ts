@@ -273,6 +273,7 @@ const layer = Layer.effect(
               // its required output tool.
               toolChoice: structuredSchema ? "required" : undefined,
               webSocket: "session",
+              assistantMessageID,
             })
             return yield* steps.attempt({
               isLocationClosed: lifecycle.isClosed,

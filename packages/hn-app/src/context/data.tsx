@@ -31,7 +31,16 @@ type EventLike = { type: string; properties: Record<string, unknown> }
 export function mergeStreamedParts(snapshot: Part[], streamed: Part[]): Part[] {
   const live = new Map(streamed.map((part) => [part.id, part]))
   const ids = new Set(snapshot.map((part) => part.id))
-  return [...snapshot.map((part) => live.get(part.id) ?? part), ...streamed.filter((part) => !ids.has(part.id))]
+  // 持久化快照是终态：同 id 时只有流式副本更长（说明快照还没跟上）才用流式副本，
+  // 否则已结束的段落会被流式副本覆盖回"思考中"。
+  const textLength = (part: Part) => (part.type === "text" || part.type === "reasoning" ? part.text.length : 0)
+  return [
+    ...snapshot.map((part) => {
+      const candidate = live.get(part.id)
+      return candidate !== undefined && textLength(candidate) > textLength(part) ? candidate : part
+    }),
+    ...streamed.filter((part) => !ids.has(part.id)),
+  ]
 }
 
 /** [MIGRATION] 事件归约（对齐 event-reducer.ts 的 chat 必需分支） */
@@ -39,6 +48,8 @@ export function applyDataEvent(
   state: DataState,
   event: EventLike,
 ): DataState {
+  // 事件载荷缺失（例如新版本服务端换了信封）时保持状态不变，绝不在渲染期抛错。
+  if (!event.properties || typeof event.properties !== "object") return state
   switch (event.type) {
     case "session.step.failed": {
       const props = event.properties as { sessionID: string; assistantMessageID: string; error: unknown }

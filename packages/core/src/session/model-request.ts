@@ -42,6 +42,7 @@ import { SessionSchema } from "./schema.js"
 import { SessionSystemPrompt } from "./system-prompt.js"
 import { toLLMMessages } from "./runner/to-llm-message.js"
 import type { SessionMessage } from "./message.js"
+import { SessionContextInsights } from "./context-insights.js"
 
 const IMAGE_BYTES_TRIGGER = 25 * 1024 * 1024 // 25 MiB
 const IMAGE_BYTES_TARGET = 15 * 1024 * 1024 // 15 MiB
@@ -112,6 +113,7 @@ export interface Prepared<Event = SessionRequest> {
   readonly event: Event
   readonly request: LLMRequest
   readonly options: StreamOptions
+  readonly capture?: (request: LLMRequest) => Effect.Effect<void>
   readonly retry: (event: PluginHooks.Domains["session"]["retry"]) => Effect.Effect<void>
   /** Runs a tool call against the tools this request advertised. */
   readonly executeTool: (
@@ -129,6 +131,7 @@ export interface Input {
   readonly toolChoice?: LLM.RequestInput["toolChoice"]
   /** Only the durable runner may use a stateful WebSocket. */
   readonly webSocket?: "session"
+  readonly assistantMessageID?: SessionMessage.ID
 }
 
 export const baseTranscript = (input: {
@@ -417,10 +420,35 @@ export const layer = Layer.effect(
         request,
       })
 
+      const insights = Option.getOrUndefined(yield* Effect.serviceOption(SessionContextInsights.Service))
+
       return {
         event: shaped,
         request,
         options: { ...(http ? { http } : {}), ...(webSocket ? { webSocket } : {}) },
+        capture: (actual: LLMRequest) =>
+          insights
+            ? insights
+                .capture({
+                  sessionID: session.id,
+                  kind,
+                  agent: input.agent,
+                  model: model.ref,
+                  contextWindow: model.limit.context,
+                  outputReserve: model.limit.output,
+                  inputLimit: model.limit.input,
+                  assistantMessageID: input.assistantMessageID,
+                  request: actual,
+                })
+                .pipe(
+                  Effect.asVoid,
+                  // Observability must never break or fail the model call it observes:
+                  // a capture/storage error is logged and dropped.
+                  Effect.catchCause((cause) =>
+                    Effect.logWarning("session context capture failed", { cause: String(cause) }),
+                  ),
+                )
+            : Effect.void,
         retry: (event: Parameters<Prepared["retry"]>[0]) =>
           hooks.trigger("session", "retry", event).pipe(Effect.asVoid),
         // Permission.assert and the question tool throw declines as defects so tools cannot

@@ -614,15 +614,17 @@ export const layer = Layer.effect(
             Effect.gen(function* () {
               if (LLMClient.canCompact(request, { mechanism: "trigger" })) {
                 const retained = retainUsers(yield* original(context.session.id), context.model, state.get().tokens)
-                const result = yield* llm
-                  .compact(request, { ...prepared.options, mechanism: "trigger" })
-                  .pipe(transient)
+                const result = yield* (prepared.capture?.(request) ?? Effect.void).pipe(
+                  Effect.andThen(llm.compact(request, { ...prepared.options, mechanism: "trigger" })),
+                  transient,
+                )
                 return { replacement: [...retained, Message.assistant(result.checkpoint)], usage: result.usage }
               }
               if (LLMClient.canCompact(request))
-                return yield* llm
-                  .compact(request, { mechanism: "endpoint", http: prepared.options.http })
-                  .pipe(transient)
+                return yield* (prepared.capture?.(request) ?? Effect.void).pipe(
+                  Effect.andThen(llm.compact(request, { mechanism: "endpoint", http: prepared.options.http })),
+                  transient,
+                )
               // Model resolution admits provider policies only for routes with a compaction operation.
               return yield* Effect.die(
                 new Error(`${request.model.provider}/${request.model.route.id} has no compaction operation`),
@@ -745,7 +747,9 @@ export const layer = Layer.effect(
           chunks.length = 0
           providerState = undefined
           failure = undefined
-          return llm.stream(request, prepared.options)
+          return Stream.unwrap(
+            (prepared.capture?.(request) ?? Effect.void).pipe(Effect.as(llm.stream(request, prepared.options))),
+          )
         }).pipe(
           Stream.runForEach((event) => {
             if (LLMEvent.is.providerError(event))

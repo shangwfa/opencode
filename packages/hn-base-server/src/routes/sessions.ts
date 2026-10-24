@@ -20,6 +20,7 @@ import { buildSignedPath } from "../lib/signed-url.js"
 import { errors } from "../lib/errors.js"
 import { saasFetch, isJson, toV2PromptBody, type SaasSession } from "../lib/saas.js"
 import { requireAuth, type AppEnv } from "../middleware/auth.js"
+import { contextInsightsRoutes } from "./context-insights.js"
 
 const LIST_LIMIT = 50
 const DEFAULT_DIRECTORY = "/workspace"
@@ -82,6 +83,13 @@ export const sessionRoutes = new Hono<AppEnv>()
 
 sessionRoutes.use("*", requireAuth)
 
+sessionRoutes.route("/", contextInsightsRoutes({
+  requireRead: (user, id, c) => assertSession(user, id, "read", c),
+  canRead: (userId, id) => check(db, { subject: { type: "user", id: userId }, permission: "read", object: { type: "session", id } }),
+  visible: (userId) => listObjects(db, { subject: { type: "user", id: userId }, permission: "read", type: "session", limit: 501 }),
+  upstream: saasJsonOr,
+}))
+
 /** 我的会话：先取可见 id，再向 SaaS 取元信息（不调 SaaS 全局列表） */
 sessionRoutes.get("/", async (c) => {
   const userId = c.get("userId")
@@ -94,9 +102,10 @@ sessionRoutes.get("/", async (c) => {
   const items: SaasSession[] = []
   for (const id of ids) {
     try {
-      const res = await saasFetch(`/session/${encodeURIComponent(id)}`)
+      const res = await saasFetch(`/api/session/${encodeURIComponent(id)}`)
       if (!res.ok) continue
-      items.push((await res.json()) as SaasSession)
+      const body = (await res.json()) as { data?: SaasSession }
+      if (body.data) items.push(body.data)
     } catch {
       // 单个会话不可达不影响列表
     }
@@ -236,7 +245,7 @@ sessionRoutes.post("/:id/message", async (c) => {
 sessionRoutes.post("/:id/abort", async (c) => {
   const id = c.req.param("id")
   await assertSession(c.get("userId"), id, "abort", c)
-  const res = await saasJsonOr(`/session/${encodeURIComponent(id)}/abort`, { method: "POST" })
+  const res = await saasJsonOr(`/api/session/${encodeURIComponent(id)}/interrupt`, { method: "POST" })
   await writeAudit(
     { actorId: c.get("userId"), action: "session.abort", resourceType: "session", resourceId: id },
     c,
@@ -249,9 +258,10 @@ sessionRoutes.get("/:id/fs", async (c) => {
   const id = c.req.param("id")
   await assertSession(c.get("userId"), id, "read", c)
   const path = c.req.query("path") ?? ""
-  const query = new URLSearchParams({ path, sessionID: id })
-  const res = await saasJsonOr(`/file?${query.toString()}`)
-  return c.json(await res.json())
+  const query = new URLSearchParams({ path })
+  const res = await saasJsonOr(`/api/session/${encodeURIComponent(id)}/fs/list?${query.toString()}`)
+  const body = (await res.json().catch(() => ({ data: [] }))) as { data?: unknown[] }
+  return c.json({ items: body.data ?? [] })
 })
 
 /** 生成短期签名 URL（5 分钟），供 <img>/下载 使用 */
@@ -269,31 +279,34 @@ sessionRoutes.get("/:id/fs/content", async (c) => {
   await assertSession(c.get("userId"), id, "read", c)
   const path = c.req.query("path") ?? ""
   if (!path) throw errors.invalid("缺少 path", "path")
-  const query = new URLSearchParams({ path, sessionID: id })
-  const res = await saasJsonOr(`/file/content?${query.toString()}`)
+  const relative = path.includes("/workspace/") ? path.slice(path.indexOf("/workspace/") + "/workspace/".length) : path.replace(/^\/+/, "")
+  const res = await saasFetch(`/api/session/${encodeURIComponent(id)}/fs/read/${relative.split("/").map(encodeURIComponent).join("/")}`)
+  if (!res.ok) throw errors.notFound("file")
   const contentType = res.headers.get("content-type") ?? "application/octet-stream"
-  // 二进制（图片等）透传，Text 走 JSON 包装
-  if (contentType.startsWith("image/") || contentType.startsWith("application/octet-stream")) {
+  // 二进制（图片等）透传，Text 走 JSON 包装（沿用前端既有契约）
+  if (contentType.startsWith("image/") || contentType.startsWith("application/octet-stream") || contentType.startsWith("video/")) {
     return new Response(res.body, { status: 200, headers: { "content-type": contentType } })
   }
-  return c.json(await res.json().catch(() => ({ content: "" })))
+  return c.json({ type: "text", content: await res.text() })
 })
 
 /** 子会话 */
 sessionRoutes.get("/:id/children", async (c) => {
   const id = c.req.param("id")
   await assertSession(c.get("userId"), id, "read", c)
-  const res = await saasJsonOr(`/session/${encodeURIComponent(id)}/children`)
-  return c.json(await res.json())
+  const res = await saasJsonOr(`/api/session?parentID=${encodeURIComponent(id)}`)
+  const body = (await res.json().catch(() => ({ data: [] }))) as { data?: unknown[] }
+  return c.json({ items: body.data ?? [] })
 })
 
 /** 详情 */
 sessionRoutes.get("/:id", async (c) => {
   const id = c.req.param("id")
   await assertSession(c.get("userId"), id, "read", c)
-  const res = await saasFetch(`/session/${encodeURIComponent(id)}`)
+  const res = await saasFetch(`/api/session/${encodeURIComponent(id)}`)
   if (!res.ok) throw errors.notFound("session")
-  return c.json(await res.json())
+  const body = (await res.json()) as { data?: unknown }
+  return c.json(body.data ?? body)
 })
 
 sessionRoutes.get("/:id/messages", async (c) => {

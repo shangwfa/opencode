@@ -20,8 +20,10 @@ publicFsRoutes.get("/:sessionId/content", async (c) => {
     throw errors.notFound("file")
   }
 
-  const query = new URLSearchParams({ path, sessionID: sessionId })
-  const res = await saasFetch(`/file/content?${query.toString()}`)
+  const relative = path.includes("/workspace/") ? path.slice(path.indexOf("/workspace/") + "/workspace/".length) : path.replace(/^\/+/, "")
+  const res = await saasFetch(
+    `/api/session/${encodeURIComponent(sessionId)}/fs/read/${relative.split("/").map(encodeURIComponent).join("/")}`,
+  )
   if (!res.ok) throw errors.notFound("file")
   const contentType = res.headers.get("content-type") ?? "application/octet-stream"
 
@@ -35,6 +37,5 @@ publicFsRoutes.get("/:sessionId/content", async (c) => {
       },
     })
   }
-  const data = await res.json().catch(() => ({ content: "" }))
-  return c.json(data)
+  return c.json({ type: "text", content: await res.text().catch(() => "") })
 })

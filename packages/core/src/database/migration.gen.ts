@@ -74,6 +74,7 @@ import m71 from "./migration/20261010140025_connector_trigger_token_crypto.js"
 import m72 from "./migration/20261010141236_connector_oauth_request.js"
 import m73 from "./migration/20261010142023_connector_trigger_receipt_event.js"
 import m74 from "./migration/20261020092340_connector_app_mcp.js"
+import m75 from "./migration/20261023005646_session_context_insights.js"
 
 export const migrations = [
   m00,
@@ -151,4 +152,5 @@ export const migrations = [
   m72,
   m73,
   m74,
+  m75,
 ] satisfies DatabaseMigration.Migration[]

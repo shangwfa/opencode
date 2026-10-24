@@ -1,4 +1,5 @@
 import { Navigate, Route, Routes } from "react-router"
+import { lazy, Suspense } from "react"
 import { AuthGate } from "@/components/auth-gate"
 import { AuthProvider } from "@/lib/auth"
 import { LoginPage } from "@/pages/login"
@@ -19,6 +20,8 @@ import { AgentRegistryPage } from "@/pages/agent-registry"
 import { CdpPage } from "@/pages/cdp"
 import { SessionPage } from "@/pages/session"
 import { NotFoundPage } from "@/pages/not-found"
+
+const ContextInsightsPage = lazy(() => import("@/pages/context-insights").then((module) => ({ default: module.ContextInsightsPage })))
 
 export function App() {
   return (
@@ -44,6 +47,7 @@ export function App() {
         <Route path="/project-intake" element={<ProjectIntakePage />} />
         <Route path="/project-intake/:dir/:sessionId" element={<ProjectIntakeSessionPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/context-insights" element={<Suspense fallback={<p role="status">…</p>}><ContextInsightsPage /></Suspense>} />
         <Route path="/git-providers" element={<GitProvidersPage />} />
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/connectors" element={<ConnectorsPage />} />

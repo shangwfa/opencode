@@ -15,6 +15,7 @@ import type { Session } from "@opencode/schema/session"
 import type { CompactionPayload, MovePayload, SyntheticPayload, UserPayload } from "@opencode/schema/session-inbox"
 import type { RevertV1 } from "@opencode/schema/session-revert"
 import type { Schema } from "effect"
+import type { SessionContextInsights } from "@opencode/schema/session-context-insights"
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 type SessionMessageData = DistributiveOmit<(typeof SessionMessage.Info)["Encoded"], "type" | "id">
@@ -113,6 +114,34 @@ export const SessionTable = sqliteTable(
       .on(table.time_suspended)
       .where(sql`${table.time_suspended} is not null`),
   ],
+)
+
+export const SessionContextRequestTable = sqliteTable(
+  "session_context_request",
+  {
+    id: text().$type<SessionContextInsights.RequestID>().primaryKey(),
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    seq: integer().notNull(),
+    summary: text({ mode: "json" }).$type<SessionContextInsights.Request>().notNull(),
+    items: text({ mode: "json" }).$type<ReadonlyArray<SessionContextInsights.Item>>().notNull(),
+  },
+  (table) => [uniqueIndex("session_context_request_session_seq_idx").on(table.session_id, table.seq)],
+)
+
+export const SessionContextContentTable = sqliteTable(
+  "session_context_content",
+  {
+    session_id: text()
+      .$type<SessionSchema.ID>()
+      .notNull()
+      .references(() => SessionTable.id, { onDelete: "cascade" }),
+    hash: text().notNull(),
+    content: text().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.session_id, table.hash] })],
 )
 
 export const SessionCommandTable = sqliteTable(

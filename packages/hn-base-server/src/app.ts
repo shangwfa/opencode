@@ -9,6 +9,7 @@ import { env } from "./config/env.js"
 import { AppError } from "./lib/errors.js"
 import { requireAuth, type AppEnv } from "./middleware/auth.js"
 import { gitProviderRoutes } from "./routes/git-providers.js"
+import { modelRoutes } from "./routes/models.js"
 import { gitWebhookRoutes } from "./routes/git-webhook.js"
 import { gitOAuthRoutes } from "./routes/git-oauth.js"
 import { orgRoutes } from "./routes/orgs.js"
@@ -118,6 +119,7 @@ export function createApp() {
   app.route("/api/connectors", connectorRoutes)
   app.route("/api/git-providers/oauth", gitOAuthRoutes)
   app.route("/api/git-providers", gitProviderRoutes)
+  app.route("/api/models", modelRoutes)
   app.route("/api/orgs", orgRoutes)
   app.route("/api/apps", appRoutes)
   // 公开文件访问（短期签名，无用户认证）

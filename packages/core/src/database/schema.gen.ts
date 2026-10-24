@@ -386,6 +386,25 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`session_context_content\` (
+          \`session_id\` text NOT NULL,
+          \`hash\` text NOT NULL,
+          \`content\` text NOT NULL,
+          CONSTRAINT \`session_context_content_pk\` PRIMARY KEY(\`session_id\`, \`hash\`),
+          CONSTRAINT \`fk_session_context_content_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`session_context_request\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`seq\` integer NOT NULL,
+          \`summary\` text NOT NULL,
+          \`items\` text NOT NULL,
+          CONSTRAINT \`fk_session_context_request_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`session_execution_gate\` (
           \`session_id\` text PRIMARY KEY,
           \`root_session_id\` text NOT NULL,
@@ -630,6 +649,9 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       yield* tx.run(`CREATE INDEX \`session_commands_session_idx\` ON \`session_commands\` (\`session_id\`);`)
       yield* tx.run(
         `CREATE UNIQUE INDEX \`session_commands_session_name_idx\` ON \`session_commands\` (\`session_id\`,\`name\`);`,
+      )
+      yield* tx.run(
+        `CREATE UNIQUE INDEX \`session_context_request_session_seq_idx\` ON \`session_context_request\` (\`session_id\`,\`seq\`);`,
       )
       yield* tx.run(
         `CREATE INDEX \`session_inbox_session_delivery_seq_idx\` ON \`session_inbox\` (\`session_id\`,\`delivery\`,\`enqueued_seq\`);`,

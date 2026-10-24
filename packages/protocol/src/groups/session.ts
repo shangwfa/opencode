@@ -3,6 +3,7 @@ import { SessionInbox } from "@opencode/schema/session-inbox"
 import { PromptInput } from "@opencode/schema/prompt-input"
 import { Session } from "@opencode/schema/session"
 import { SessionStats } from "@opencode/schema/session-stats"
+import { SessionContextInsights } from "@opencode/schema/session-context-insights"
 import { InstructionEntry } from "@opencode/schema/instruction-entry"
 import { Project } from "@opencode/schema/project"
 import {
@@ -631,6 +632,104 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           description: "Retrieve the active context messages for a session (all messages after the last compaction).",
         }),
       ),
+    )
+    .add(
+      HttpApiEndpoint.post("session.contextInsights.overview", "/api/context-insights/overview", {
+        payload: SessionContextInsights.OverviewInput,
+        success: Schema.Struct({ data: SessionContextInsights.Overview }),
+        error: [SessionContextInsights.RangeError],
+      }).annotateMerge(OpenApi.annotations({ identifier: "session.contextInsights.overview", summary: "Aggregate explicitly selected sessions" })),
+    )
+    .add(
+      HttpApiEndpoint.get("session.contextInsights.analysis", "/api/session/:sessionID/context-insights/analysis", {
+        params: { sessionID: Session.ID },
+        query: {
+          before: Schema.NumberFromString.pipe(Schema.decodeTo(NonNegativeInt), Schema.optional),
+          limit: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt.check(Schema.isLessThanOrEqualTo(100))), Schema.optional),
+        },
+        success: Schema.Struct({ data: SessionContextInsights.Analysis }),
+        error: [SessionNotFoundError],
+      }).middleware(sessionLocationMiddleware).annotateMerge(OpenApi.annotations({ identifier: "session.contextInsights.analysis", summary: "Get paged request analysis" })),
+    )
+    .add(
+      HttpApiEndpoint.get("session.contextInsights.family", "/api/session/:sessionID/context-insights/family", {
+        params: { sessionID: Session.ID }, success: Schema.Struct({ data: SessionContextInsights.Family }), error: [SessionNotFoundError],
+      }).middleware(sessionLocationMiddleware).annotateMerge(OpenApi.annotations({ identifier: "session.contextInsights.family", summary: "Get agent lineage excluding forks" })),
+    )
+    .add(
+      HttpApiEndpoint.get("session.contextInsights.summary", "/api/session/:sessionID/context-insights", {
+        params: { sessionID: Session.ID },
+        success: Schema.Struct({ data: SessionContextInsights.Summary }),
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.contextInsights.summary",
+            summary: "Get captured context summary",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.contextInsights.requests", "/api/session/:sessionID/context-insights/requests", {
+        params: { sessionID: Session.ID },
+        query: {
+          before: Schema.NumberFromString.pipe(Schema.decodeTo(NonNegativeInt), Schema.optional),
+          limit: Schema.NumberFromString.pipe(
+            Schema.decodeTo(PositiveInt.check(Schema.isLessThanOrEqualTo(100))),
+            Schema.optional,
+          ),
+        },
+        success: SessionContextInsights.Page,
+        error: [SessionNotFoundError],
+      })
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.contextInsights.requests",
+            summary: "List captured context requests",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get(
+        "session.contextInsights.request",
+        "/api/session/:sessionID/context-insights/requests/:requestID",
+        {
+          params: { sessionID: Session.ID, requestID: SessionContextInsights.RequestID },
+          success: Schema.Struct({ data: SessionContextInsights.Detail }),
+          error: [SessionNotFoundError, SessionContextInsights.NotFoundError],
+        },
+      )
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.contextInsights.request",
+            summary: "Get captured context manifest",
+          }),
+        ),
+    )
+    .add(
+      HttpApiEndpoint.get(
+        "session.contextInsights.content",
+        "/api/session/:sessionID/context-insights/requests/:requestID/items/:index",
+        {
+          params: {
+            sessionID: Session.ID,
+            requestID: SessionContextInsights.RequestID,
+            index: Schema.NumberFromString.pipe(Schema.decodeTo(NonNegativeInt)),
+          },
+          success: Schema.Struct({ data: SessionContextInsights.Content }),
+          error: [SessionNotFoundError, SessionContextInsights.NotFoundError],
+        },
+      )
+        .middleware(sessionLocationMiddleware)
+        .annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.contextInsights.content",
+            summary: "Get one captured context item",
+          }),
+        ),
     )
     .add(
       HttpApiEndpoint.get("session.commandDefinitions.list", "/api/session/:sessionID/commands", {

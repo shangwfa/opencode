@@ -382,6 +382,8 @@ it.effect("generates a title for an explicitly requested child session", () =>
   Effect.gen(function* () {
     yield* enableTitleAgent
     const sessionID = Session.ID.make("ses_title_child")
+    const parentID = Session.ID.make("ses_title_parent")
+    yield* insertSession(parentID)
     const { db } = yield* Database.Service
     yield* db
       .insert(ProjectTable)
@@ -394,7 +396,7 @@ it.effect("generates a title for an explicitly requested child session", () =>
       .values({
         id: sessionID,
         project_id: Project.ID.global,
-        parent_id: Session.ID.make("ses_title_parent"),
+        parent_id: parentID,
         slug: sessionID,
         directory: "/project",
         version: "test",

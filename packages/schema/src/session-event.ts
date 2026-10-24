@@ -29,6 +29,7 @@ import { Permission } from "./permission.js"
 import { AppId } from "./session-app-id.js"
 import { PvcMode } from "./session-pvc-mode.js"
 import { SessionSandboxResource } from "./session-sandbox-resource.js"
+import { SessionContextInsights } from "./session-context-insights.js"
 
 export { FileAttachment }
 
@@ -182,6 +183,16 @@ export const UsageUpdated = Event.ephemeral({
   },
 })
 export type UsageUpdated = typeof UsageUpdated.Type
+
+export const ContextCaptured = Event.durable({
+  type: "session.context.captured",
+  ...options,
+  schema: {
+    ...Base,
+    request: SessionContextInsights.Request,
+  },
+})
+export type ContextCaptured = typeof ContextCaptured.Type
 
 export const Deleted = Event.durable({
   type: "session.deleted",
@@ -807,6 +818,7 @@ export const Definitions = Event.inventory(
   Permissions,
   Viewed,
   UsageUpdated,
+  ContextCaptured,
   Deleted,
   Forked,
   InboxDelivered,

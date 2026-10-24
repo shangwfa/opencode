@@ -11,12 +11,15 @@ import {
   Terminal,
   GitBranch,
   Cable,
+  ChartNoAxesCombined,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { readPreferences } from "@/components/context-insights/model"
 import { UserMenu } from "@/components/user-menu"
 
 /** 分组：主流程 / 辅助工具（分隔线在两组之间，与 ChatGPT 图标栏一致） */
-const navGroups: { to: string; label: string; icon: typeof Home }[][] = [
+type NavItem = { to: string; label: string; icon: typeof Home }
+const navGroups: NavItem[][] = [
   [
     { to: "/", label: "首页", icon: Home },
     { to: "/free-chat", label: "自由对话", icon: MessagesSquare },
@@ -26,6 +29,8 @@ const navGroups: { to: string; label: string; icon: typeof Home }[][] = [
     { to: "/apps", label: "应用", icon: Boxes },
     { to: "/connectors", label: "连接器", icon: Cable },
     { to: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
+    { to: "/context-insights", label: "上下文洞察", icon: ChartNoAxesCombined },
+
     { to: "/git-providers", label: "Git 服务连接", icon: GitBranch },
     { to: "/agent-registry", label: "Agent 注册表", icon: Bot },
     { to: "/cdp", label: "浏览器 CDP", icon: Monitor },
@@ -43,6 +48,13 @@ const navGroups: { to: string; label: string; icon: typeof Home }[][] = [
  */
 export function AppLayout() {
   const { pathname } = useLocation()
+  // 入口显隐是展示偏好：默认显示，隐藏后仍可通过地址直达。
+  const preferences = readPreferences()
+  const groups = navGroups.map((group) =>
+    group.map((item) => item.to === "/context-insights" && preferences.insightsEntry === "hide"
+      ? { ...item, hidden: true }
+      : item),
+  )
   const isActiveOf = (to: string) =>
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`)
 
@@ -59,10 +71,10 @@ export function AppLayout() {
           </div>
 
           <nav className="flex flex-1 flex-col items-center gap-1 overflow-y-auto p-2">
-            {navGroups.map((group, gi) => (
+            {groups.map((group, gi) => (
               <div key={gi} className="flex w-full flex-col items-center gap-1">
                 {gi > 0 && <div className="my-1.5 h-px w-6 bg-border" aria-hidden />}
-                {group.map(({ to, label, icon: Icon }) => {
+                {group.filter((item) => !("hidden" in item && item.hidden)).map(({ to, label, icon: Icon }) => {
                   const active = isActiveOf(to)
                   return (
                     <Tooltip key={to}>

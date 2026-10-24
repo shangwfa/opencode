@@ -118,6 +118,25 @@ docker run ... -e OPENCODE_APP_VERSION=2.0.5 ... opencode-saas-image
 
 ## 六、遗留问题（另行跟进）
 
-- 前端：`finish:"error"` 且空 content 的 assistant 消息在 timeline 无错误提示（用户感知"一直加载中"）
+- ~~前端：`finish:"error"` 且空 content 的 assistant 消息在 timeline 无错误提示~~ **已修复**：V2 `assistant.error` 现在映射进时间线，渲染为红色错误气泡（`packages/hn-app/src/lib/rest.ts` -> `adaptV2Messages`）。
+- ~~前端：SSE 事件信封不匹配导致渲染期白屏~~ **已修复**：V2 推 `{type,data}`，边界归一化为 `{type,properties}`，并给 `applyDataEvent` 加载荷缺失防御。
 - 前端：服务器 401（缺密码）时 `/api/event` 无退避风暴重试
 - 前端：origin 初始服务器认证失败时无密码输入引导，UI 停留"加载中"
+
+## 七、部署备注（本次验证）
+
+- **容器内配置**：`Dockerfile` 已把项目 `opencode.jsonc` COPY 到 `/home/opencode/.config/opencode/`，容器不会读取宿主机的本地配置。
+- **端口冲突**：宿主机若已有 `opencode` 服务占用 `127.0.0.1:4096`，容器映射到 4096 后部分请求会打到宿主机那个实例（表现为 `/prompt` 返回 `Missing key at ["prompt"]`，因为那是不同版本的契约）。用 `-p 4196:4096` 之类的高位端口可避免。
+- **启动示例**：
+
+```bash
+docker run -d --name opencode-saas -p 4196:4096 \
+  -e OPENCODE_DATABASE_URL="postgresql://local@host.docker.internal:5432/opencode-v2-up" \
+  -e OPENCODE_PASSWORD=ab123456 \
+  -e OPENCODE_APP_VERSION=2.0.5 \
+  -e OPENCODE_SANDBOX_ENABLED=false \
+  opencode-saas:ui-20261024b
+```
+
+- **模型可用性过滤**：`packages/core/src/model.ts` 的 `available` 现在只列出"provider 真正可用（已有连接，或无集成的配置 provider）"的模型，避免界面默认选中没有凭据的 provider。
+- **前端选择校验**：本地缓存（localStorage）里的模型若已不在可用列表，发送前会自动回退到第一个可用模型；会话列表里的旧会话若绑定了已下线模型，需要重新选一次。

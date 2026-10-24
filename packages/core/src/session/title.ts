@@ -71,6 +71,7 @@ export const layer = Layer.effect(
         messages: [Message.user(input.text)],
       })
       if (prepared.event.result !== undefined) return prepared.event.result
+      yield* (prepared.capture?.(prepared.request) ?? Effect.void)
       yield* llm.stream(prepared.request, prepared.options).pipe(
         Stream.runForEach((event) => {
           if (LLMEvent.is.providerError(event)) failed = true

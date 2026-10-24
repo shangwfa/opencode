@@ -34,11 +34,34 @@ let cache: NormalizedProviderList | null = null
 let inflight: Promise<NormalizedProviderList> | null = null
 const listeners = new Set<(v: NormalizedProviderList | null) => void>()
 
+/** 扁平模型列表 → 按 providerID 分组；两种通道返回同一形状。 */
+function groupModels(data: ReadonlyArray<ProviderModelInfo & { id: string; providerID: string }>): NormalizedProviderList {
+  const all: NormalizedProvider[] = []
+  for (const model of data) {
+    let provider = all.find((item) => item.id === model.providerID)
+    if (!provider) {
+      provider = { id: model.providerID, name: model.providerID, models: {} }
+      all.push(provider)
+    }
+    provider.models[model.id] = model
+  }
+  // 免费额度是否可用取决于服务端 UA（需注入 OPENCODE_APP_VERSION，见
+  // docs/console-free-tier-403-fix.md），因此这里只做排序偏好、不剔除模型：
+  // 有自有 provider 时把它排在最后，避免默认选中它。
+  const ordered = all.every((item) => item.id === "opencode")
+    ? all
+    : [...all.filter((item) => item.id !== "opencode"), ...all.filter((item) => item.id === "opencode")]
+  return { all: ordered, connected: ordered.map((item) => item.id) }
+}
+
 function normalize(input: unknown): NormalizedProviderList {
   const root = (input ?? {}) as {
     connected?: string[]
     all?: { id: string; name?: string; models?: Record<string, ProviderModelInfo> }[]
   }
+  // 扁平列表（/api/model）直接分组；分组结构（旧通道）原样归一化。
+  if (Array.isArray((input as { data?: unknown })?.data))
+    return groupModels((input as { data: (ProviderModelInfo & { id: string; providerID: string })[] }).data)
   const all: NormalizedProvider[] = (root.all ?? []).map((provider) => ({
     id: provider.id,
     name: provider.name,
@@ -53,16 +76,8 @@ export async function fetchProviderList(force = false): Promise<NormalizedProvid
   if (!force && cache) return cache
   if (inflight) return inflight
   const load = usingBaseServer()
-    ? baseFetch<{ data: (ProviderModelInfo & { id: string; providerID: string })[] }>("/api/models").then(({ data }) => {
-        const all: NormalizedProvider[] = []
-        for (const model of data) {
-          let provider = all.find((item) => item.id === model.providerID)
-          if (!provider) { provider = { id: model.providerID, name: model.providerID, models: {} }; all.push(provider) }
-          provider.models[model.id] = model
-        }
-        return { all, connected: all.map((item) => item.id) }
-      })
-    : providerList()
+    ? baseFetch<{ data: (ProviderModelInfo & { id: string; providerID: string })[] }>("/api/models").then(({ data }) => groupModels(data))
+    : providerList().then((body) => groupModels(body.data ?? []))
   inflight = load
     .then((raw) => {
       cache = normalize(raw)

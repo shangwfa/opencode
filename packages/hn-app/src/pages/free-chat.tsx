@@ -5,7 +5,7 @@
  * - 左侧会话列表（GET /session），右侧 timeline + composer；发送/停止复用 REST 管线
  * 高级功能（AgentConfigPanel / 子代理页 / rrweb 回放）见 MIGRATION.md。
  */
-import { useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router"
 import { MessageSquareText, PanelLeft, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -29,6 +29,8 @@ import { useTurnPhase } from "@/hooks/use-turn-phase"
 import { pickFirstModel, useProviderList } from "@/hooks/use-provider-list"
 import { sessionSource, usingBaseServer, type ChatSession } from "@/lib/session-source"
 import { useSessionBridge } from "@/hooks/use-session-bridge"
+import { ContextDialog, LazySessionInsights } from "@/components/context-insights/entry"
+import { readPreferences } from "@/components/context-insights/model"
 
 type SessionRow = {
   id: string
@@ -161,6 +163,8 @@ function FreeChatCore({
   const prompt = usePromptController()
   const [previewHref, setPreviewHref] = useState<string | undefined>(undefined)
   const [imageTarget, setImageTarget] = useState<ImagePreviewTarget>(undefined)
+  const [contextOpen, setContextOpen] = useState(false)
+  const [contextDock, setContextDock] = useState(false)
   const toast = useToast()
 
   const sid = sessionId ?? ""
@@ -175,12 +179,43 @@ function FreeChatCore({
   }, [sid])
 
   const { providers } = useProviderList()
-  const modelRef = local.model.current() ?? pickFirstModel(providers)
+  // 本地保存的选择可能指向已下线的 provider/模型（换配置、换环境后常见）：
+  // 只有它在当前可用列表里才采用，否则回退到第一个可用模型，避免发一个必然失败的请求。
+  const stored = local.model.current()
+  // 列表未加载完成时不要先信任缓存的选择：那会用一个可能已失效的模型发出请求。
+  const storedUsable = stored !== undefined && providers !== null &&
+    providers.all.find((item) => item.id === stored.providerID)?.models[stored.modelID] !== undefined
+  const modelRef = storedUsable ? stored : pickFirstModel(providers)
   const agent = local.agent.current() ?? "build"
 
   const turnPhase = useTurnPhase({ working, messages, parts })
 
   const handleSubmit = async ({ text, clear }: { text: string; clear: () => void }) => {
+    if (text.trim() === "/context") {
+      if (sid) { setContextOpen(true); clear() }
+      else toast({ title: "请先创建会话" })
+      return
+    }
+    // 斜杠命令：V2 的 /api/command 提供目录，/api/session/:id/command 执行。
+    const slash = /^\/([A-Za-z0-9._-]+)(?:\s+([\s\S]*))?$/.exec(text.trim())
+    if (slash) {
+      if (!sid) {
+        toast({ title: "请先创建会话" })
+        return
+      }
+      try {
+        const { commandList, sessionCommand } = await import("@/lib/rest")
+        const commands = (await commandList({ directory: directory || undefined })).data ?? []
+        if (commands.some((command) => command.name === slash[1])) {
+          await sessionCommand(sid, { name: slash[1], arguments: slash[2] ?? "" }, { directory: directory || undefined })
+          clear()
+          return
+        }
+      } catch (err) {
+        toast({ variant: "destructive", title: "命令执行失败", description: String(err) })
+        return
+      }
+    }
     let targetSid = sid
     try {
       if (!targetSid) {
@@ -248,8 +283,16 @@ function FreeChatCore({
           自由对话
           {working && <Badge variant="outline">{turnPhase.phaseLabel}</Badge>}
         </CardTitle>
+        {sid && <Button size="sm" variant="ghost" className="ml-auto shrink-0 text-xs" onClick={() => {
+          // Wide screens dock the panel; narrow ones must use the dialog. The placement preference
+          // only narrows that choice, it never forces a dock that cannot fit.
+          const wide = window.matchMedia("(min-width: 1024px)").matches
+          if (wide && readPreferences().placement === "dock") setContextDock((old) => !old)
+          else setContextOpen(true)
+        }}>上下文</Button>}
       </CardHeader>
-      <CardContent className="flex min-h-0 flex-1 flex-col p-0">
+      <CardContent className="flex min-h-0 min-w-0 flex-1 flex-row p-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ScrollArea className="min-h-0 flex-1">
           <SessionTimeline
             messages={messages}
@@ -295,7 +338,10 @@ function FreeChatCore({
           onSubmit={handleSubmit}
           prompt={prompt}
         />
+        </div>
+        {contextDock && sid && <aside aria-label="上下文面板" className="hidden min-w-80 w-[48%] max-w-3xl shrink-0 overflow-y-auto border-l p-3 lg:block"><div className="mb-2 text-right"><Button size="sm" variant="ghost" onClick={() => setContextDock(false)}>关闭</Button></div><Suspense fallback={<p role="status">…</p>}><LazySessionInsights key={sid} sessionID={sid} embedded /></Suspense></aside>}
       </CardContent>
+      {sid && <ContextDialog sessionID={sid} open={contextOpen} onOpenChange={setContextOpen} />}
     </Card>
   )
 }

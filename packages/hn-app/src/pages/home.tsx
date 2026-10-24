@@ -15,9 +15,17 @@ function useOpenCodeHealth() {
   const load = () => {
     setError(null)
     setLoading(true)
-    fetch(`${opencodeSaasBaseUrl()}/global/health`)
-      .then((r) => r.json())
-      .then(setHealth)
+    // 本仓库 SaaS 没有 /global/health（会落到 SPA 的 HTML），服务身份在 GET /api/info。
+    // 只有拿到带 version 的 JSON 才算健康，避免把 200 的 HTML 误判为可用。
+    fetch(`${opencodeSaasBaseUrl()}/api/info`)
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        const body: unknown = await r.json()
+        if (typeof body !== "object" || body === null || typeof (body as { version?: unknown }).version !== "string")
+          throw new Error("非预期的服务响应")
+        return body as { version: string }
+      })
+      .then((info) => setHealth({ healthy: true, version: info.version }))
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setLoading(false))
   }

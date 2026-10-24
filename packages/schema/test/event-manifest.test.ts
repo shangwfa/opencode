@@ -152,6 +152,7 @@ describe("public event manifest", () => {
         "session.compaction.started.1",
         "session.compaction.ended.1",
         "session.compaction.failed.1",
+        "session.context.captured.1",
         "session.revert.staged.1",
         "session.revert.cleared.1",
         "session.revert.committed.1",

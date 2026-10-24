@@ -7,6 +7,7 @@
  */
 import { opencodeSaasBaseUrl } from "@/utils/opencode-saas-base"
 import { authEnabled } from "./auth"
+import { timelineMessages, type SessionMessage } from "./session-messages"
 import { baseFetchRaw } from "./base-api"
 
 export function restBaseUrl(): string {
@@ -60,20 +61,23 @@ export async function rest<T = unknown>(
 // ── 业务封装 ──
 // ── 会话管理 ──
 
-export function sessionCreate(opts: { directory?: string; body?: Record<string, unknown> } = {}) {
-  return rest<{ id: string; [key: string]: unknown }>("/session", {
+export async function sessionCreate(opts: { directory?: string; body?: Record<string, unknown> } = {}) {
+  // V2 统一包一层 data；调用方拿到的仍是会话对象本身。
+  const body = await rest<{ data: { id: string; [key: string]: unknown } }>("/api/session", {
     method: "POST",
     directory: opts.directory,
     body: opts.body ?? {},
   })
+  return body.data
 }
 
-export function sessionList(opts: { directory?: string } = {}) {
-  return rest<unknown[]>("/session", { directory: opts.directory })
+export async function sessionList(opts: { directory?: string } = {}) {
+  const body = await rest<{ data: unknown[] }>("/api/session", { directory: opts.directory })
+  return body.data
 }
 
 export function sessionGet(sessionID: string, opts: { directory?: string } = {}) {
-  return rest<Record<string, unknown>>(`/session/${encodeURIComponent(sessionID)}`, {
+  return rest<Record<string, unknown>>(`/api/session/${encodeURIComponent(sessionID)}`, {
     directory: opts.directory,
   })
 }
@@ -85,58 +89,120 @@ export type SessionMessageItem = {
   parts: Record<string, unknown>[]
 }
 
-export function sessionMessages(sessionID: string, opts: { directory?: string; limit?: number } = {}) {
-  return rest<{ info?: unknown; data?: SessionMessageItem[] | unknown[] }>(
-    `/session/${encodeURIComponent(sessionID)}/message`,
-    { directory: opts.directory, query: { limit: opts.limit ?? 200 } },
-  )
+type V2Content =
+  | { type: "text"; text: string }
+  | { type: "reasoning"; text: string }
+  | {
+      type: "tool"
+      id: string
+      name: string
+      state: { status: "streaming" | "running" | "completed" | "error"; input?: Record<string, unknown>; content?: unknown; error?: unknown }
+    }
+
+
+export async function sessionMessages(sessionID: string, opts: { directory?: string; limit?: number } = {}) {
+  const body = await rest<{ data?: SessionMessage[] }>(`/api/session/${encodeURIComponent(sessionID)}/message`, {
+    directory: opts.directory,
+    query: { limit: opts.limit ?? 200 },
+  })
+  const data = Array.isArray(body?.data) ? body.data : []
+  return { data: timelineMessages(sessionID, data) }
 }
 
+/**
+ * V2 `/prompt` 只接收 `text`；调用方仍按 V1 的 `parts` 组装，这里做一次转换。
+ * `agent` / `variant` 在 V2 是会话级选择，payload 里不接受，故不转发。
+ */
 export function sessionPromptAsync(
   sessionID: string,
   body: Record<string, unknown>,
   opts: { directory?: string } = {},
 ) {
-  return rest(`/session/${encodeURIComponent(sessionID)}/prompt_async`, {
+  const parts = Array.isArray(body.parts)
+    ? (body.parts as Array<{ type?: string; text?: string; synthetic?: boolean; url?: string; filename?: string; mime?: string }>)
+    : []
+  const text = parts.flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : [])).join("\n\n")
+  // 附件（图片/文件）走 V2 的 files: FileAttachment[]，不能静默丢弃。
+  const files = parts.flatMap((part) =>
+    part.type === "file" && typeof part.url === "string"
+      ? [{ uri: part.url, ...(part.filename === undefined ? {} : { name: part.filename }) }]
+      : [],
+  )
+  const model = body.model as { providerID?: string; modelID?: string } | undefined
+  return rest(`/api/session/${encodeURIComponent(sessionID)}/prompt`, {
     method: "POST",
     directory: opts.directory,
-    body,
+    body: {
+      text,
+      ...(model?.providerID && model.modelID ? { model: { providerID: model.providerID, id: model.modelID } } : {}),
+      ...(typeof body.messageID === "string" ? { id: body.messageID } : {}),
+      ...(files.length === 0 ? {} : { files }),
+      metadata: {},
+    },
   })
 }
 
+/**
+ * V2 命令载荷是 `{name, text, files?}`；调用方仍按 V1 的 `{command, arguments, parts}` 组装，
+ * 这里做一次转换（与 sessionPromptAsync 同理）。
+ */
 export function sessionCommand(
   sessionID: string,
   body: Record<string, unknown>,
   opts: { directory?: string } = {},
 ) {
-  return rest(`/session/${encodeURIComponent(sessionID)}/command`, {
+  const name = typeof body.name === "string"
+    ? body.name
+    : typeof body.command === "string" ? body.command.replace(/^\//, "") : ""
+  const parts = Array.isArray(body.parts)
+    ? (body.parts as Array<{ type?: string; text?: string; url?: string; filename?: string }>)
+    : []
+  const text = typeof body.arguments === "string"
+    ? body.arguments
+    : parts.flatMap((part) => (part.type === "text" && typeof part.text === "string" ? [part.text] : [])).join("\n\n")
+  const files = parts.flatMap((part) =>
+    part.type === "file" && typeof part.url === "string"
+      ? [{ uri: part.url, ...(part.filename === undefined ? {} : { name: part.filename }) }]
+      : [],
+  )
+  return rest(`/api/session/${encodeURIComponent(sessionID)}/command`, {
     method: "POST",
     directory: opts.directory,
-    body,
+    body: { name, text, ...(files.length === 0 ? {} : { files }), metadata: {} },
+  })
+}
+
+/** V2 命令目录（含内置命令与项目命令），用于 `/` 前缀解析。 */
+export function commandList(opts: { directory?: string } = {}) {
+  return rest<{ data: Array<{ name: string; description?: string }> }>("/api/command", {
+    directory: opts.directory,
   })
 }
 
 export function sessionAbort(sessionID: string, opts: { directory?: string } = {}) {
-  return rest(`/session/${encodeURIComponent(sessionID)}/abort`, {
+  // V2 用 interrupt 取代 V1 的 abort。
+  return rest(`/api/session/${encodeURIComponent(sessionID)}/interrupt`, {
     method: "POST",
     directory: opts.directory,
   })
 }
 
 export function sessionStatus(opts: { directory?: string } = {}) {
-  return rest<Record<string, { type: string; [key: string]: unknown }>>("/session/status", {
+  return rest<Record<string, { type: string; [key: string]: unknown }>>("/api/session/active", {
     directory: opts.directory,
   })
 }
 
-export function fileContent(
+/**
+ * 兼容包装：V1 的 `/file/content` 在本仓库不存在，统一委托给 `readSandboxFile`
+ * （会话沙箱 → location 级 fs/read 两级通道）。
+ */
+export async function fileContent(
   path: string,
   opts: { directory?: string; sessionId?: string } = {},
 ) {
-  return rest<{ type: string; content?: string }>(
-    `/file/content`,
-    { directory: opts.directory, query: { path, sessionID: opts.sessionId } },
-  )
+  const file = await readSandboxFile(path, { directory: opts.directory, sessionId: opts.sessionId })
+  return { type: file.binary ? "binary" : "text", content: file.content }
 }
 
 /**
@@ -220,19 +286,30 @@ export async function readSandboxFile(
     }
   }
 
-  // 通道 B
-  // 实测（本地 14096）：`/file/content` 的 `sessionID` 是定位沙箱的**必需**参数 ——
-  // 带 sessionID 返回 126151 字节，缺它返回 `{type:"text",content:""}`（静默空内容）。
-  // 注意：若该 session 的沙箱已被销毁/重建，文件也会读为空（沙箱无持久卷）。
-  const res = await fileContent(path, { directory: opts.directory, sessionId: opts.sessionId })
-  const content = typeof res?.content === "string" ? res.content : ""
-  const isText = !res?.type || res.type === "text"
-  return {
-    content,
-    mime: opts.mime ?? (isText ? "text/plain" : "application/octet-stream"),
-    binary: !isText,
-    source: "file-content",
+  // 通道 B：V2 的 location 级读取（无会话沙箱时用），路径相对 location。
+  const absolute = path.split(/[?#]/)[0] ?? path
+  const relative = opts.directory && absolute.startsWith(`${opts.directory.replace(/\/+$/, "")}/`)
+    ? absolute.slice(opts.directory.replace(/\/+$/, "").length + 1)
+    : absolute.replace(/^\/+/, "")
+  try {
+    const url = new URL(`${opts.base ?? opencodeSaasBaseUrl()}/api/fs/read/${encodePathSegments(relative)}`)
+    if (opts.directory) url.searchParams.set("directory", opts.directory)
+    const res = await fetch(url.toString())
+    const contentType = res.headers.get("content-type") ?? ""
+    if (res.ok && !contentType.includes("text/html")) {
+      const buffer = await res.arrayBuffer()
+      const binary = !!contentType && !contentType.startsWith("text/")
+      return {
+        content: binary ? toBase64(buffer) : new TextDecoder().decode(buffer),
+        mime: contentType || opts.mime || "text/plain",
+        binary,
+        source: "fs-read",
+      }
+    }
+  } catch {
+    // 落到最后的空结果
   }
+  return { content: "", mime: opts.mime ?? "text/plain", binary: false, source: "file-content" }
 }
 
 /** 绝对路径 → workspace 相对路径；不在 /workspace 下返回 null */
@@ -260,8 +337,14 @@ function toBase64(buffer: ArrayBuffer): string {
   return btoa(binary)
 }
 
+/**
+ * V2 模型目录：`GET /api/model` 返回扁平模型列表（V1 的 `/provider` 在本仓库不存在）。
+ * 调用方按 providerID 分组即可，无需另一套 provider 结构。
+ */
 export function providerList(opts: { directory?: string } = {}) {
-  return rest<unknown>("/provider", { directory: opts.directory })
+  return rest<{ data: Array<Record<string, unknown> & { id: string; providerID: string }> }>("/api/model", {
+    directory: opts.directory,
+  })
 }
 
 /** SSE 事件流（EventSource，GET /event?directory=...） */
@@ -269,11 +352,14 @@ export function subscribeEvents(
   onEvent: (event: { type: string; properties: Record<string, unknown> }) => void,
   opts: { directory?: string } = {},
 ): () => void {
-  const es = new EventSource(restUrl("/event", { directory: opts.directory }))
+  const es = new EventSource(restUrl("/api/event", { directory: opts.directory }))
   es.onmessage = (msg) => {
     try {
-      const parsed = JSON.parse(msg.data) as { type: string; properties: Record<string, unknown> }
-      if (parsed?.type) onEvent(parsed)
+      // V2 帧是 {type, data}；应用层沿用 {type, properties}，在此归一化。
+      const parsed = JSON.parse(msg.data) as { type?: string; data?: Record<string, unknown>; properties?: Record<string, unknown> }
+      if (!parsed?.type) return
+      const properties = parsed.properties ?? parsed.data
+      if (properties && typeof properties === "object") onEvent({ type: parsed.type, properties })
     } catch {
       // 非 JSON 心跳/噪声忽略
     }

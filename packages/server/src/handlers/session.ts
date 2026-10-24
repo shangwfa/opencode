@@ -21,6 +21,8 @@ const audit = Effect.fn("session.audit")(
 )
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
 import { SessionStats } from "@opencode/core/session/stats"
+import { SessionContextInsights } from "@opencode/core/session/context-insights"
+import { SessionContextAnalysis } from "@opencode/core/session/context-analysis"
 import { SessionTitle } from "@opencode/core/session/title"
 import { SessionTransfer } from "@opencode/core/session/transfer"
 import { InstructionEntry } from "@opencode/core/session/instruction-entry"
@@ -994,6 +996,52 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
             )
           yield* audit(ctx.params.sessionID, "session.revert.commit")
           return HttpApiSchema.NoContent.make()
+        }),
+      )
+      .handle(
+        "session.contextInsights.overview",
+        Effect.fn(function* (ctx) {
+          return { data: yield* SessionContextAnalysis.overview(ctx.payload) }
+        }),
+      )
+      .handle(
+        "session.contextInsights.analysis",
+        Effect.fn(function* (ctx) {
+          return { data: yield* SessionContextAnalysis.get(ctx.params.sessionID, ctx.query) }
+        }),
+      )
+      .handle(
+        "session.contextInsights.family",
+        Effect.fn(function* (ctx) {
+          return { data: yield* SessionContextAnalysis.family(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.contextInsights.summary",
+        Effect.fn(function* (ctx) {
+          const insights = yield* SessionContextInsights.Service
+          return { data: yield* insights.summary(ctx.params.sessionID) }
+        }),
+      )
+      .handle(
+        "session.contextInsights.requests",
+        Effect.fn(function* (ctx) {
+          const insights = yield* SessionContextInsights.Service
+          return yield* insights.list(ctx.params.sessionID, ctx.query)
+        }),
+      )
+      .handle(
+        "session.contextInsights.request",
+        Effect.fn(function* (ctx) {
+          const insights = yield* SessionContextInsights.Service
+          return { data: yield* insights.detail(ctx.params.sessionID, ctx.params.requestID) }
+        }),
+      )
+      .handle(
+        "session.contextInsights.content",
+        Effect.fn(function* (ctx) {
+          const insights = yield* SessionContextInsights.Service
+          return { data: yield* insights.content(ctx.params.sessionID, ctx.params.requestID, ctx.params.index) }
         }),
       )
       .handle(
