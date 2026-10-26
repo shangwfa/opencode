@@ -3,6 +3,10 @@ import { SandboxConfig } from "@opencode/core/sandbox/config"
 
 const KEYS = [
   "OPENCODE_SANDBOX_ENABLED",
+  "OPENCODE_SANDBOX_PROVIDER",
+  "VERCEL_TOKEN",
+  "VERCEL_TEAM_ID",
+  "VERCEL_PROJECT_ID",
   "OPENCODE_SANDBOX_DOMAIN",
   "OPENCODE_SANDBOX_PROTOCOL",
   "OPENCODE_SANDBOX_API_KEY",
@@ -16,6 +20,14 @@ const KEYS = [
   "OPENCODE_SANDBOX_CPU",
   "OPENCODE_SANDBOX_MEMORY",
   "OPENCODE_SANDBOX_VOLUME_TYPE",
+  "OPENCODE_VERCEL_INSTALL_RIPGREP",
+  "OPENCODE_ALIYUN_API_KEY",
+  "OPENCODE_ALIYUN_API_URL",
+  "OPENCODE_ALIYUN_DOMAIN",
+  "OPENCODE_ALIYUN_TEMPLATE",
+  "OPENCODE_ALIYUN_PAUSE_ENABLED",
+  "OPENCODE_ALIYUN_RUNNER_ASSET",
+  "OPENCODE_ALIYUN_INSTALL_RIPGREP",
 ] as const
 
 afterEach(() => {
@@ -23,6 +35,61 @@ afterEach(() => {
 })
 
 describe("SandboxConfig.load", () => {
+  it("requires Aliyun endpoint credentials and keeps pause explicitly opt-in", () => {
+    process.env.OPENCODE_SANDBOX_ENABLED = "1"
+    process.env.OPENCODE_SANDBOX_PROVIDER = "aliyun"
+    expect(() => SandboxConfig.load()).toThrow("requires OPENCODE_ALIYUN_API_KEY")
+    process.env.OPENCODE_ALIYUN_API_KEY = "test-only"
+    process.env.OPENCODE_ALIYUN_API_URL = "https://api.cn-hangzhou.sandbox.aliyuncs.com"
+    process.env.OPENCODE_ALIYUN_DOMAIN = "cn-hangzhou.sandbox.aliyuncs.com"
+    const config = SandboxConfig.load()
+    expect(config.aliyun?.template).toBe("code-interpreter-v1")
+    expect(config.aliyun?.pauseEnabled).toBe(false)
+    expect(config.aliyun?.installRipgrep).toBe(true)
+    expect(SandboxConfig.forOpenSandbox(config).volumeType).toBe("pvc")
+    process.env.OPENCODE_ALIYUN_PAUSE_ENABLED = "true"
+    expect(SandboxConfig.load().aliyun?.pauseEnabled).toBe(true)
+    process.env.OPENCODE_SANDBOX_VOLUME_TYPE = "pvc"
+    expect(() => SandboxConfig.load()).toThrow("does not support OpenSandbox PVC")
+  })
+
+  it("rejects unsafe or mismatched Aliyun endpoints", () => {
+    process.env.OPENCODE_ALIYUN_API_KEY = "test-only"
+    process.env.OPENCODE_ALIYUN_DOMAIN = "cn-hangzhou.sandbox.aliyuncs.com"
+    for (const url of ["http://api.cn-hangzhou.sandbox.aliyuncs.com", "https://api.cn-beijing.sandbox.aliyuncs.com", "https://user:pass@api.cn-hangzhou.sandbox.aliyuncs.com", "https://api.cn-hangzhou.sandbox.aliyuncs.com/path"] ) {
+      process.env.OPENCODE_ALIYUN_API_URL = url
+      expect(() => SandboxConfig.load()).toThrow("requires matching HTTPS")
+    }
+  })
+  it("selects Vercel only with credentials and rejects explicit PVC", () => {
+    process.env.OPENCODE_SANDBOX_ENABLED = "1"
+    process.env.OPENCODE_SANDBOX_PROVIDER = "vercel"
+    expect(() => SandboxConfig.load()).toThrow("requires VERCEL_TOKEN")
+    process.env.VERCEL_TOKEN = "test-token"
+    process.env.VERCEL_TEAM_ID = "team_test"
+    process.env.VERCEL_PROJECT_ID = "prj_test"
+    expect(SandboxConfig.load().provider).toBe("vercel")
+    expect(SandboxConfig.load().volumeType).toBe("snapshot")
+    expect(SandboxConfig.forOpenSandbox(SandboxConfig.load()).volumeType).toBe("pvc")
+    process.env.OPENCODE_SANDBOX_VOLUME_TYPE = "pvc"
+    expect(() => SandboxConfig.load()).toThrow("not PVC")
+  })
+
+  it("installs ripgrep for Vercel by default and honors an explicit opt-out", () => {
+    process.env.OPENCODE_SANDBOX_ENABLED = "1"
+    process.env.OPENCODE_SANDBOX_PROVIDER = "vercel"
+    process.env.VERCEL_TOKEN = "test-token"
+    process.env.VERCEL_TEAM_ID = "team_test"
+    process.env.VERCEL_PROJECT_ID = "prj_test"
+    expect(SandboxConfig.load().vercel?.installRipgrep).toBe(true)
+    process.env.OPENCODE_VERCEL_INSTALL_RIPGREP = "false"
+    expect(SandboxConfig.load().vercel?.installRipgrep).toBe(false)
+  })
+
+  it("rejects unknown sandbox providers", () => {
+    process.env.OPENCODE_SANDBOX_PROVIDER = "unknown"
+    expect(() => SandboxConfig.load()).toThrow("Unknown sandbox provider")
+  })
   it("stays disabled by default with safe defaults", () => {
     const config = SandboxConfig.load()
     expect(config.enabled).toBe(false)

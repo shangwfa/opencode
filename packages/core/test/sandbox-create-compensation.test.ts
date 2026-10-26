@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { Effect, Layer } from "effect"
-import { persistCreatedSandbox } from "../src/sandbox/create-lease"
+import { persistCreatedSandbox } from "../src/sandbox/lifecycle/create-lease"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)

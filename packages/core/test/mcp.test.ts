@@ -504,6 +504,26 @@ test("MCP tool names match V1 sanitization", () => {
   expect(McpTool.name("context 7", "resolve.library/id")).toBe("context_7_resolve_library_id")
 })
 
+test("does not replay tool calls after an empty gateway error response", async () => {
+  for (const status of [502, 503, 504]) {
+    let sideEffects = 0
+    await Effect.runPromise(Effect.scoped(Effect.gen(function* () {
+      const server = yield* resourceServer({ respond: async (request) => {
+        if (request.method !== "POST") return
+        const message = await request.clone().json()
+        if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "tools/call") return
+        // The server can execute a side effect before the response is lost.
+        sideEffects++
+        return new Response(null, { status })
+      } })
+      const connection = yield* connect("gateway-error", new ConfigMCP.Remote({ type: "remote", url: server.url, oauth: false }), import.meta.dir)
+      const result = yield* connection.callTool({ name: "echo" }).pipe(Effect.result)
+      expect(result._tag).toBe("Failure")
+      expect(sideEffects).toBe(1)
+    })))
+  }
+})
+
 test("passes session IDs as MCP request metadata", async () => {
   await Effect.runPromise(
     Effect.scoped(

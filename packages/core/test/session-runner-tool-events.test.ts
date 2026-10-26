@@ -459,7 +459,7 @@ test("authoritative end values replace accumulated deltas in the durable ended e
   })
 })
 
-test("tool input deltas are accumulated without being published", async () => {
+test("tool input deltas are batched and published before the ended boundary", async () => {
   const { published, publisher } = capture()
   await Effect.runPromise(
     Effect.forEach(
@@ -474,10 +474,14 @@ test("tool input deltas are accumulated without being published", async () => {
     ),
   )
 
-  expect(published.some((event) => event.type === "session.tool.input.delta")).toBe(false)
-  expect(published.find((event) => event.type === "session.tool.input.ended.1")?.data).toMatchObject({
+  const deltas = published.filter((event) => event.type === "session.tool.input.delta")
+  const ended = published.find((event) => event.type === "session.tool.input.ended.1")
+  expect(deltas.map((event) => (event.data as { delta: string }).delta).join("")).toBe('{"path":"file.txt"}')
+  expect(ended?.data).toMatchObject({
     text: '{"path":"file.txt"}',
   })
+  const endedIndex = published.indexOf(ended!)
+  for (const delta of deltas) expect(published.indexOf(delta)).toBeLessThan(endedIndex)
 })
 
 test("provider-executed tool metadata is flattened using the route key", async () => {

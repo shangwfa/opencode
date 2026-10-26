@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { SandboxOomSample } from "../src/sandbox/oom-sample"
+import { SandboxOomSample } from "../src/sandbox/opensandbox/oom-sample"
 
 const sample = (oomKill: number | null, usageBytes: number | null, limitBytes: number | null) => ({
   oomKill,

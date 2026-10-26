@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { SandboxProxyRewrite } from "../src/sandbox/proxy-rewrite.js"
+import { SandboxProxyRewrite } from "../src/sandbox/preview/rewrite.js"
 
 const rewriteCss = SandboxProxyRewrite.rewriteCss
 const rewriteHtml = SandboxProxyRewrite.rewriteHtml

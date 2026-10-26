@@ -37,6 +37,16 @@ export function resources(cpu: string, memory: string) {
   return { vcpus }
 }
 
+type ReapCandidate = Pick<typeof SandboxTable.$inferSelect, "id" | "state" | "time_updated">
+
+export const claimStop = (db: Database.Interface["db"], record: typeof SandboxTable.$inferSelect, stamp: number, expected?: ReapCandidate) =>
+  db.update(SandboxTable).set({ state: "snapshotting", time_updated: sql`max(${SandboxTable.time_updated} + 1, ${stamp})` })
+    .where(and(eq(SandboxTable.session_id, record.session_id), eq(SandboxTable.provider, "vercel"),
+      eq(SandboxTable.id, record.id), eq(SandboxTable.state, record.state),
+      eq(SandboxTable.time_updated, record.time_updated),
+      ...(expected ? [eq(SandboxTable.id, expected.id), eq(SandboxTable.state, expected.state), eq(SandboxTable.time_updated, expected.time_updated)] : [])))
+    .returning({ id: SandboxTable.id, stamp: SandboxTable.time_updated }).all().pipe(Effect.orDie)
+
 export const make = (config: SandboxConfig.Config, rawTransport?: Transport) => Effect.gen(function* () {
   const credentials = config.vercel
   if (!credentials) return yield* Effect.die(new Error("Vercel credentials are not configured"))
@@ -163,7 +173,7 @@ export const make = (config: SandboxConfig.Config, rawTransport?: Transport) => 
     }
   })
 
-  const destroy = Effect.fn("VercelSandbox.destroy")(function* (sessionID: string) {
+  const destroy = Effect.fn("VercelSandbox.destroy")(function* (sessionID: string, expected?: ReapCandidate) {
     const record = yield* row(sessionID)
     if (!record || record.state === "destroyed") return
     check(record)
@@ -172,11 +182,11 @@ export const make = (config: SandboxConfig.Config, rawTransport?: Transport) => 
       return yield* Effect.fail(new Error("Vercel stop is already in progress"))
     }
     const stamp = Math.max(Date.now(), record.time_updated + 1)
-    const claimed = yield* db.update(SandboxTable).set({ state: "snapshotting", time_updated: sql`max(${SandboxTable.time_updated} + 1, ${stamp})` })
-      .where(and(current(sessionID, record.id), eq(SandboxTable.state, record.state),
-        ...(record.state === "snapshotting" ? [eq(SandboxTable.time_updated, record.time_updated)] : [])))
-      .returning({ id: SandboxTable.id, stamp: SandboxTable.time_updated }).all().pipe(Effect.orDie)
-    if (!claimed.length) return yield* Effect.fail(new Error("Vercel stop generation changed"))
+    const claimed = yield* claimStop(db, record, stamp, expected)
+    if (!claimed.length) {
+      if (expected) return
+      return yield* Effect.fail(new Error("Vercel stop generation or activity changed"))
+    }
     const closure = yield* gate.close(sessionID, true, record.id)
     if (!closure) return yield* Effect.fail(new Error("Vercel stop gate could not be closed"))
     // Stop addresses the captured VM, never an auto-resumed replacement.
@@ -363,10 +373,10 @@ export const make = (config: SandboxConfig.Config, rawTransport?: Transport) => 
     for (const record of records) {
       const work = Effect.gen(function* () {
         if (record.state === "snapshotting" && record.time_updated < Date.now() - leaseMs) {
-          yield* destroy(record.session_id)
+          yield* destroy(record.session_id, record)
         } else if (record.state === "running") {
           if (config.idleReapSeconds > 0 && record.time_updated < Date.now() - config.idleReapSeconds * 1000) {
-            yield* destroy(record.session_id)
+            yield* destroy(record.session_id, record)
           } else if (record.keep_alive) {
             const active = yield* readActive(record)
             const remaining = active.sandbox.expiresAt?.getTime()

@@ -312,6 +312,15 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
       const { queryTimeoutMs, ...clientOptions } = pgOptions
       const native = postgres(url, clientOptions)
       yield* Effect.addFinalizer(() => Effect.promise(() => native.end({ timeout: 5 })))
+      // Bootstrap, the sqlite-shim DDL and migrations serialize across replicas
+      // on a session-level advisory lock (the pool is hardcoded max:1, so
+      // lock/unlock land on the one shared connection): two Pods booting an
+      // empty database used to race CREATE TABLE/VIEW (pg_type duplicate key)
+      // and double-apply ALTERs.
+      const migrateLock = "opencode:database:migrate"
+      const advisory = (statement: string) =>
+        Effect.promise(() => native.unsafe(statement, [migrateLock] as unknown as Parameters<typeof native.unsafe>[1]))
+      yield* advisory("SELECT pg_advisory_lock(hashtextextended($1, 0))")
       // sqlite-shim views/functions must exist before migrations introspect.
       yield* Effect.tryPromise(() => native.unsafe(COMPAT_DDL))
 
@@ -365,7 +374,8 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
 
       // PG 引导：sqlite 迁移链是 sqlite 方言，无法在 PG 上回放；改为执行等价的
       // PG DDL（由 dump-pg-schema.ts 从 sqlite 迁移链导出，先建表后补 FK）。journal
-      // 表的存在即引导完成的标记；后续增量 PG 迁移按 journal 追加。
+      // 表的存在即引导完成的标记；后续增量 PG 迁移按 journal 追加。本段持上述锁。
+      yield* Effect.gen(function* () {
       const journal = yield* db.all<{ name: string }>(
         sql`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'migration'`,
       )
@@ -403,6 +413,9 @@ export const layer = (url: string): Layer.Layer<Database.Service, never, Global.
           )
         }
       }
+      }).pipe(Effect.ensuring(Effect.promise(() =>
+        native.unsafe("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [migrateLock] as unknown as Parameters<typeof native.unsafe>[1]).catch(() => []),
+      )))
       // Transaction-scoped: covers absent sequence rows as well as existing
       // aggregates, and is released by PG on commit/rollback/connection loss.
       // Hash collisions only serialize unrelated aggregates; they do not

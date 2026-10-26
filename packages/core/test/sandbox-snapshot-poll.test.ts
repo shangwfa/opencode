@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 import { ConnectionConfig } from "@alibaba-group/opensandbox"
 import { Clock, Effect, Fiber } from "effect"
 import { TestClock } from "effect/testing"
-import { SandboxSnapshot } from "../src/sandbox/snapshot"
-import type { State } from "../src/sandbox/snapshot.sql"
+import { SandboxSnapshot } from "../src/sandbox/opensandbox/snapshot/index"
+import type { State } from "../src/sandbox/opensandbox/snapshot/tables.sql"
 import { it } from "./lib/effect"
 
 type RemoteStatus = { state: "Creating" | "Ready" | "Failed"; reason?: string; message?: string }

@@ -1,7 +1,7 @@
 import { describe, expect } from "bun:test"
 import { Effect, Fiber, Layer, Logger } from "effect"
 import { TestClock } from "effect/testing"
-import { measureSnapshotStage } from "../src/sandbox/snapshot-latency"
+import { measureSnapshotStage } from "../src/sandbox/opensandbox/snapshot/latency"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)

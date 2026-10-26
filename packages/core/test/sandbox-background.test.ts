@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
 import { Cause, Effect } from "effect"
-import { recoverIteration } from "../src/sandbox/background"
+import { recoverIteration } from "../src/sandbox/opensandbox/background"
 import { testEffect } from "./lib/effect"
 import { Layer } from "effect"
 

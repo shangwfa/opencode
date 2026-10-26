@@ -6,6 +6,7 @@ export interface Remote {
   readonly token: string | undefined
   start(command: string, opts: CommandStartOpts): Promise<{ pid: number; wait(): Promise<{ exitCode: number }> }>
   killCommand(pid: number): Promise<boolean>
+  listCommands(): Promise<Array<{ pid: number }>>
   snapshot(name: string): Promise<string>
   extend(ms: number): Promise<void>
   stat(path: string): Promise<{ size: number; type?: string }>
@@ -40,6 +41,7 @@ function remote(sandbox: Sandbox): Remote {
       } }
     },
     killCommand: (pid) => sandbox.commands.kill(pid),
+    listCommands: () => sandbox.commands.list(),
     snapshot: async (name) => (await sandbox.createSnapshot({ name, requestTimeoutMs: 300000 })).snapshotId,
     extend: (ms) => sandbox.setTimeout(ms),
     stat: (path) => sandbox.files.getInfo(path),

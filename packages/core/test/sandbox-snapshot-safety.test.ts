@@ -1,6 +1,6 @@
 import { describe, expect } from "bun:test"
 import { Duration, Effect, Layer } from "effect"
-import { ensureSandboxLifetime, reconnectSandbox, requireReadySnapshot, withSnapshotLease } from "../src/sandbox/snapshot-safety"
+import { ensureSandboxLifetime, reconnectSandbox, requireReadySnapshot, withSnapshotLease } from "../src/sandbox/opensandbox/snapshot/safety"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)

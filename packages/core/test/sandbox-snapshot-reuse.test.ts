@@ -7,7 +7,7 @@ import {
   parseMarkerOutput,
   snapshotDirtyCheckCommand,
   snapshotManifestCommand,
-} from "../src/sandbox/snapshot-reuse"
+} from "../src/sandbox/opensandbox/snapshot/reuse"
 
 describe("snapshot dirty-check command", () => {
   test("quick path compares mtimes against the marker", () => {

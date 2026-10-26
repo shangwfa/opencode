@@ -7,7 +7,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 
 const [name, output] = process.argv.slice(2)
-const allowed = new Set(["exec-api-v2", "sandbox-keepalive-v2", "sandbox-keepalive-lazy-v2", "sandbox-idle-reap-v2", "files-api-v2", "files-api-glob-v2", "files-api-edge-v2", "files-api-stress-v2", "agent-chain-v2", "mcp-interactions-v2", "sandbox-vercel-tool-t20", "sandbox-proxy-endpoint-v2", "sandbox-vercel-preview-v2", "sandbox-vercel-session-mcp-t22", "sandbox-aliyun-preview"])
+const allowed = new Set(["exec-api-v2", "sandbox-keepalive-v2", "sandbox-keepalive-lazy-v2", "sandbox-idle-reap-v2", "files-api-v2", "files-api-glob-v2", "files-api-edge-v2", "files-api-stress-v2", "agent-chain-v2", "mcp-interactions-v2", "sandbox-vercel-tool-t20", "sandbox-proxy-endpoint-v2", "sandbox-vercel-preview-v2", "sandbox-vercel-session-mcp-t22", "sandbox-vercel-multipod-race", "sandbox-aliyun-preview"])
 if (!allowed.has(name) || !output || !process.env.BASE || !process.env.PG_URL) throw new Error("Expected original T19 script name, output directory, BASE and PG_URL")
 if (!new URL(process.env.PG_URL).pathname.endsWith("-test")) throw new Error("A dedicated test PG database is required")
 if (process.env.RESTART_CONTAINER && !process.env.RESTART_CONTAINER.startsWith("opencode-vercel-t19-")) throw new Error("Refusing to restart a non-test container")
@@ -35,7 +35,7 @@ async function answerForms(id) {
   }
 }
 await mkdir(output, { recursive: true })
-const result = { name, status: "running", codeMode: ["agent-chain-v2", "mcp-interactions-v2"].includes(name) || (name === "sandbox-vercel-session-mcp-t22" && process.env.MCP_T22_STAGE !== "A") ? "sandbox executor; verify execute calls and nested MCP calls in events" : name === "sandbox-vercel-tool-t20" ? "built-in tools execute in the Vercel sandbox; verify tool parts, session.shell and isolation" : "not exercised: shell API cases contain no model turn", assertions: name === "sandbox-proxy-endpoint-v2" ? "underlying API assertions; endpoint mode selected explicitly; WebSocket targets BASE_DIRECT" : name === "sandbox-vercel-session-mcp-t22" ? "API/PG checks plus strict completed MCP calls; provider-specific execution" : "original scripts unchanged", sessions: [], cleanup: [], pg: [], bindings: [] }
+const result = { name, status: "running", codeMode: ["agent-chain-v2", "mcp-interactions-v2"].includes(name) || (name === "sandbox-vercel-session-mcp-t22" && process.env.MCP_T22_STAGE !== "A") ? "sandbox executor; verify execute calls and nested MCP calls in events" : name === "sandbox-vercel-tool-t20" ? "built-in tools execute in the Vercel sandbox; verify tool parts, session.shell and isolation" : "not exercised: shell API cases contain no model turn", assertions: name === "sandbox-proxy-endpoint-v2" ? "underlying API assertions; endpoint mode selected explicitly; WebSocket targets BASE_DIRECT" : name === "sandbox-vercel-session-mcp-t22" ? "API/PG checks plus strict completed MCP calls; provider-specific execution" : name === "sandbox-vercel-multipod-race" ? "public API, two blocked PG sweep claims, real cloud generation and workspace checks" : "original scripts unchanged", sessions: [], cleanup: [], pg: [], bindings: [] }
 
 function captureBinding(id) {
   const sql = `SELECT json_build_object('sessionID',session_id,'provider',provider,'remoteName',remote_name)::text FROM sandbox WHERE session_id='${id.replaceAll("'", "''")}'`

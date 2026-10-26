@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { FileNotFoundError, SandboxNotFoundError } from "e2b"
-import { and, desc, eq, sql } from "drizzle-orm"
+import { and, desc, eq, inArray, sql } from "drizzle-orm"
 import { Effect } from "effect"
 import { Glob } from "@opencode/util/glob"
 import { Database } from "../../database/database.js"
@@ -82,6 +82,25 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
     if (installed.exitCode !== 0) return yield* Effect.fail(new Error("Aliyun Code Mode runner installation failed"))
   })
   const info = (id: string) => attempt(() => api.info(id))
+  const inspect = (id: string) => info(id).pipe(Effect.catch((error) =>
+    error instanceof SandboxNotFoundError ? Effect.succeed(null) : Effect.fail(error)))
+  const retireGone = (record: typeof SandboxTable.$inferSelect) => Effect.gen(function* () {
+    const saved = (yield* snapshots(record.session_id))[0]
+    const lost = (yield* persistent(record.session_id)) && (!saved?.snapshot_id || saved.state !== "ready")
+    const closure = yield* gate.close(record.session_id, true, record.id)
+    if (!closure) return false
+    const changed = yield* db.update(SandboxTable).set({ state: "destroyed", time_updated: Date.now(),
+      remote_name: lost ? `lost:${record.remote_name ?? record.id}` : null, endpoint_token: null, command_session_id: null,
+    }).where(and(current(record.session_id, record.id), eq(SandboxTable.state, record.state), eq(SandboxTable.time_updated, record.time_updated)))
+      .returning({ id: SandboxTable.id }).all().pipe(Effect.orDie)
+    if (!changed.length) {
+      yield* gate.retained(record.session_id, closure)
+      return false
+    }
+    yield* gate.destroyed(record.session_id, closure)
+    yield* db.delete(SandboxCommandTable).where(and(eq(SandboxCommandTable.session_id, record.session_id), eq(SandboxCommandTable.sandbox_id, record.id))).run().pipe(Effect.orDie)
+    return true
+  })
   const touch = (id: string, remote: Active) => Effect.gen(function* () {
     const changed = yield* db.update(SandboxTable).set({ time_updated: sql`max(${SandboxTable.time_updated} + 1, ${Date.now()})` })
       .where(and(current(id, remote.generation), eq(SandboxTable.state, "running"))).returning({ id: SandboxTable.id }).all().pipe(Effect.orDie)
@@ -93,8 +112,14 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
     while (Date.now() < until) {
       const prior = yield* row(id)
       yield* Effect.try({ try: () => check(prior), catch: (error) => error instanceof Error ? error : new Error(String(error)) })
+      if (prior?.remote_name?.startsWith("lost:"))
+        return yield* Effect.fail(new Error("Aliyun workspace disappeared without a confirmed snapshot; refusing an empty workspace. Explicit deletion is still available"))
       if (prior?.state === "running") {
-        const status = yield* info(prior.remote_name ?? "")
+        const status = yield* inspect(prior.remote_name ?? "")
+        if (!status) {
+          yield* retireGone(prior)
+          continue
+        }
         if (status.state === "running") {
           const remote = yield* attempt(() => api.connect(prior.remote_name ?? ""))
           if (!remote.token) return yield* Effect.fail(new Error("Aliyun traffic access token is unavailable"))
@@ -173,13 +198,15 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
     // A scan must not claim a generation or activity watermark newer than its candidate.
     if (expected && (record.id !== expected.id || record.state !== expected.state || record.time_updated !== expected.time_updated)) return
     if (record.state === "creating") return yield* Effect.fail(new Error("Aliyun sandbox is still being created"))
+    // Recovery follows the persisted operation, not the caller that found it stale.
+    if (record.state === "snapshotting") stop = !record.command_session_id?.startsWith("capture:")
     const retain = !stop || (yield* persistent(id))
     if (record.state === "snapshotting" && record.time_updated > Date.now() - 360000)
       return yield* Effect.fail(new Error("Aliyun stop is already in progress"))
     const stamp = Math.max(Date.now(), record.time_updated + 1)
     const owner = `oc-${randomUUID()}`
     const intent = record.state === "snapshotting" ? record.command_session_id?.split(":").at(-1) ?? owner : owner
-    const token = `${owner}:${intent}`
+    const token = `${stop ? "stop" : "capture"}:${owner}:${intent}`
     const owned = and(current(id, record.id), eq(SandboxTable.state, "snapshotting"), eq(SandboxTable.command_session_id, token))
     const claimed = yield* db.update(SandboxTable).set({ state: "snapshotting", time_updated: stamp, command_session_id: token })
       .where(and(current(id, record.id), eq(SandboxTable.state, record.state), eq(SandboxTable.time_updated, record.time_updated)))
@@ -191,19 +218,42 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
     const closure = yield* gate.close(id, true, record.id)
     if (!closure) return yield* Effect.fail(new Error("Aliyun execution gate could not be closed"))
     const work = Effect.gen(function* () {
+    const status = yield* inspect(record.remote_name ?? "")
+    if (!status) {
+      const claimedRecord = yield* bound(id)
+      if (claimedRecord?.command_session_id === token) yield* retireGone(claimedRecord)
+      return
+    }
     const commands = yield* db.select().from(SandboxCommandTable)
       .where(and(eq(SandboxCommandTable.session_id, id), eq(SandboxCommandTable.sandbox_id, record.id))).all().pipe(Effect.orDie)
     if (commands.length) {
-      yield* db.update(SandboxTable).set({ state: "running", command_session_id: null }).where(owned).run().pipe(Effect.orDie)
-      yield* gate.retained(id, closure)
-      return yield* Effect.fail(new Error("Aliyun snapshot requires all commands to finish or be cancelled"))
+      let remaining = commands.length
+      const observed = yield* attempt(async () => {
+        if (status.state !== "running") throw new Error("Aliyun command reconciliation requires a running source")
+        return (await api.connect(record.remote_name ?? "")).listCommands()
+      }).pipe(Effect.result)
+      if (observed._tag === "Success") {
+        const live = new Set(observed.success.map((command) => String(command.pid)))
+        const ended = commands.filter((command) => !live.has(command.command_id))
+        if (ended.length) yield* db.delete(SandboxCommandTable).where(and(
+          eq(SandboxCommandTable.session_id, id), eq(SandboxCommandTable.sandbox_id, record.id),
+          inArray(SandboxCommandTable.id, ended.map((command) => command.id)),
+        )).run().pipe(Effect.orDie)
+        remaining -= ended.length
+      }
+      if (remaining) {
+        yield* db.update(SandboxTable).set({ state: "running", command_session_id: null }).where(owned).run().pipe(Effect.orDie)
+        yield* gate.retained(id, closure)
+        if (observed._tag === "Failure") return yield* Effect.fail(observed.failure)
+        return yield* Effect.fail(new Error("Aliyun snapshot requires all commands to finish or be cancelled"))
+      }
     }
     let saved: typeof Snapshots.$inferSelect | undefined
     if (retain) {
       // A stale operation only reconciles its persisted intent; never replay create.
       saved = record.state === "snapshotting" ? (yield* snapshots(id)).find((value) => value.id === intent) : undefined
       if (!saved) {
-        if ((yield* info(record.remote_name ?? "")).state !== "running")
+        if (status.state !== "running")
           return yield* Effect.fail(new Error("Aliyun snapshot source must be running; automatic resume is disabled"))
         const pending = { id: intent, session_id: id, provider_scope: scope,
           sandbox_id: record.id, remote_name: record.remote_name ?? "", state: "creating" as const }
@@ -335,9 +385,11 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
           yield* destroy(record.session_id, record)
         else if (record.state === "running") {
           if (config.idleReapSeconds > 0 && record.time_updated < Date.now() - config.idleReapSeconds * 1000) yield* destroy(record.session_id, record)
-          else if (record.keep_alive) {
+          else {
             // Do not resume a paused VM just because a SaaS Pod restarted.
-            if ((yield* info(record.remote_name ?? "")).state === "running") yield* attempt(async () => (await api.connect(record.remote_name ?? "")).extend(config.timeoutSeconds * 1000))
+            const status = yield* inspect(record.remote_name ?? "")
+            if (!status) yield* retireGone(record)
+            else if (record.keep_alive && status.state === "running") yield* attempt(async () => (await api.connect(record.remote_name ?? "")).extend(config.timeoutSeconds * 1000))
           }
         }
       }).pipe(Effect.catch(() => Effect.logWarning("Aliyun lifecycle reconciliation failed", { sessionID: record.session_id })))
@@ -354,7 +406,11 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
       const remote = yield* attempt(() => api.connect(record.remote_name ?? ""))
       const commands = yield* db.select().from(SandboxCommandTable).where(and(eq(SandboxCommandTable.session_id, record.session_id),
         eq(SandboxCommandTable.sandbox_id, record.id), ...(operation ? [eq(SandboxCommandTable.operation_id, operation)] : []))).all().pipe(Effect.orDie)
-      for (const command of commands) yield* attempt(() => remote.killCommand(Number(command.command_id)))
+      for (const command of commands) {
+        yield* attempt(() => remote.killCommand(Number(command.command_id)))
+        yield* db.delete(SandboxCommandTable).where(and(eq(SandboxCommandTable.id, command.id),
+          eq(SandboxCommandTable.sandbox_id, record.id))).run().pipe(Effect.orDie)
+      }
     }).pipe(Effect.orDie),
     destroy: (id) => key(id).pipe(Effect.flatMap(destroy), Effect.orDie),
     release: (id) => key(id).pipe(Effect.flatMap((id) => setKeepAlive(id, false).pipe(Effect.andThen(destroy(id)))), Effect.orDie),
@@ -412,7 +468,8 @@ export const make = (config: SandboxConfig.Config, supplied?: Api) => Effect.gen
       const record = yield* bound(id)
       if (record && (record.state !== "destroyed" || record.remote_name?.startsWith("intent:"))) return yield* Effect.fail(new Error("Reconcile or stop Aliyun sandbox before permanent removal"))
       if (record?.remote_name) {
-        yield* attempt(() => api.kill(record.remote_name ?? "")).pipe(Effect.catch((error) => error instanceof SandboxNotFoundError ? Effect.succeed(false) : Effect.fail(error)))
+        if (!record.remote_name.startsWith("lost:"))
+          yield* attempt(() => api.kill(record.remote_name ?? "")).pipe(Effect.catch((error) => error instanceof SandboxNotFoundError ? Effect.succeed(false) : Effect.fail(error)))
         yield* db.update(SandboxTable).set({ remote_name: null, endpoint_token: null }).where(current(record.session_id, record.id)).run().pipe(Effect.orDie)
       }
       // Fail Session removal if cloud cleanup fails, retaining the recovery ledger.

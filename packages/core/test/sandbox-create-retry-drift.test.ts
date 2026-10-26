@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { refuseCreate, shouldRetryCreate } from "../src/sandbox/provider.js"
-import { expectedSandboxArch, snapshotDrift } from "../src/sandbox/snapshot.js"
+import { expectedSandboxArch, snapshotDrift } from "../src/sandbox/opensandbox/snapshot/index.js"
 
 describe("sandbox create retry policy", () => {
   it("retries transient failures while attempts remain", () => {

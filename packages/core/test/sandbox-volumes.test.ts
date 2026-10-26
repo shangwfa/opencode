@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { SandboxConfig } from "../src/sandbox/config"
-import { SandboxVolumes } from "../src/sandbox/volumes"
+import { SandboxVolumes } from "../src/sandbox/opensandbox/volumes"
 
 const config = (overrides: Partial<SandboxConfig.Config> = {}): SandboxConfig.Config => ({
   enabled: true,
+  provider: "opensandbox",
   domain: "sandbox.test",
   protocol: "http",
   useServerProxy: false,

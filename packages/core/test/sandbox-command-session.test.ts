@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
 import { Deferred, Effect, Fiber, Layer, Ref } from "effect"
-import { claimCommandSession, commandSessionKey } from "../src/sandbox/command-session"
+import { claimCommandSession, commandSessionKey } from "../src/sandbox/opensandbox/command-session"
 import { testEffect } from "./lib/effect"
 
 const it = testEffect(Layer.empty)
