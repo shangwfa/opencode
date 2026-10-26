@@ -31,6 +31,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache,sharing=locked \
       --filter '@opencode/core'
 
 RUN bun packages/core/script/build-session-tool-host.ts
+RUN bun packages/core/script/build-sandbox-runner.ts
 RUN find /app -path "*/node-pty/prebuilds/*/spawn-helper" -exec chmod +x {} \;
 
 FROM base AS runtime
@@ -52,6 +53,7 @@ ENV OPENCODE_SERVER_PORT=4096
 ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
 ENV OPENCODE_EVENTS_PERSIST=1
 ENV OPENCODE_CCR_ENABLED=true
+ENV OPENCODE_ALIYUN_RUNNER_ASSET=/app/packages/core/dist/sandbox-runner.mjs.gz
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
 ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=/tmp/bun-transpile
 # 部署按需注入（不写入镜像层）：

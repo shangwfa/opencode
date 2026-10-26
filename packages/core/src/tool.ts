@@ -280,6 +280,7 @@ const layer = Layer.effect(
                               try: (signal) =>
                                 CodeModeRunner.execute({
                                   endpoint: endpoint.endpoint,
+                                  headers: endpoint.headers,
                                   executionID,
                                   code,
                                   tools,

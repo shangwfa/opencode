@@ -86,12 +86,64 @@ bun run typecheck
 | 2026-09-24 | 同上，`OPENCODE_SESSION_AUTO_KEEPALIVE=0` 独立实例（14107）                                                                              | `sandbox-keepalive-lazy-v2.mjs`                 | ✅ boot=false 写 pending/true 且不建远端沙箱；首次 shell 懒创建并继承偏好                                                |
 | 2026-09-24 | 同上，`OPENCODE_SANDBOX_IDLE_REAP_SEC=60`                                                                                                | idle reap 手工用例                              | ✅ `keep_alive=false/true` 两个过期 running 行 275s 内回收为 destroyed，`keep_alive=true` 偏好保留                       |
 | 2026-09-24 | 本地                                                                                                                                     | `sandbox-provider/config/path` 单测 + typecheck | ✅ 19 pass / 0 fail                                                                                                      |
+| 2026-10-24 | Vercel provider：独立容器 `opencode-saas:vercel-t20-rg-20261024` + 专用 PG `opencode-v2-vercel-lifecycle-test`                          | `sandbox-keepalive-v2.mjs` / `sandbox-keepalive-lazy-v2.mjs` / `sandbox-idle-reap-v2.mjs` | ✅ 三个脚本退出码 0；详见下方「Vercel 后端复测」                                                                         |
+| 2026-10-25 | Aliyun provider：`opencode-saas:aliyun-lifecycle-20261025` + `base-5wa5` + 独立生命周期 PG | 全部适用接口用例、边界补测、CAS 竞态、单测/typecheck | ⚠️ 主流程和懒创建通过；idle 保活回收、killed 重试、刷新 CAS 三项不符合契约；单测 114/114，通过详情见 [阿里云复测](aliyun-lifecycle-2026-10-25.md) |
 
 复测备注：
 
 - 脚本 `session.fork` 前置条件：父 session 需至少一条持久化消息；`synthetic resume:false` 只进 pending inbox 不满足。脚本已改为 fork 前用 `session.shell` 播种。
 - 旧镜像 `opencode-saas-v2:local-session-log` 不含 root 自动 boot 逻辑（无 `OPENCODE_SESSION_AUTO_KEEPALIVE`），主脚本首断言会失败；需用包含该功能的镜像。
 - 远端 OpenSandbox（30040）当前创建沙箱 `Failed`，不能用于本验收。
+
+## Vercel 后端复测（2026-10-24）
+
+独立 Docker 测试实例使用 `OPENCODE_SANDBOX_PROVIDER=vercel`（镜像 `opencode-saas:vercel-t20-rg-20261024`），通过真实 Vercel Sandbox 执行同一组生命周期脚本；三个脚本均经 `sandbox-vercel-t19.mjs` 包装器运行（创建会话后订阅公共 SSE，结束时删除会话、核对 PG 并做远端只读清理复核）。PG 使用专用库 `opencode-v2-vercel-lifecycle-test`。
+
+**结果：三个脚本退出码均为 0。**
+
+| 用例 | Vercel 实测结论 |
+| --- | --- |
+| root 自动保活/boot | PASS（`running` + `keep_alive=true`） |
+| release | PASS（API 返回 false；PG `destroyed` 且 `keep_alive` 清除） |
+| 显式 boot 与幂等 | PASS（新建 sandbox ID 与 PG 一致；重复 boot 返回同一 ID） |
+| kill-sandbox | PASS（`destroyed`、sandbox ID 为 null、`keep_alive` 保留） |
+| 销毁后重建 | PASS（新 ID、`running`、偏好保留） |
+| fork 延迟创建 | PASS（无自动 sandbox 行；首次 shell 懒创建） |
+| 子/父会话删除 | PASS（各自 sandbox 销毁） |
+| session 删除 | PASS（沙箱销毁；`keep_alive` 偏好保留） |
+| `boot:false` 懒创建 | PASS（`pending-<sessionID>`、`destroyed`、`keep_alive=true`，不创建远端沙箱） |
+| 首次 shell 懒创建 | PASS（替换 pending 行，`running`，继承偏好） |
+| 服务重启重连 | PASS（重启后复用 PG 中的 remote sandbox，shell 完成） |
+| idle reap | PASS（`time_updated=0` 并重启后行变为 `destroyed`，`keep_alive` 保留） |
+| 远端清理 | PASS（4 个测试沙箱均不存在，无残留快照） |
+
+### 本轮环境编排注意
+
+这两点会误判为产品失败，复跑时先排除：
+
+1. 直接复用旧测试容器的全部 env 会带入 `OPENCODE_SESSION_AUTO_KEEPALIVE=0` 与 `OPENCODE_SANDBOX_IDLE_REAP_SEC=0`，导致「root 自动保活」首断言失败、idle reap 完全不扫描。本文验收必须去掉这两个变量；`boot:false` 实例才显式设置 `OPENCODE_SESSION_AUTO_KEEPALIVE=0`。
+2. 两个实例同时对**空库**启动会竞争迁移 DDL（`duplicate key ... pg_type_typname_nsp_index`），后启动实例退出。先启动一个实例完成迁移，再启动第二个；这是测试库初始化顺序问题，不是生命周期回归。
+
+### 证据与复跑
+
+证据目录：`artifacts/vercel-lifecycle-20261024/`（`keepalive2/`、`lazy2/`、`idlereap/`、`summary.json`、`cleanup-verification.json`、`checks/`）。`keepalive/` 保留环境变量误配导致的首次失败，用于对照。
+
+```bash
+# 自动保活实例
+BASE=http://127.0.0.1:15110 OPENCODE_PASSWORD=... \
+PG_URL=postgresql://local@127.0.0.1:5432/<dedicated>-test \
+STRESS_OUT="$PWD/artifacts/vercel-lifecycle-20261024/keepalive2" \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-keepalive-v2 \
+  "$PWD/artifacts/vercel-lifecycle-20261024/keepalive2"
+
+# 懒创建实例（服务端 OPENCODE_SESSION_AUTO_KEEPALIVE=0）
+BASE=http://127.0.0.1:15111 ... \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-keepalive-lazy-v2 ...
+
+# idle reap（同一自动保活实例；包装器要求容器名以 opencode-vercel-t19- 开头）
+BASE=http://127.0.0.1:15110 RESTART_CONTAINER=opencode-vercel-t19-lifecycle-a ... \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-idle-reap-v2 ...
+```
 
 ## 不再适用的旧版断言
 

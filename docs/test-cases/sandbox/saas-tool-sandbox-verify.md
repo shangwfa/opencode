@@ -160,6 +160,53 @@ curl -fsS "${H[@]}" -X DELETE "$BASE/api/session/$SID"
 
 实测方式：T20.2–T20.7 走真实 Agent 多轮（`saas-tool-sandbox-verify-v2.mjs`，模型 Yd-DeepSeek，每轮 prompt + wait），文件级证据由会话内 shell `cat` 复核；T20.1 为静态 grep；T20.9 在删除后查 PG。全部断言 rc=0。
 
+## Vercel 后端验收（2026-10-24）
+
+独立 Docker 测试服务使用 `OPENCODE_SANDBOX_PROVIDER=vercel`，通过真实 Vercel Sandbox 执行同一组 T20 用例。执行器 `docs/test-cases/scripts/sandbox-vercel-tool-t20.mjs` 经 `sandbox-vercel-t19.mjs` 包装器运行：创建会话后先订阅公共 SSE，每轮以 `prompt_stream` 驱动模型，结束时先释放保活再删除会话，并核对 PG 与远端清理。
+
+**结果：13/13 检查通过。**
+
+| 用例 | Vercel 实测结论 |
+| --- | --- |
+| T20.1 | PASS（静态检查：write/read/edit/glob/grep → SandboxTools；shell → SandboxProvider） |
+| T20.2 | PASS（write 工具调用 completed，仓库文件落点由后续 shell 复核） |
+| T20.3 | PASS（read 返回写入的 marker） |
+| T20.4 | PASS（edit 替换成功，文件内容变为 `edited-<marker>`） |
+| T20.5 | PASS（glob 返回 `/workspace/sandbox-tool-proof.txt`） |
+| T20.6 | PASS（grep 命中 1 行，内容为编辑后 marker） |
+| T20.7 | PASS（hostname/whoami/cat 三个 shell 调用 exit=0，whoami=ubuntu） |
+| T20.8 | 未执行：deepseek 模型不暴露 patch；patch 沙箱行为由 `packages/core/test/tool-patch.test.ts` 覆盖 |
+| T20.9 | PASS（先释放 keep-alive 再删除；HTTP 204；PG `state=destroyed`、`remote_name=null`） |
+| 文件证据 | PASS（`session.shell`：`pwd=/workspace`、exit=0、读到编辑后内容） |
+| 隔离证据 | PASS（SaaS 容器与宿主机均不存在 `/workspace/sandbox-tool-proof.txt`） |
+| 运行态 PG | PASS（`provider=vercel`、`state=running`、`keep_alive=1`） |
+| 远端清理 | PASS（只读复核：沙箱不存在，无残留快照） |
+
+### Vercel 镜像缺少 ripgrep（本轮发现并修复）
+
+首次执行时 T20.5/T20.6 失败：`ripgrep (rg) is not available in the sandbox image`。Vercel 托管镜像 `vercel/sandbox/node:24` 不包含 `rg`，而 OpenSandbox 镜像 `packages/containers/sandbox/Dockerfile` 已安装。由于 `glob`/`grep` 依赖 `rg`，这两个内置工具在 Vercel 后端对所有会话不可用，属于真实功能缺口，不是执行器问题。
+
+修复位于 `packages/core/src/sandbox/vercel/provider.ts` 的 `ensureAssets`：boot 时先执行 `command -v rg`，缺失则通过 `sudo apt-get install -y ripgrep` 幂等安装（实测约 11 秒），失败只记录 warning，不阻塞会话；snapshot 会保留已安装的二进制。可用 `OPENCODE_VERCEL_INSTALL_RIPGREP=false` 关闭。修复后同一脚本原样重跑，T20.5/T20.6 通过。
+
+注意：这是运行时兜底，不是镜像治理的终点。生产上更稳妥的做法是构建带 `ripgrep` 的 VCR 自定义镜像并经 `OPENCODE_VERCEL_IMAGE` 指定；届时可关闭自动安装。
+
+### 证据与复跑
+
+证据目录：`artifacts/vercel-tool-t20-20261024/final5/`（`result.json`、`tool-sandbox-report.json`、每轮原始事件、`shell-evidence.json`、`events.json`、`cleanup-verification.json`）。首次失败证据在 `final3/`，保留用于说明缺陷复现。
+
+```bash
+BASE=http://127.0.0.1:15109 \
+OPENCODE_PASSWORD=... \
+PG_URL=postgresql://local@127.0.0.1:5432/<dedicated>-test \
+STRESS_OUT="$PWD/artifacts/vercel-tool-t20-20261024/final5" \
+HOST_CONTAINER=<test-container> \
+REPO_ROOT="$PWD" \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-vercel-tool-t20 \
+  "$PWD/artifacts/vercel-tool-t20-20261024/final5"
+```
+
+单测与静态检查：`sandbox-config`/`sandbox-vercel-provider`/`sandbox-tools-*` 共 33 pass / 0 fail；Core typecheck 与相关文件 lint 通过。
+
 ## 历史记录说明
 
 原文中的 `/session/:id/exec`、`/session/:id/message`、`bash`、`ls`、`apply_patch`、V1 `packages/opencode/src/tool` 路径及旧 Pod 名断言均属于旧版验收记录，不再作为 V2 的执行步骤或通过结论。历史结果可从 Git 历史查看。

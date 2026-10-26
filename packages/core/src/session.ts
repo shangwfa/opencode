@@ -504,6 +504,7 @@ const layer = Layer.effect(
                   const remaining = yield* sandbox.lifecycle(sessionID)
                   if (remaining.state && remaining.state !== "destroyed")
                     return yield* Effect.fail(new SandboxRetainedError({ sessionID }))
+                  if (sandbox.purge) yield* sandbox.purge(sessionID)
                   // Snapshot rows follow the session; the remote snapshots
                   // themselves are only deleted when the deployment enables it.
                   yield* sandbox

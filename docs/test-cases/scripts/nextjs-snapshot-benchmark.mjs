@@ -6,7 +6,7 @@ import { randomUUID } from "node:crypto"
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 import { execFileSync } from "node:child_process"
-import { touchSnapshotMarker, workspaceUnchangedSinceSnapshot } from "../../../packages/core/src/sandbox/snapshot-reuse.ts"
+import { touchSnapshotMarker, workspaceUnchangedSinceSnapshot } from "../../../packages/core/src/sandbox/opensandbox/snapshot/reuse.ts"
 
 const require = createRequire(new URL("../../../packages/core/package.json", import.meta.url))
 const { Effect } = await import(pathToFileURL(require.resolve("effect")).href)

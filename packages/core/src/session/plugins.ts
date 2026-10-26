@@ -9,6 +9,7 @@ import { Database } from "../database/database.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { PluginHooks } from "../plugin/hooks.js"
 import { SandboxProvider } from "../sandbox/provider.js"
+import { SandboxEndpoint } from "../sandbox/endpoint.js"
 import type { Session } from "../session.js"
 import { SessionStore } from "./store.js"
 import { SessionPluginTable } from "./sql.js"
@@ -45,7 +46,7 @@ function fromRow(row: typeof SessionPluginTable.$inferSelect): Stored {
   } as Stored
 }
 
-type Runtime = { endpoint: string; version: string }
+type Runtime = { endpoint: string; version: string; headers?: Readonly<Record<string, string>> }
 
 const layer = Layer.effect(
   Service,
@@ -111,16 +112,16 @@ const layer = Layer.effect(
       for (let attempt = 0; attempt < 60; attempt++) {
         const resolved = yield* sandbox.endpoint(sessionID, PORT, true)
         if (resolved._tag === "resolved") {
-          endpoint = `http://${resolved.endpoint.replace(/\/$/, "")}`
+          endpoint = SandboxEndpoint.httpUrl(resolved.endpoint.replace(/\/$/, ""))
           const health = yield* Effect.tryPromise({
             try: async () => {
-              const response = await fetch(`${endpoint}/health`, { signal: AbortSignal.timeout(1500) })
+              const response = await fetch(`${endpoint}/health`, { headers: resolved.headers, signal: AbortSignal.timeout(1500) })
               if (!response.ok) throw new Error(`Plugin agent health HTTP ${response.status}`)
               return await response.json() as { status: string }
             },
             catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
           }).pipe(Effect.orElseSucceed(() => undefined))
-          if (health) return { endpoint, version: "agent" }
+          if (health) return { endpoint, version: "agent", headers: resolved.headers }
         }
         yield* Effect.sleep("250 millis")
       }
@@ -142,14 +143,14 @@ const layer = Layer.effect(
             // before trusting a process-local endpoint cache (important in multi-pod mode).
             const current = yield* sandbox.endpoint(sessionID, PORT, true)
             const currentEndpoint = current._tag === "resolved"
-              ? `http://${current.endpoint.replace(/\/$/, "")}`
+              ? SandboxEndpoint.httpUrl(current.endpoint.replace(/\/$/, ""))
               : undefined
             const alive = yield* Effect.tryPromise({
               try: async () => currentEndpoint === cached.endpoint &&
-                (await fetch(`${cached.endpoint}/health`, { signal: AbortSignal.timeout(1000) })).ok,
+                (await fetch(`${cached.endpoint}/health`, { headers: current._tag === "resolved" ? current.headers : undefined, signal: AbortSignal.timeout(1000) })).ok,
               catch: () => new Error("Plugin agent health check failed"),
             }).pipe(Effect.orElseSucceed(() => false))
-            if (alive) return cached
+            if (alive) return { ...cached, headers: current._tag === "resolved" ? current.headers : undefined }
             runtimes.delete(sessionID)
           }
           const runtime = yield* launch(sessionID)
@@ -176,7 +177,7 @@ const layer = Layer.effect(
           try: async () => {
             const response = await fetch(`${runtime.endpoint}/hook/${domain}/${name}`, {
               method: "POST",
-              headers: { "content-type": "application/json" },
+              headers: { "content-type": "application/json", ...runtime.headers },
               body: JSON.stringify({
                 event,
                 // PostgreSQL is the source of truth: every Pod supplies its current owner rows.
@@ -251,16 +252,18 @@ const layer = Layer.effect(
       const runtime = runtimes.get(ownerID)
       return Effect.gen(function* () {
         let endpoint = runtime?.endpoint
+        let headers = runtime?.headers
         if (!endpoint) {
           const resolved = yield* sandbox.endpoint(ownerID, PORT, true)
           if (resolved._tag !== "resolved") return
-          endpoint = `http://${resolved.endpoint.replace(/\/$/, "")}`
+          endpoint = SandboxEndpoint.httpUrl(resolved.endpoint.replace(/\/$/, ""))
+          headers = resolved.headers
         }
         const rows = yield* stored(ownerID)
         yield* Effect.tryPromise({
           try: async () => fetch(`${endpoint}/configure`, {
             method: "POST",
-            headers: { "content-type": "application/json" },
+            headers: { "content-type": "application/json", ...headers },
             body: JSON.stringify({ plugins: rows.map(({ name, source }) => ({ name, source })) }),
             signal: AbortSignal.timeout(5000),
           }),

@@ -2,7 +2,8 @@ import { Bus } from "@opencode/core/bus"
 import { SandboxConfig } from "@opencode/core/sandbox/config"
 import { SandboxPath } from "@opencode/core/sandbox/path"
 import { SandboxProvider } from "@opencode/core/sandbox/provider"
-import { SandboxProxyRewrite } from "@opencode/core/sandbox/proxy-rewrite"
+import { SandboxEndpoint } from "@opencode/core/sandbox/endpoint"
+import { SandboxProxyRewrite } from "@opencode/core/sandbox/preview/rewrite"
 import { SessionEvent } from "@opencode/schema/session-event"
 import type { SessionID } from "@opencode/schema/session-id"
 import { InvalidRequestError, SandboxUnreachableError } from "@opencode/protocol/errors"
@@ -10,6 +11,7 @@ import { Effect, Stream } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { Socket } from "effect/unstable/socket"
+import { WebSocket as UpstreamWebSocket } from "ws"
 import { Api } from "../api"
 
 type PortDiagnostics = SandboxProxyRewrite.PortDiagnostics
@@ -38,7 +40,7 @@ const MAX_SESSIONS = 500
 const PROXY_TARGET_TTL_MS = 10_000
 const MAX_PROXY_TARGETS = 2_000
 
-const proxyTargets = new Map<string, { endpoint: string; expiresAt: number }>()
+const proxyTargets = new Map<string, { endpoint: string; headers?: Readonly<Record<string, string>>; expiresAt: number }>()
 const errors = new Map<string, ProxyError[]>()
 
 const proxyTargetKey = (sessionID: string, port: number) => `${sessionID}:${port}`
@@ -51,7 +53,7 @@ function getProxyTarget(sessionID: string, port: number) {
   return undefined
 }
 
-function setProxyTarget(sessionID: string, port: number, target: { endpoint: string }) {
+function setProxyTarget(sessionID: string, port: number, target: { endpoint: string; headers?: Readonly<Record<string, string>> }) {
   const key = proxyTargetKey(sessionID, port)
   if (!proxyTargets.has(key) && proxyTargets.size >= MAX_PROXY_TARGETS) {
     const oldest = proxyTargets.keys().next().value
@@ -169,13 +171,13 @@ function websocketTargetURL(target: string) {
  * side uses the platform WebSocket deliberately: Effect's socket client can
  * hang on the raw-route upgrade path, a lesson inherited from V1.
  */
-function bridgeWebSocket(request: HttpServerRequest.HttpServerRequest, target: string) {
+function bridgeWebSocket(request: HttpServerRequest.HttpServerRequest, target: string, headers?: Readonly<Record<string, string>>) {
   return Effect.gen(function* () {
     const inbound = yield* Effect.orDie(request.upgrade)
     const outbound = yield* Effect.tryPromise({
       try: () =>
-        new Promise<WebSocket>((resolve, reject) => {
-          const socket = new WebSocket(websocketTargetURL(target), websocketProtocols(request.headers))
+        new Promise<UpstreamWebSocket>((resolve, reject) => {
+          const socket = new UpstreamWebSocket(websocketTargetURL(target), websocketProtocols(request.headers), { headers })
           socket.binaryType = "arraybuffer"
           socket.onopen = () => resolve(socket)
           socket.onerror = () => reject(new Error("outbound websocket connection failed"))
@@ -189,7 +191,7 @@ function bridgeWebSocket(request: HttpServerRequest.HttpServerRequest, target: s
         void data.arrayBuffer().then((value) => Effect.runFork(writeInbound(new Uint8Array(value))))
         return
       }
-      Effect.runFork(writeInbound(typeof data === "string" ? data : new Uint8Array(data)))
+      Effect.runFork(writeInbound(typeof data === "string" ? data : Array.isArray(data) ? Buffer.concat(data) : new Uint8Array(data)))
     }
     outbound.onclose = (event) => {
       Effect.runFork(writeInbound(new Socket.CloseEvent(event.code, event.reason)))
@@ -233,6 +235,7 @@ function proxyHttp(input: {
   readonly prefix: string
   readonly subPath: string
   readonly endpoint: string
+  readonly headers?: Readonly<Record<string, string>>
 }) {
   const { request, provider, sessionID, port, prefix, subPath, endpoint } = input
   return Effect.gen(function* () {
@@ -255,6 +258,7 @@ function proxyHttp(input: {
     // stale module referencing chunks that no longer exist (Strict MIME error).
     outHeaders.delete("if-none-match")
     outHeaders.delete("if-modified-since")
+    for (const [key, value] of Object.entries(input.headers ?? {})) outHeaders.set(key, value)
 
     // The request body stream is already consumed by the platform layer, so it
     // must be buffered and re-sent; forwarding the stream yields an empty body.
@@ -309,6 +313,12 @@ function proxyHttp(input: {
     for (const header of ["x-frame-options", "cross-origin-resource-policy", "cross-origin-embedder-policy"]) {
       resHeaders.delete(header)
     }
+    // Some gateways (Aliyun) stamp a bare `Content-Disposition: attachment`
+    // on user-port responses; Chrome then treats the proxy navigation as a
+    // download and aborts it (ERR_ABORTED). Real downloads always carry a
+    // filename parameter, so a bare value is gateway-added, not app intent.
+    const disposition = resHeaders.get("content-disposition")
+    if (disposition?.trim().toLowerCase() === "attachment") resHeaders.delete("content-disposition")
     resHeaders.set("access-control-allow-origin", "*")
     resHeaders.set("cross-origin-resource-policy", "cross-origin")
 
@@ -323,11 +333,15 @@ function proxyHttp(input: {
 
     // The server-proxy plane answers a dead upstream with an opaque 5xx JSON;
     // surface port-level diagnostics instead of forwarding the vagueness.
+    // Some gateways (Aliyun) do the same for unbound ports, so any opaque 5xx
+    // JSON is checked against in-sandbox diagnostics first: a real app 500
+    // with a live listener keeps passing through untouched.
     if (res.status >= 500 && contentType.includes("json")) {
       const text = yield* Effect.tryPromise(() => res.text()).pipe(Effect.catch(() => Effect.succeed("")))
-      if (text.includes("Could not connect to the backend sandbox")) {
-        clearProxyTarget(sessionID, port)
-        const diagnostics = yield* diagnosePort(provider, sessionID, port)
+      const marker = text.includes("Could not connect to the backend sandbox")
+      const diagnostics = yield* diagnosePort(provider, sessionID, port)
+      if (marker || !diagnostics?.portListening) {
+        if (marker) clearProxyTarget(sessionID, port)
         const hint = diagnostics ? SandboxProxyRewrite.diagHint(diagnostics, port) : "port has no listener"
         yield* Effect.logWarning("session-proxy: upstream process unreachable via server proxy", { sessionID, port, hint })
         return HttpServerResponse.jsonUnsafe(
@@ -395,7 +409,7 @@ export const SessionProxyHandler = HttpApiBuilder.group(Api, "server.session-pro
       Effect.gen(function* () {
         const resolution = yield* provider.endpoint(sessionID, port, config.useServerProxy)
         if (resolution._tag !== "resolved") return undefined
-        const target = { endpoint: `${config.protocol}://${resolution.endpoint}` }
+        const target = { endpoint: SandboxEndpoint.httpUrl(resolution.endpoint, config.protocol), headers: resolution.headers }
         setProxyTarget(sessionID, port, target)
         return target
       })
@@ -438,7 +452,7 @@ export const SessionProxyHandler = HttpApiBuilder.group(Api, "server.session-pro
         } catch {
           targetQuery = ""
         }
-        return yield* bridgeWebSocket(ctx.request, proxyTarget.endpoint + subPath + targetQuery).pipe(
+        return yield* bridgeWebSocket(ctx.request, proxyTarget.endpoint + subPath + targetQuery, proxyTarget.headers).pipe(
           Effect.catch(() => Effect.succeed(HttpServerResponse.empty({ status: 502 }))),
         )
       }
@@ -451,6 +465,7 @@ export const SessionProxyHandler = HttpApiBuilder.group(Api, "server.session-pro
         prefix,
         subPath,
         endpoint: proxyTarget.endpoint,
+        headers: proxyTarget.headers,
       })
     })
 
@@ -471,8 +486,9 @@ export const SessionProxyHandler = HttpApiBuilder.group(Api, "server.session-pro
           const { sessionID } = ctx.params
           const direct = yield* provider.endpoint(sessionID, port, false)
           const viaProxy = yield* provider.endpoint(sessionID, port, true)
-          const directUrl = direct._tag === "resolved" ? `${config.protocol}://${direct.endpoint}` : null
-          const proxyUrl = viaProxy._tag === "resolved" ? `${config.protocol}://${viaProxy.endpoint}` : null
+          // Native traffic credentials stay server-side; browsers use the authenticated SaaS proxy.
+          const directUrl = direct._tag === "resolved" && !direct.headers ? SandboxEndpoint.httpUrl(direct.endpoint, config.protocol) : null
+          const proxyUrl = viaProxy._tag === "resolved" && !viaProxy.headers ? SandboxEndpoint.httpUrl(viaProxy.endpoint, config.protocol) : null
           const sandboxId =
             direct._tag === "resolved"
               ? direct.sandboxId

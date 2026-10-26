@@ -31,6 +31,7 @@ export const port = PORT
 
 import { Effect, Schema } from "effect"
 import { CodeMode } from "@opencode/codemode"
+import { SandboxEndpoint } from "../sandbox/endpoint.js"
 import type { SandboxProvider } from "../sandbox/provider.js"
 
 /** Ensure the Session-local daemon is running and resolve it through the server gateway only. */
@@ -84,6 +85,7 @@ export const stop = Effect.fn("CodeModeRunner.stop")(function* (input: {
 
 export type ExecuteInput = {
   readonly endpoint: string
+  readonly headers?: Readonly<Record<string, string>>
   readonly executionID: string
   readonly code: string
   /** Whether the Runner may expose its Sandbox-local fetch extension. */
@@ -110,7 +112,9 @@ export type ExecuteInput = {
 /** Run one immutable execution over an SaaS-initiated Runner WebSocket. */
 export function execute(input: ExecuteInput): Promise<CodeMode.Result> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(`ws://${input.endpoint}/`)
+    const socket = input.headers
+      ? new WebSocket(`${SandboxEndpoint.wsUrl(input.endpoint)}/`, { headers: { ...input.headers } })
+      : new WebSocket(`${SandboxEndpoint.wsUrl(input.endpoint)}/`)
     let settled = false
     const finish = (error?: Error, value?: CodeMode.Result) => {
       if (settled) return

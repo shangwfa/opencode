@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 
 const BASE = (process.env.BASE ?? "http://127.0.0.1:14105").replace(/\/$/, "")
 const STREAM_TIMEOUT_MS = Number(process.env.STREAM_TIMEOUT_MS ?? 180_000)
-const MODEL = { providerID: "Yd-DeepSeek", id: "deepseek-v4-flash" }
+const MODEL = process.env.MODEL_JSON ? JSON.parse(process.env.MODEL_JSON) : { providerID: "Yd-DeepSeek", id: "deepseek-v4-flash" }
 const AUTH = process.env.OPENCODE_PASSWORD
   ? `Basic ${Buffer.from(`opencode:${process.env.OPENCODE_PASSWORD}`).toString("base64")}`
   : undefined

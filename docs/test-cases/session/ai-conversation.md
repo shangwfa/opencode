@@ -222,6 +222,27 @@ curl -fsS --noproxy '*' "${CURL_AUTH[@]}" "$BASE/api/session/$SID_CM/message?ord
 
 PG 核验：T4.1–T4.6 session 行存在且 `directory=/workspace`；assistant 10 条、user 7 条、idle 7 条；数据库中的真实工具调用为 shell 1、write 1、read 1，状态全部 `completed`；T4.7 中断 session 也存在，两个 session 的 pending 数均为 0。测试 session 与对应 sandbox 已在核验后清理。
 
+## 2026-10-25 阿里云后端实测记录
+
+环境：镜像 `opencode-saas:aliyun-proxy-fixed-20261025`（当前工作区构建，含本次 proxy 修复）、独立 PG `opencode-v2-ai-conv-test`、阿里云杭州 + 二代模板 `base-5wa5`、`deepseek/deepseek-flash`，`OPENCODE_CODEMODE_EXECUTOR=sandbox`，HTTP Basic Auth 开启。会话目录 `/workspace`。执行器 `docs/test-cases/scripts/ai-conversation-v2.mjs`：全程订阅公共 SSE、表单自动代答、PG 后检、结束清理并做云端只读核验。**PASS=8 FAIL=0**（T4.1–T4.8）：
+
+| 用例 | 结果 | 实际观察 |
+|---|---|---|
+| T4.1 | ✅ | 回复 `2`，`finish=stop` |
+| T4.2 | ✅ | 第二轮回复「你叫张三。」（同一 SID） |
+| T4.3 | ✅ | `write(completed)`；`GET /api/session/:id/fs/read/t4-3.txt` 返回 `hello` |
+| T4.4 | ✅ | `read(completed)` |
+| T4.5 | ✅ | `shell(completed)`，入参 `{"command":"ls /workspace"}`，输出含 `t4-3.txt` |
+| T4.6 | ✅ | prompt HTTP 200 且 **57ms** 返回（含 `msg_*` ID，不等模型）；wait 204；assistant 五言绝句已落库 |
+| T4.7 | ✅ | active map `type=running`；interrupt 200 `{"interrupted":true}`；wait 后 active 为 null；assistant 消息 0 条（文档允许） |
+| T4.8 | ✅ | `execute(completed)`；入参 `await tools.opencode.models({limit:100})`；返回 14 个 provider 的真实模型数据 |
+
+PG 核验（本轮实测）：3 个会话 `directory=/workspace`、`model={"id":"deepseek-flash","providerID":"deepseek"}`；`session_message` 展开工具调用 `write/read/shell/execute` 各 1 条且全部 `completed`；`session_pending=0`；清理后 `session_v2` 0 行、9 个 sandbox 行全部 `destroyed` 且无云实例残留（按 metadata 只读核验 0 个）。
+
+过程说明（不影响结论）：新专用库默认无 provider 认证，需从已有库导入 `credential` 表后模型路由才可用；消息列表接口 `limit` 契约上限为 200（执行器曾用 400 被契约层拒绝，属脚本问题）。
+
+
+
 ## 2026-09-29 V2 实测记录
 
 环境：按当前工作区重新构建两个镜像 —— SaaS 服务 `opencode-saas-sandbox-test:9d86bde786-t4`（HEAD `9d86bde786`）、沙箱 `opencode-opensandbox:local`（`7057c941ec64`，含 code mode runner）；本地 PG `opencode-v2-up`（组合 3）、本地 OpenSandbox（Docker runtime）、`Yd-DeepSeek/deepseek-v4-flash`。会话目录 `/workspace`，HTTP Basic Auth 开启。共 21 条断言（含 T4.8），**PASS=21 FAIL=0**。

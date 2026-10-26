@@ -90,3 +90,11 @@ node docs/test-cases/scripts/sandbox-idle-reap-v2.mjs
 | T19.6 idle-reap | `sandbox-idle-reap-v2.mjs`（`IDLE_REAP_SEC=60`，`RESTART_CONTAINER` 指向测试容器） | PASS（重启后按 PG ID reconnect；`time_updated` 置旧后回收销毁；keep_alive 保留） |
 
 > 注意：脚本默认 `BASE`/`PG_URL` 指向旧端口，执行时需按 `docs/local-test-env.md` 显式传参。
+
+## Vercel 环境实测（2026-10-24）
+
+T19.1–T19.6 **PASS**：已接入 Vercel provider，在独立 Docker 双实例 → Vercel Sandbox → 专用 PG 链路运行原四份脚本，保留原断言，配套公共 SSE、PG 和远端清理复核。首次 timeout=0 错误已补回归修复并重跑通过。
+
+报告及能力边界见 [`vercel-exec-api-2026-10-24.md`](./vercel-exec-api-2026-10-24.md)，原始证据在 `artifacts/vercel-t19-20261024/final/`。未重启现有服务；Code Mode/MCP/Tool Host 等完整 Agent 链路尚未支持或验收。上方 2026-10-02 的记录仍仅代表当时的 OpenSandbox 环境。
+
+Agent 链路补测（2026-10-24）：公网 token 网关、Code Mode、Tool Host、Session 本地 MCP echo 均 PASS。MCP 曾被 supergateway 握手 400 阻塞，已通过自研 HTTP 桥接替换解除。最终证据为 `artifacts/vercel-agent-chain-20261024/final/`；详细范围和协议限制见 `vercel-exec-api-2026-10-24.md` 的“原生 HTTP MCP 桥接”一节。

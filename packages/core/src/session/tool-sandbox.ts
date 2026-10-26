@@ -6,6 +6,7 @@ import { Tool } from "@opencode/schema/tool"
 import { ToolFailure } from "@opencode/ai"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { SandboxProvider } from "../sandbox/provider.js"
+import { SandboxEndpoint } from "../sandbox/endpoint.js"
 import { Database } from "../database/database.js"
 import { SessionToolGate } from "./tool-gate.js"
 import { materialize } from "./tool-host/assets.js"
@@ -16,15 +17,18 @@ import { Manifest, HostError, port, prefix, protocolVersion, versionHash, type E
 
 const quote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`
 const ownerID = randomUUID()
-const launcher = (sandboxID: string, runtimeDirectory: string) => {
+export const launcher = (sandboxID: string, runtimeDirectory: string) => {
   const pid = "/tmp/opencode-session-tool-host.pid"
-  const command = `if [ -s ${quote(pid)} ] && kill -0 "$(cat ${quote(pid)})" 2>/dev/null; then echo ready; else OPENCODE_SESSION_TOOL_SANDBOX_ID=${quote(sandboxID)} nohup node ${quote(`${runtimeDirectory}/session-tool-host.mjs`)} --serve > /tmp/opencode-session-tool-host.log 2>&1 </dev/null & echo $! > ${quote(pid)}; fi`
+  // A resumed VM can retain a daemon from an older SaaS fencing generation.
+  const generation = `${pid}.generation`
+  const command = `if [ -s ${quote(pid)} ] && kill -0 "$(cat ${quote(pid)})" 2>/dev/null && [ "$(cat ${quote(generation)} 2>/dev/null)" = ${quote(sandboxID)} ]; then echo ready; else if [ -s ${quote(pid)} ]; then old="$(cat ${quote(pid)})"; kill "$old" 2>/dev/null || true; for i in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$old" 2>/dev/null || break; sleep 0.1; done; kill -9 "$old" 2>/dev/null || true; fi; OPENCODE_SESSION_TOOL_SANDBOX_ID=${quote(sandboxID)} nohup node ${quote(`${runtimeDirectory}/session-tool-host.mjs`)} --serve > /tmp/opencode-session-tool-host.log 2>&1 </dev/null & echo $! > ${quote(pid)}; printf '%s' ${quote(sandboxID)} > ${quote(generation)}; fi`
   // The daemon must not inherit the flock descriptor and retain the startup lock forever.
   return `flock --close -x ${quote(`${pid}.lock`)} -c ${quote(command)}`
 }
 
 export interface Connection {
   endpoint: string
+  headers?: Readonly<Record<string, string>>
   envelope: Envelope
 }
 export interface Interface {
@@ -52,9 +56,9 @@ export async function rpc(
   body: Record<string, unknown> = {},
   signal?: AbortSignal,
 ) {
-  const response = await fetch(`http://${connection.endpoint}${prefix}${operation}`, {
+  const response = await fetch(`${SandboxEndpoint.httpUrl(connection.endpoint)}${prefix}${operation}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...connection.headers },
     body: JSON.stringify({ ...connection.envelope, ...body }),
     signal: signal ?? AbortSignal.timeout(12_000),
   })
@@ -154,7 +158,7 @@ const layer = Layer.effect(
       for (let attempt = 0; attempt < 20; attempt++) {
         health = yield* Effect.tryPromise({
           try: async () => {
-            const response = await fetch(`http://${endpoint}${prefix}health`, { signal: AbortSignal.timeout(2000) })
+            const response = await fetch(`${SandboxEndpoint.httpUrl(endpoint)}${prefix}health`, { headers: resolved.headers, signal: AbortSignal.timeout(2000) })
             if (!response.ok) throw new Error(`Host health HTTP ${response.status}`)
             return (await response.json()) as NonNullable<typeof health>
           },
@@ -167,6 +171,7 @@ const layer = Layer.effect(
         return yield* Effect.fail(new Error("Session Tool Host capability/identity mismatch"))
       const connection: Connection = {
         endpoint,
+        headers: resolved.headers,
         envelope: {
           protocolVersion,
           sandboxID,
@@ -378,7 +383,7 @@ const layer = Layer.effect(
             const endpoint = resolved.endpoint.replace(/\/$/, "")
             const health = yield* Effect.tryPromise({
               try: async () => {
-                const response = await fetch(`http://${endpoint}${prefix}health`, { signal: AbortSignal.timeout(2000) })
+                const response = await fetch(`${SandboxEndpoint.httpUrl(endpoint)}${prefix}health`, { headers: resolved.headers, signal: AbortSignal.timeout(2000) })
                 if (!response.ok) throw new Error(`Host health HTTP ${response.status}`)
                 return (await response.json()) as { hostEpoch: string; sandboxID: string }
               },
@@ -386,6 +391,7 @@ const layer = Layer.effect(
             })
             current = {
               endpoint,
+              headers: resolved.headers,
               envelope: {
                 protocolVersion,
                 sandboxID: health.sandboxID,

@@ -300,10 +300,39 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`aliyun_snapshot\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`provider_scope\` text NOT NULL,
+          \`sandbox_id\` text NOT NULL,
+          \`remote_name\` text NOT NULL,
+          \`snapshot_id\` text,
+          \`state\` text NOT NULL,
+          \`restored_count\` integer DEFAULT 0 NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
+        CREATE TABLE \`sandbox_command\` (
+          \`id\` text PRIMARY KEY,
+          \`session_id\` text NOT NULL,
+          \`sandbox_id\` text NOT NULL,
+          \`command_id\` text NOT NULL,
+          \`operation_id\` text NOT NULL,
+          \`time_created\` integer NOT NULL,
+          \`time_updated\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`sandbox\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
           \`host\` text NOT NULL,
+          \`provider\` text DEFAULT 'opensandbox' NOT NULL,
+          \`provider_scope\` text,
+          \`remote_name\` text,
+          \`endpoint_token\` text,
           \`state\` text NOT NULL,
           \`keep_alive\` integer DEFAULT false NOT NULL,
           \`command_session_id\` text,
@@ -441,6 +470,7 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
           \`session_id\` text NOT NULL,
           \`name\` text NOT NULL,
           \`config\` text NOT NULL,
+          \`runtime_port\` integer,
           \`time_created\` integer NOT NULL,
           \`time_updated\` integer NOT NULL,
           CONSTRAINT \`fk_session_mcps_session_id_session_v2_id_fk\` FOREIGN KEY (\`session_id\`) REFERENCES \`session_v2\`(\`id\`) ON DELETE CASCADE
@@ -637,6 +667,12 @@ const schema: Omit<DatabaseMigration.Migration, "id"> = {
       )
       yield* tx.run(
         `CREATE UNIQUE INDEX \`session_permission_approval_scope_idx\` ON \`session_permission_approval\` (\`session_id\`,\`action\`,\`resource\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`aliyun_snapshot_session_idx\` ON \`aliyun_snapshot\` (\`session_id\`,\`time_created\`);`,
+      )
+      yield* tx.run(
+        `CREATE INDEX \`sandbox_command_session_idx\` ON \`sandbox_command\` (\`session_id\`,\`sandbox_id\`);`,
       )
       yield* tx.run(`CREATE UNIQUE INDEX \`sandbox_session_id_idx\` ON \`sandbox\` (\`session_id\`);`)
       yield* tx.run(`CREATE INDEX \`sandbox_state_time_updated_idx\` ON \`sandbox\` (\`state\`,\`time_updated\`);`)

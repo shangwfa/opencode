@@ -75,6 +75,10 @@ import m72 from "./migration/20261010141236_connector_oauth_request.js"
 import m73 from "./migration/20261010142023_connector_trigger_receipt_event.js"
 import m74 from "./migration/20261020092340_connector_app_mcp.js"
 import m75 from "./migration/20261023005646_session_context_insights.js"
+import m76 from "./migration/20261024062646_vercel_sandbox_binding.js"
+import m77 from "./migration/20261024093925_vercel_endpoint_token.js"
+import m78 from "./migration/20261025091743_aliyun_snapshot.js"
+import m79 from "./migration/20261025152054_session_mcp_runtime_port.js"
 
 export const migrations = [
   m00,
@@ -153,4 +157,8 @@ export const migrations = [
   m73,
   m74,
   m75,
+  m76,
+  m77,
+  m78,
+  m79,
 ] satisfies DatabaseMigration.Migration[]

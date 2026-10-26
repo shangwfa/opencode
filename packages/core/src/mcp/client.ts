@@ -4,11 +4,14 @@ import path from "node:path"
 import { pathToFileURL } from "node:url"
 import {
   Client,
+  ProtocolError,
   SdkHttpError,
   StreamableHTTPClientTransport,
   UnauthorizedError,
   UnsupportedProtocolVersionError,
   type CallToolResult as SdkCallToolResult,
+  type CreateMessageRequestParams,
+  type CreateMessageResult,
   type ElicitRequestFormParams,
   type ElicitRequestParams,
   type ElicitRequestURLParams,
@@ -28,6 +31,7 @@ import { Cause, Effect, Exit, Schema } from "effect"
 import { ConfigMCP } from "@opencode/schema/config/mcp"
 import type { Session } from "@opencode/schema/session"
 import { McpStdio } from "./stdio.js"
+import { KeyedMutex } from "../effect/keyed-mutex.js"
 
 const DEFAULT_STARTUP_TIMEOUT = 30_000
 const DEFAULT_CATALOG_TIMEOUT = 30_000
@@ -50,6 +54,7 @@ export class ConnectError extends Schema.TaggedError<ConnectError>()("MCP.Connec
 /** A legacy Streamable HTTP server no longer recognizes this connection's session; the lifecycle reconnects. */
 export class SessionExpiredError extends Schema.TaggedError<SessionExpiredError>()("MCP.SessionExpiredError", {
   server: Schema.String,
+  rejected: Schema.optional(Schema.Boolean),
 }) {
   override get message() {
     return `MCP server session expired: ${this.server}`
@@ -69,10 +74,22 @@ export interface CallToolResult {
 export type ElicitationFormParams = ElicitRequestFormParams
 export type ElicitationParams = ElicitRequestParams
 export type ElicitationResult = ElicitResult
-
-export interface ElicitationHandler {
+export type SamplingParams = CreateMessageRequestParams
+export type SamplingResult = CreateMessageResult
+export interface SamplingHandler {
   readonly create: (input: {
     readonly server: string
+    readonly sessionID?: Session.ID
+    readonly params: SamplingParams
+    readonly signal: AbortSignal
+  }) => Effect.Effect<SamplingResult, Error>
+}
+
+export interface ElicitationHandler {
+  readonly sessionScoped?: boolean
+  readonly create: (input: {
+    readonly server: string
+    readonly sessionID?: Session.ID
     readonly params: ElicitationParams
     readonly signal: AbortSignal
   }) => Effect.Effect<ElicitationResult, Error>
@@ -127,7 +144,17 @@ export const connect = Effect.fnUntraced(function* (
   authProvider?: OAuthClientProvider,
   elicitation?: ElicitationHandler,
   clientInfo: Implementation = { name: "opencode", version: "unknown" },
+  sampling?: SamplingHandler,
 ) {
+  const calls = KeyedMutex.makeUnsafe<string>()
+  let caller: Session.ID | undefined
+  let callerSignal: AbortSignal | undefined
+  const interactive = async <A>(effect: Effect.Effect<A, Error>, signal: AbortSignal) => {
+    const exit = await Effect.runPromiseExit(effect, { signal })
+    if (Exit.isSuccess(exit)) return exit.value
+    const error = Cause.squash(exit.cause)
+    throw error instanceof Error ? error : new ProtocolError(-1, "MCP interaction cancelled")
+  }
   // The SDK takes list-changed handlers at construction, but consumers register after connect. On a
   // modern connection the SDK opens the subscriptions/listen stream behind these itself.
   const changed = { tools: () => {}, prompts: () => {}, resources: () => {} }
@@ -141,6 +168,7 @@ export const connect = Effect.fnUntraced(function* (
     const client = new Client(clientInfo, {
       capabilities: {
         ...(elicitation ? { elicitation: { form: { applyDefaults: true }, url: {} } } : {}),
+        ...(sampling ? { sampling: {} } : {}),
         // Legacy era only: roots are deprecated as of 2026-07-28 and modern servers cannot request them.
         // Some legacy servers refuse to run without one (https://github.com/anomalyco/opencode/issues/2308).
         roots: {},
@@ -154,12 +182,19 @@ export const connect = Effect.fnUntraced(function* (
     })
     client.setRequestHandler("roots/list", () => ({ roots: [{ uri: pathToFileURL(directory).href }] }))
     if (elicitation) {
-      client.setRequestHandler("elicitation/create", (request, ctx) =>
-        Effect.runPromise(elicitation.create({ server, params: request.params, signal: ctx.mcpReq.signal })),
-      )
+      client.setRequestHandler("elicitation/create", (request, ctx) => {
+        const signal = callerSignal ? AbortSignal.any([ctx.mcpReq.signal, callerSignal]) : ctx.mcpReq.signal
+        return interactive(elicitation.create({ server, sessionID: caller, params: request.params, signal }), signal)
+      })
       client.setNotificationHandler("notifications/elicitation/complete", (notification) =>
         Effect.runPromise(elicitation.complete({ server, elicitationID: notification.params.elicitationId })),
       )
+    }
+    if (sampling) {
+      client.setRequestHandler("sampling/createMessage", (request, ctx) => {
+        const signal = callerSignal ? AbortSignal.any([ctx.mcpReq.signal, callerSignal]) : ctx.mcpReq.signal
+        return interactive(sampling.create({ server, sessionID: caller, params: request.params, signal }), signal)
+      })
     }
 
     yield* Effect.tryPromise({
@@ -178,6 +213,10 @@ export const connect = Effect.fnUntraced(function* (
     reported: false,
   }
   const failure = (error: unknown) => {
+    // A background catalog request can observe expiry and close this transport
+    // while tools/call is still awaiting its own response.
+    if (session.reported && error instanceof Error && error.message === "Connection closed")
+      return new SessionExpiredError({ server })
     if (!(error instanceof SdkHttpError) || session.transport?.sessionId === undefined) return toError(error)
     const expired =
       error.status === 404 ||
@@ -189,7 +228,7 @@ export const connect = Effect.fnUntraced(function* (
       session.reported = true
       session.expired?.()
     }
-    return new SessionExpiredError({ server })
+    return new SessionExpiredError({ server, rejected: true })
   }
 
   const exit = yield* Effect.gen(function* () {
@@ -241,7 +280,9 @@ export const connect = Effect.fnUntraced(function* (
     const execution = config.timeout?.execution ?? DEFAULT_EXECUTION_TIMEOUT
     const request = <A>(what: string, run: (signal: AbortSignal) => Promise<A>) =>
       Effect.tryPromise({ try: run, catch: failure }).pipe(
-        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, { server, error: error.message })),
+        Effect.tapError((error) => Effect.logWarning(`failed to ${what}`, {
+          server, error: error.message, ...(error instanceof SdkHttpError ? { status: error.status } : {}),
+        })),
       )
 
     return {
@@ -269,8 +310,8 @@ export const connect = Effect.fnUntraced(function* (
         request("get MCP prompt", (signal) =>
           client.getPrompt({ name: input.name, arguments: input.args ?? {} }, { signal, timeout: execution }),
         ),
-      callTool: (input) =>
-        request("call MCP tool", (signal) =>
+      callTool: (input) => {
+        const call = request("call MCP tool", (signal) =>
           client.callTool(
             {
               name: input.name,
@@ -280,7 +321,26 @@ export const connect = Effect.fnUntraced(function* (
             // Requesting progress keeps long calls alive under the SDK's timeout; execution is the hard wall.
             { signal, timeout: execution, onprogress: () => {} },
           ),
-        ).pipe(Effect.map(toCallToolResult)),
+        ).pipe(Effect.map(toCallToolResult))
+        if (!elicitation?.sessionScoped && !sampling) return call
+        return calls.withLock("interaction")(
+          Effect.gen(function* () {
+            const controller = new AbortController()
+            caller = input.sessionID
+            callerSignal = controller.signal
+            return yield* call.pipe(
+              Effect.onInterrupt(() => Effect.promise(() => client.close()).pipe(Effect.ignore)),
+              Effect.ensuring(
+                Effect.sync(() => {
+                  controller.abort()
+                  caller = undefined
+                  callerSignal = undefined
+                }),
+              ),
+            )
+          }),
+        )
+      },
       onClose: (callback) => {
         client.onclose = callback
       },

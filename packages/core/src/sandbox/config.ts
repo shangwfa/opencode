@@ -9,6 +9,27 @@ export * as SandboxConfig from "./config.js"
 
 export interface Config {
   readonly enabled: boolean
+  readonly provider: "opensandbox" | "vercel" | "aliyun"
+  readonly aliyun?: {
+    readonly apiKey: string
+    readonly apiUrl: string
+    readonly domain: string
+    readonly template: string
+    /** Account must have pause/resume enabled; never fall back to killing a persistent workspace. */
+    readonly pauseEnabled: boolean
+    readonly runnerAsset?: string
+    readonly installRipgrep?: boolean
+  }
+  readonly vercel?: {
+    readonly token: string
+    readonly teamId: string
+    readonly projectId: string
+    readonly image: string
+    /** Host-side path to the gzipped Code Mode runner bundle (stock Vercel images lack /opt tooling). */
+    readonly runnerAsset?: string
+    /** Install ripgrep on boot when the stock image lacks it; glob/grep depend on rg. */
+    readonly installRipgrep?: boolean
+  }
   readonly domain: string
   readonly protocol: "http" | "https"
   readonly apiKey?: string
@@ -60,7 +81,7 @@ export interface Config {
     readonly batch: number
     readonly pressureRatio: number
   }
-  /** Sandbox snapshot persistence (see sandbox/snapshot.ts and docs/sandbox-snapshot-design.md). */
+  /** OpenSandbox snapshot persistence (see opensandbox/snapshot/index.ts). */
   readonly snapshot: {
     /** Master switch; snapshot requests for sessions without the persist mode return an error when off. */
     readonly enabled: boolean
@@ -92,6 +113,13 @@ const flag = (value: string | undefined) => value === "true" || value === "1"
 const volumeType = (value: string | undefined): Config["volumeType"] =>
   value === "snapshot" ? "snapshot" : "pvc"
 
+/** Switching the new-session provider must not change legacy OpenSandbox's PVC default. */
+export const forOpenSandbox = (config: Config): Config => ({
+  ...config,
+  provider: "opensandbox",
+  volumeType: volumeType(process.env["OPENCODE_SANDBOX_VOLUME_TYPE"]),
+})
+
 const number = (value: string | undefined, fallback: number) => {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
@@ -109,8 +137,52 @@ const nonNegativeInteger = (value: string | undefined, fallback: number) => {
 
 export function load(): Config {
   const env = process.env
+  const provider = env["OPENCODE_SANDBOX_PROVIDER"] || "opensandbox"
+  if (provider !== "opensandbox" && provider !== "vercel" && provider !== "aliyun") throw new Error("Unknown sandbox provider")
+  const aliyunKey = env["OPENCODE_ALIYUN_API_KEY"]?.trim()
+  const aliyunDomain = env["OPENCODE_ALIYUN_DOMAIN"]?.trim()
+  const aliyunUrl = env["OPENCODE_ALIYUN_API_URL"]?.trim()
+  if (aliyunKey && aliyunDomain && aliyunUrl) {
+    const url = new URL(aliyunUrl)
+    if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/" ||
+      !/^[a-z0-9.-]+$/i.test(aliyunDomain) || url.hostname !== `api.${aliyunDomain}`) {
+      throw new Error("Aliyun sandbox requires matching HTTPS API URL and domain, without credentials or paths")
+    }
+  }
+  if (flag(env["OPENCODE_SANDBOX_ENABLED"]) && provider === "aliyun") {
+    if (!aliyunKey || !aliyunDomain || !aliyunUrl) throw new Error("Aliyun sandbox requires OPENCODE_ALIYUN_API_KEY, OPENCODE_ALIYUN_API_URL and OPENCODE_ALIYUN_DOMAIN")
+    if (env["OPENCODE_SANDBOX_VOLUME_TYPE"] && env["OPENCODE_SANDBOX_VOLUME_TYPE"] !== "snapshot")
+      throw new Error("Aliyun sandbox does not support OpenSandbox PVC persistence")
+  }
+  const token = env["VERCEL_TOKEN"]?.trim()
+  const teamId = env["VERCEL_TEAM_ID"]?.trim()
+  const projectId = env["VERCEL_PROJECT_ID"]?.trim()
+  if (flag(env["OPENCODE_SANDBOX_ENABLED"]) && provider === "vercel") {
+    if (!token || !teamId || !projectId) throw new Error("Vercel sandbox requires VERCEL_TOKEN, VERCEL_TEAM_ID and VERCEL_PROJECT_ID")
+    if (env["OPENCODE_SANDBOX_VOLUME_TYPE"] && env["OPENCODE_SANDBOX_VOLUME_TYPE"] !== "snapshot") {
+      throw new Error("Vercel sandbox supports snapshot persistence, not PVC")
+    }
+  }
   return {
     enabled: flag(env["OPENCODE_SANDBOX_ENABLED"]),
+    provider,
+    aliyun: aliyunKey && aliyunDomain && aliyunUrl ? {
+      apiKey: aliyunKey, apiUrl: aliyunUrl, domain: aliyunDomain,
+      template: env["OPENCODE_ALIYUN_TEMPLATE"]?.trim() || "code-interpreter-v1",
+      pauseEnabled: flag(env["OPENCODE_ALIYUN_PAUSE_ENABLED"]),
+      runnerAsset: env["OPENCODE_ALIYUN_RUNNER_ASSET"] || undefined,
+      installRipgrep: env["OPENCODE_ALIYUN_INSTALL_RIPGREP"] === undefined ? true : flag(env["OPENCODE_ALIYUN_INSTALL_RIPGREP"]),
+    } : undefined,
+    vercel: token && teamId && projectId
+      ? {
+          token,
+          teamId,
+          projectId,
+          image: env["OPENCODE_VERCEL_IMAGE"] || "vercel/sandbox/node:24",
+          ...(env["OPENCODE_VERCEL_RUNNER_ASSET"] ? { runnerAsset: env["OPENCODE_VERCEL_RUNNER_ASSET"] } : {}),
+          installRipgrep: env["OPENCODE_VERCEL_INSTALL_RIPGREP"] === undefined ? true : flag(env["OPENCODE_VERCEL_INSTALL_RIPGREP"]),
+        }
+      : undefined,
     domain: env["OPENCODE_SANDBOX_DOMAIN"] ?? "",
     protocol: env["OPENCODE_SANDBOX_PROTOCOL"] === "http" ? "http" : "https",
     apiKey: env["OPENCODE_SANDBOX_API_KEY"] || undefined,
@@ -135,7 +207,7 @@ export function load(): Config {
       memory: env["OPENCODE_SANDBOX_MEMORY"] || "4Gi",
     },
     publicDomain: env["OPENCODE_SANDBOX_PUBLIC_DOMAIN"] || undefined,
-    volumeType: volumeType(env["OPENCODE_SANDBOX_VOLUME_TYPE"]),
+    volumeType: provider !== "opensandbox" ? "snapshot" : volumeType(env["OPENCODE_SANDBOX_VOLUME_TYPE"]),
     pvcClaimName: env["OPENCODE_SANDBOX_PVC_CLAIM"] || "sandbox-test",
     packageCacheMount: env["OPENCODE_SANDBOX_PACKAGE_CACHE_MOUNT"] || "/opt/pnpm-store",
     maxConcurrentCommandsPerSession: number(env["OPENCODE_SANDBOX_MAX_CONCURRENT_COMMANDS_PER_SESSION"], 4),

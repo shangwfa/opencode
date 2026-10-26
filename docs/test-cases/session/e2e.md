@@ -243,6 +243,25 @@ PG 侧工具记录（`session_message.data.content[]` 展开）同样显示 `wri
 
 ---
 
+## 2026-10-25 阿里云后端实测记录
+
+环境：镜像 `opencode-saas:aliyun-proxy-fixed-20261025`（当前工作区，含 proxy 修复）、独立 PG `opencode-v2-e2e-test`、阿里云杭州 + 二代模板 `base-5wa5`（自带 Python 3.13.13）、`deepseek/deepseek-flash`，`OPENCODE_CODEMODE_EXECUTOR=sandbox`，root 会话自动保活开启。执行器 `session-e2e-stream-v2.mjs` 原样运行（仅将 MODEL 常量改为 `MODEL_JSON` 环境变量可覆盖，默认值不变）。**T10.1–T10.4 全部通过（硬断言）**：
+
+| 用例 | SSE 事件数 | 断言验证 |
+|---|---|---|
+| T10.1 | 58 | 4 个 .py 文件（`find \| wc -l` = 4）；`python3 -c 'from myapp.main import main; main()'` 输出 `hello` |
+| T10.2 | 26 + 22 | `edit` SSE 成功事件；`add(2,3),subtract(5,2)` 输出 `5,3`；diff 含 `subtract` |
+| T10.3 | 32 | 流式事件实时渲染；`cat /workspace/hello.py` 含 `hello from SSE test` |
+| T10.4 | 14 + 13 | Round 2 终态回复 `42` |
+
+独立证据（session fs 接口直读，不依赖脚本自述）：`myapp/myapp/main.py` = `def main(): print("hello")`；`myapp/tests/test_main.py` 导入 `myapp.main`；`calc.py` 含 `subtract`（只可能由第二轮 edit 产生）；`hello.py` 内容正确。
+
+PG 侧工具记录（`session_message` 展开）：`write×6`、`edit×1`、`read×1`、`shell×1`，全部 `completed`；4 个会话 `directory=/workspace`、model 正确。
+
+清理（按本文「清理陷阱」写法逐行删除并打印状态码）：4 个会话全部 204，`session_v2` 复查 count=0，6 个 sandbox 行全部 `destroyed`，云端按 metadata 只读核验 0 个残留实例。
+
+环境陷阱（复跑前排除）：容器**不能**设置 `OPENCODE_SESSION_AUTO_KEEPALIVE=0`——轮次结束会回收沙箱，轮后 shell API 触发代次更替，报 `Sandbox identity is no longer current`（首跑实测命中，与 Vercel 生命周期复测记录同源）。
+
 ## ⚠️ 清理陷阱：zsh 下 `for s in $SIDS` 只迭代一次
 
 测试后清理会话时踩到的坑，**会导致「看起来清理干净、实际一个没删」**。

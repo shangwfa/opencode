@@ -4,6 +4,24 @@
 
 ---
 
+## V2 对照（2026-10-24）
+
+本文档的 `apply_patch` 与 `ls` 属于已移除的 V1 工具，V2 不存在这两个名字，也不使用 `ctx.sandbox` 分支。对应的 V2 能力与验收位置：
+
+| 本文档主题 | V2 对应 | 验收 |
+| --- | --- | --- |
+| `apply_patch` 写/删/移动 | `write` / `edit` / `patch`（`packages/core/src/sandbox/tools.ts`） | `packages/core/test/tool-patch.test.ts`；Vercel 真实 Agent 见 [20-saas-tool-sandbox-verify.md](./saas-tool-sandbox-verify.md) |
+| `ls` 目录列举 | `glob`（`rg --files`）/ `read` | `sandbox-tools-ripgrep.test.ts`；Vercel 上需镜像含 `ripgrep`（provider 现在按需安装） |
+| 路径转换 | `packages/core/src/sandbox/path.ts` | `packages/core/test/sandbox-path.test.ts` |
+| 错误信息泄露 | 工具错误不包含 “sandbox” 内部细节 | T20 工具轮的错误与输出断言 |
+| SDK 边界/并发（三~六章） | `SandboxProvider` + `SandboxTools` | `sandbox-tools-read/write.test.ts`、`sandbox-provider.test.ts` |
+
+本轮 V2 回归：`sandbox-path`、`tool-patch`、`sandbox-tools-read/write/ripgrep` 共 **66 pass / 0 fail**（194 assertions）。Vercel 真实 Agent 的 write/read/edit/glob/grep/shell 已在 [20-saas-tool-sandbox-verify.md](./saas-tool-sandbox-verify.md) 的「Vercel 后端验收」中 13/13 通过。
+
+下方三~六章保留为 V1 SDK 层历史记录，不作为 V2 执行步骤或通过结论。
+
+---
+
 ## 一、背景
 
 ### 1.1 问题描述

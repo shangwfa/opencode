@@ -560,7 +560,84 @@ runtime.tools.map((tool) => ({
 - session 删除时主会话 `release` 后销毁沙箱、子会话仅 release（`session.ts:493-544`，部分被 T22.25 步骤 6 覆盖）；
 - 资源链跨 project/directory 的防御性 die（`resource-owner.ts:44-45`，内部防御，API 层难以构造）。
 
+## Vercel 后端验收（2026-10-25）
+
+独立 Docker 测试实例使用 `OPENCODE_SANDBOX_PROVIDER=vercel`（镜像 `opencode-saas:vercel-t22-20261025`，含按需端口注册与 call 条件重试），通过真实 Vercel Sandbox 分四个阶段执行本文件用例；全部经 `sandbox-vercel-t19.mjs` 包装器运行（公共 SSE、会话清理、PG 与远端只读复核）。执行器 `docs/test-cases/scripts/sandbox-vercel-session-mcp-t22.mjs`，阶段由 `MCP_T22_STAGE=A|B|C|D` 控制。
+
+**结果：38/38 检查通过**（A 14 + B 13 + C 4 + D 7），单测 `session-mcps.test.ts` 13 pass / 0 fail，Core typecheck 与 lint 通过。
+
+| 阶段 | 覆盖 | 关键证据 |
+| --- | --- | --- |
+| A | T22.1–T22.12、T22.16、T22.18（name 校验）、T22.30、T22.8/9 | CRUD/upsert 时间语义/隔离/级联 404/8 类非法 payload 全 400 且 PG 无行；name 64/200、65/400 |
+| B | T22.14、T22.17、T22.18、T22.19、T22.26、T22.27、T22.29、T22.31 | local echo `Echo: hello-sandbox-mcp`；pid 1016→1016 复用；env 写入 `/tmp/mcp-env-test`；SAFE_MARKER 无注入；端口 9103/9104 连续分配、删除后 9103 被 mcp-c 复用；disabled 三态；`cm-off` 顶层直连工具；kill -9 bridge 后自愈 1016→2483 |
+| C | T22.13、T22.15 | remote `persist-tools.echo` 真实 completed（round-1/round-3），SaaS 容器 → `host.docker.internal:9105` 可达 |
+| D | T22.21、T22.32、T22.25 | 容器重启后 sweep 清扫重建（1016/1080 → 1283/1338，无 DEAD）；parentID 子会话真实调用 `sweep-a.echo` completed，父会话 pid 1283 不变（单一 bridge 复用），删子会话后父会话可用 |
+
+### Vercel 特有行为与本轮改动
+
+1. **call 条件重试（代码改动，修正 2026-10-07 语义）**：`SessionMcps.call` 现在只对**连接级失败**（`SessionExpiredError`、connection closed、ECONNREFUSED、fetch failed 等）做一次驱逐+透明重试；协议/交互失败（sampling/elicitation 拒绝或取消、JSON-RPC error）只驱逐、绝不重放——这类失败可能已产生副作用或已向用户提问。T22.31 的自愈语义保持，且采样/审批不会被重复触发。
+2. **按需端口注册与 MCP 端口共存**：Vercel 15 端口预算下，MCP bridge 端口（9100 起）随首次连接动态注册公网路由；本轮 5 个 local MCP + 预览端口并存无冲突。
+3. **fork 不共享是契约**：验证中发现 fork 会话目录确无父会话 MCP（`Unknown tool`），与文档「可选补充」一致；共享语义须用 `parentID` 创建子会话（T22.25 正确形态）。执行器断言已收紧为嵌套 `toolCalls` completed，避免 shell 伪造文本造成假阳性。
+4. **沙箱内依赖**：`server-everything` 经 `sudo npm install -g` 预装（Vercel 镜像无预置），local command 用 `npx -y` 命中全局安装，60s 连接预算内稳定启动。
+
+### 环境编排注意
+
+- remote MCP 前置必须在宿主机以**完全分离形态**启动 streamable-HTTP MCP（`nohup ... < /dev/null &`）；随测试 shell 退出的网关会让 SaaS 容器侧 `ECONNREFUSED`，模型会退化为 shell 自行模拟调用——首轮 C 失败即此因，非产品问题。
+- `OPENCODE_SESSION_AUTO_KEEPALIVE=0` 的实例适合纯 API 阶段（A）；含 boot 的阶段显式 keep-alive boot。
+- `parentID` 子会话没有自己的 sandbox 行，`EXPECT_SANDBOX=0` 跳过包装器“会话必须有沙箱行”的假设（仍校验已存在行为 vercel/destroyed/null）。
+
+### 证据与复跑
+
+证据目录：`artifacts/vercel-session-mcp-t22-20261025/`（`A2/`、`B2/`、`C2/`、`D3/`、`summary.json`、`cleanup-verification.json`；`C/` 保留网关误配的首轮失败对照）。
+
+```bash
+BASE=http://127.0.0.1:<port> OPENCODE_PASSWORD=... \
+PG_URL=postgresql://local@127.0.0.1:5432/<dedicated>-test \
+STRESS_OUT="$PWD/artifacts/vercel-session-mcp-t22-20261025/<stage>" \
+MCP_T22_STAGE=B \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-vercel-session-mcp-t22 \
+  "$PWD/artifacts/vercel-session-mcp-t22-20261025/<stage>"
+# C 阶段前置：宿主机分离启动 supergateway --port 9105 --outputTransport streamableHttp
+# D 阶段前置：RESTART_CONTAINER=<以 opencode-vercel-t19- 开头的测试容器>
+```
+
 ## 结果汇总
+
+### 阿里云后端复测（2026-10-25，本轮优先于历史结果）
+
+使用独立 Docker `opencode-vercel-t19-mcp-aliyun`、镜像 `opencode-saas:aliyun-sse-fixed-20261025`、专用 PG `opencode-v2-aliyun-mcp-test`、二代模板 `base-5wa5`。执行器扩展为 A/B/C/D/E 五阶段；请求前订阅公共 SSE，保留嵌套工具状态，正常调用必须具有匹配输入的 `completed` 且本轮无 `error`，不接受模型自述或 shell 模拟结果。
+
+| 阶段 | 本轮结果 | 覆盖与证据 |
+| --- | --- | --- |
+| A | 通过，15 项检查 | T22.1–12/16/18/30：CRUD、隔离、级联/404、字段/互斥/恶意名称校验、64/65 边界、删除重建；无沙箱创建 |
+| B | **失败于 T22.31** | 此前 T22.14/17/18/19/26/27/29 已通过：PID 575 连续复用、环境注入、安全、9103/9104 双端口及回收、disabled 三态、原生 `cm-off_echo`、pid/log 清理。kill bridge 后首次调用 error，模型第二次 execute 才 completed，不是透明恢复 |
+| C | 通过，3 项检查 | T22.13/15：三轮真实 remote echo；独立夹具记录 initialized=1，同一 MCP session 收到 round-1/2/3 |
+| D2 | 通过，8 项检查 | T22.21/25/32：重启后 PID 570/618→826/874，旧 PID 全死、两个 pid 文件且对应进程存活；parentID 子会话真实 echo，父 PID 826 不变，删除子会话后父 echo 仍可用 |
+| E | 通过，5 项检查 | T22.24/28：配置漂移 PID 570→739，旧进程死亡、新环境生效，PG 创建时间不变/更新时间递增；broken 首轮 37637ms 后降级，good 不饿死，修复配置立即恢复 |
+
+T22.22 由重试退避/预算单测覆盖；T22.23 仅有预算分层单测及 E 阶段降级路径，**没有精确 30s 墙钟上限断言**。本轮 core 13、server 1、PG 资源归属 1 测试通过。T22.20 是去重保留编号，不计独立用例。检查数量不等于用例数量。
+
+T22.31 失败分诊（2026-10-25 首轮，已被次日修复取代）：公共 SSE 中首个 execute 返回 `Error POSTing to endpoint: {"errorMessage":"Process exited unexpectedly before completing request (duration: 0ms, maxMemoryUsage: 0.00MB)"}`；同一输入 `after-kill` 的嵌套状态先 error，模型第二个 execute 才 completed。当日实现不将该错误文本归为可透明重试的连接错误。2026-10-26 已按调用前健康探测方案修复并复测通过，见下节与本轮专项文档。
+
+证据目录：`artifacts/session-mcp-aliyun-20261025/`（A/B/C/D/E、remote）。B 首跑失败时执行器尚未支持 finally 写阶段报告，原始 `B/executor.log`、`B/events.json` 和包装器结果保留，不补造通过报告。A/B/C 包装器旧 `codeMode: not exercised` 标签不准确，B/C 的 execute 和嵌套 completed 已由 SSE 证明；E/D 使用修正标签。
+
+### 阿里云后端复测（2026-10-26，MCP 恢复 + 多 Pod 修复）
+
+独立双 Docker SaaS（15130/15131，镜像 `opencode-saas:mcp-multipod3-20261026`）+ 专用 PG `opencode-v2-mcp-multipod3-test` + 阿里云 `base-5wa5`，经公共 SSE 执行 B/D/F 三阶段；执行器新增 F 阶段（跨 Pod 共享、in-flight 保护、不重放、恢复）。**B 14 项、D 8 项、F 4 项全部通过**，全程为真实模型轮次 + Code Mode execute：
+
+| 阶段 | 关键证据 |
+| --- | --- |
+| B（含 T22.31） | kill -9 bridge 后**首次调用即透明恢复**（578→2634，嵌套仅 completed、无 error）——2026-10-25 的失败不再复现 |
+| F 多 Pod | 跨 Pod 发现复用同一 bridge（564→564）且不杀进行中 30s slowEcho；ambiguous 工具写入后断开：调用一次、错误一次、副作用一次，**不自动重放**；死亡 stdio 在下一次派发前由健康探测恢复 |
+| D 重启共享 | SaaS 重启后 bridge 复用（582/650 不变且存活、恰两个 pid 文件）；parentID 子会话共享、父会话不受影响、删除子会话后可用 |
+
+配套修复与完整证据：[`session-mcp-multipod-fix-2026-10-26.md`](session-mcp-multipod-fix-2026-10-26.md)。相关单测 8 文件 119 pass / 0 fail。`mcp.test.ts` 现代协议资源通知用例超时与本轮改动无关（撤销改动后仍复现），未计入本轮结果。
+
+D 首轮业务 8 项通过，但包装器错误要求子会话具有独立 sandbox 行，最终失败；按既有契约以 `EXPECT_SANDBOX=0` 重跑，`D2/` 最终通过，仍检查实际沙箱行的 provider/destroyed/null。没有删除首轮证据。当前所有非去重编号均已执行对应 API/E2E 或上述单测，不能宣称全量通过：T22.31 仍失败，T22.23 精确墙钟边界未覆盖。
+
+**清理复核**：专用 PG 中 `session_v2=0`、`session_mcps=0`、`sandbox_command=0`；五个自有 sandbox 行均 `aliyun/destroyed/remote_name=null`。逐个调用原生 `Sandbox.getInfo`，五个云实例均返回 `SandboxNotFoundError`。自有 remote 夹具已终止，测试 Docker 已停止，日志保存为证据目录下 `docker.log`；保留测试数据库与停止的容器用于复查，未影响其他服务。
+
+> 下表为历史验收结果，不能据此把本轮阿里云 T22.31 标记通过；当前 local 桥为原生 `mcp-http-bridge`，不是历史 supergateway 主路径。
 
 > **编号说明**：T22.20 与 T22.9 完全重复，2026-07-17 去重删除，编号保留断栏。
 >
@@ -593,6 +670,7 @@ runtime.tools.map((tool) => ({
 | T22.30 | ✅ 已执行 | name 64/65 边界、time_created 稳定、删后重建（2026-10-07） |
 | T22.31 | ✅ 已执行并修复 | bridge 死亡自愈：第 4 缺陷（ECONNREFUSED 无自愈路径）实证，call 全失败驱逐+重试修复，透明恢复（2026-10-07） |
 | T22.32 | ✅ 已执行并验证 | 沙箱级 stale 批量清扫（V1 借鉴项）：旧 bridge 全清、新 bridge 重建、无孤儿（2026-10-08） |
+| T22.1–T22.32（Vercel） | ✅ 38/38 | Vercel 后端分四阶段复测，含 call 条件重试改动；见「Vercel 后端验收（2026-10-25）」 |
 
 ## 单元测试覆盖（V2）
 

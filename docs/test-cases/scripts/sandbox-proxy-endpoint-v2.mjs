@@ -168,7 +168,7 @@ try {
   console.log(`sandbox: ${sandboxId1}`)
 
   await shell(sessionID, `echo '${SERVER_B64}' | base64 -d > /workspace/preview-server.js`)
-  await shell(sessionID, `nohup node /workspace/preview-server.js > /tmp/preview-server.log 2>&1 & echo started`)
+  await shell(sessionID, `(nohup node /workspace/preview-server.js > /tmp/preview-server.log 2>&1 </dev/null &) ; echo started`)
 
   const prefix = `/api/session/${sessionID}/proxy/8080`
   let booted = false
@@ -221,7 +221,7 @@ try {
     // still completes it — poll readiness either way instead of hard failing.
     await shell(
       sessionID,
-      `echo '${Buffer.from(WS_ECHO_SERVER).toString("base64")}' | base64 -d > /workspace/ws-echo.js && nohup node /workspace/ws-echo.js > /tmp/ws-echo.log 2>&1 & echo ws-started`,
+      `echo '${Buffer.from(WS_ECHO_SERVER).toString("base64")}' | base64 -d > /workspace/ws-echo.js; (nohup node /workspace/ws-echo.js > /tmp/ws-echo.log 2>&1 </dev/null &) ; echo ws-started`,
       240,
     ).catch(() => console.log("⚠️ ws-echo 启动命令超时,继续探测端口"))
     const wsPrefix = `/api/session/${sessionID}/proxy/8081`
@@ -237,7 +237,7 @@ try {
     if (wsReady) {
       const bridged = await new Promise((resolve) => {
         const token = Buffer.from(`opencode:${PASSWORD ?? ""}`).toString("base64")
-        const ws = new WebSocket(`ws://${new URL(BASE).host}${wsPrefix}/?auth_token=${token}`)
+        const ws = new WebSocket(`${(process.env.BASE_DIRECT ?? BASE).replace(/^http/, "ws")}${wsPrefix}/?auth_token=${token}`)
         const timer = setTimeout(() => {
           ws.close()
           resolve("timeout")
@@ -294,7 +294,8 @@ try {
 
   // T17.3: endpoint payload
   const endpoint = await (await api(`/api/session/${sessionID}/endpoint/8080`)).json()
-  check("T17.3 mode=direct", endpoint.mode === "direct", JSON.stringify(endpoint).slice(0, 200))
+  const expectedMode = process.env.EXPECT_ENDPOINT_MODE ?? "direct"
+  check(`T17.3 mode=${expectedMode}`, endpoint.mode === expectedMode, JSON.stringify(endpoint).slice(0, 200))
   check("T17.3 url/sandboxId/port/fallback", Boolean(endpoint.url) && endpoint.port === 8080 && Boolean(endpoint.sandboxId) && String(endpoint.fallback).startsWith(`/api/session/${sessionID}/proxy/8080`))
   check("T17.3 previewUrl 指向 SaaS proxy", !endpoint.previewUrl || endpoint.previewUrl.includes(`/api/session/${sessionID}/proxy/8080`))
 

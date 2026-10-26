@@ -222,6 +222,7 @@ export const SessionMcpTable = sqliteTable(
       .references(() => SessionTable.id, { onDelete: "cascade" }),
     name: text().$type<import("@opencode/schema/session-mcp").SessionMcp.Name>().notNull(),
     config: text({ mode: "json" }).$type<import("@opencode/schema/session-mcp").SessionMcp.Config>().notNull(),
+    runtime_port: integer(),
     ...Timestamps,
   },
   (table) => [

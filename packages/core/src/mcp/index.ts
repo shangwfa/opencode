@@ -18,6 +18,7 @@ import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
 import type { McpClient } from "./client.js"
+import { toElicitationField } from "./elicitation-field.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
 export type ServerName = typeof ServerName.Type
@@ -344,7 +345,7 @@ export const layer = (options?: Options) =>
         run(connection).pipe(
           Effect.catchIf(
             // The client module is loaded lazily, so match the tagged error by tag rather than class.
-            (error) => "_tag" in error && error._tag === "MCP.SessionExpiredError",
+            (error) => "_tag" in error && error._tag === "MCP.SessionExpiredError" && "rejected" in error && error.rejected === true,
             (error) =>
               recover(name, entry, connection).pipe(
                 Effect.flatMap(() => (entry.client ? run(entry.client) : Effect.fail(error))),
@@ -748,64 +749,3 @@ export const node = configured()
 
 // Schema `optional` strips undefined-valued properties on encode, so fields can assign
 // optional properties directly instead of conditionally spreading them.
-function toElicitationField(key: string, property: ElicitationProperty, required: boolean): Form.Field {
-  // Some servers emit machine titles like "string with format email"; prefer description/key over those.
-  const machineTitle = /^(boolean|string|number|integer|array|object)(\s+with\b.*|\s+in\b.*)?$/i
-  const title =
-    property.title && !machineTitle.test(property.title.trim()) ? property.title : (property.description ?? key)
-  const base = {
-    key,
-    title,
-    description: property.description === title ? undefined : property.description,
-    required: required || undefined,
-  }
-  switch (property.type) {
-    case "boolean":
-      return { ...base, type: "boolean", default: property.default }
-    case "number":
-    case "integer":
-      return {
-        ...base,
-        type: property.type,
-        minimum: property.minimum,
-        maximum: property.maximum,
-        default: property.default,
-      }
-    case "array":
-      return {
-        ...base,
-        type: "multiselect",
-        options:
-          "anyOf" in property.items
-            ? property.items.anyOf.map((option) => ({ value: option.const, label: option.title }))
-            : property.items.enum.map((value) => ({ value, label: value })),
-        custom: false,
-        minItems: property.minItems,
-        maxItems: property.maxItems,
-        default: property.default,
-      }
-    case "string": {
-      const options =
-        "oneOf" in property
-          ? property.oneOf.map((option) => ({ value: option.const, label: option.title }))
-          : "enum" in property
-            ? property.enum.map((value, index) => ({
-                value,
-                label: ("enumNames" in property ? property.enumNames?.[index] : undefined) ?? value,
-              }))
-            : undefined
-      return {
-        ...base,
-        type: "string",
-        format: "format" in property ? property.format : undefined,
-        minLength: "minLength" in property ? property.minLength : undefined,
-        maxLength: "maxLength" in property ? property.maxLength : undefined,
-        default: property.default,
-        options,
-        custom: options ? false : undefined,
-      }
-    }
-  }
-}
-
-type ElicitationProperty = McpClient.ElicitationFormParams["requestedSchema"]["properties"][string]

@@ -788,9 +788,51 @@ PG 核验：上述历史测试时 `event_sequence` 有水位记录，但 `event`
 
 > T9.4–T9.12、T9.14、T9.15、T9.17–T9.20、T9.22、T9.25–T9.27、T9.31–T9.34 及 T9.5/T9.6 等已按 V2 契约改写，命令可直接执行，但尚未在本轮全部实跑（其中 T9.5/T9.6/T9.11/T9.26/T9.27 依赖真实 LLM 与 sandbox）。执行时若与期望不符，按上面的 V1→V2 对照表核对事件名与端点。
 
+## 2026-10-25 阿里云后端全量复测
+
+环境：镜像 `opencode-saas:aliyun-sse-fixed-20261025`（含本轮 tool-input-delta 接线修复）、独立 PG `opencode-v2-sse-test`、`OPENCODE_EVENTS_PERSIST=1`、阿里云 `base-5wa5`、`deepseek/deepseek-flash`。执行器 `docs/test-cases/scripts/sse-v2-full.mjs` 按本文逐条断言（订阅→动作→断言，含原始心跳注释行、envelope 原文、replay+live 窗口、负向 404）。**结果：32 PASS / 2 N-A / 1 偏差**：
+
+| 用例 | 结果 | 实际观察 |
+|---|---|---|
+| T9.1/T9.4/T9.25 | ✅ | 200 + `text/event-stream` + `no-cache, no-transform`；首帧 `server.connected`；目录头被忽略 |
+| T9.2 | ✅ | 全局流 `session.created`，`data.sessionID` 一致 |
+| T9.3 | ✅ | 20s 窗口 `: heartbeat` ×2（注释行） |
+| T9.5/T9.10 | ✅ | `text.delta`/`text.ended`；异步接纳 HTTP 200 + `msg_*` |
+| T9.6 | ✅ | `input.started → input.delta → input.ended → called → success` |
+| T9.7 | ✅ | 权限默认放行分支：回合正常完成 |
+| T9.8/T9.29 | ✅ | 会话流隔离：A 流仅自身，`renamed` 恰 1 条，B 零泄漏 |
+| T9.9 | ✅ | 末个执行事件 `session.execution.succeeded` |
+| T9.11 | ✗ 偏差 | 沙箱内写 `/workspace` 不产生 `filesystem.changed`（见下） |
+| T9.12/T9.17 | N/A | 文档标注待补/不适用 |
+| T9.13 | ✅ | 两次重连首帧均 `server.connected` |
+| T9.14 | ✅ | 3 客户端各收到 text×3 + 终态 |
+| T9.15 | ✅ | B 中途加入（54 事件、7 text）含终态 |
+| T9.16 | ✅ | `renamed(title=sse-renamed)` + `deleted` ×1（等沙箱 running 后再 DELETE） |
+| T9.18 | ✅ | `session.step.ended` ×1 |
+| T9.19/T9.32 | ✅ | 非法模型 → `execution.failed`（data.error / 流内终态关流） |
+| T9.20 | ✅ | `revert.staged` ×1；`/diff` 返回数组 |
+| T9.21/T9.22 | ✅ | `agent.selected(plan)`（204）；命令 → `inbox.enqueued` |
+| T9.23/T9.24 | ✅ | envelope 含 `id/created/type/data/durable/location`；`evt_*` 前缀 |
+| T9.26 | ✅ | `tool.called` 早于 `success` 且 `input` 完整 |
+| T9.27 | ✅ 修复后 | `input.delta` ×4（449 字节）全部早于 `input.ended`（见下） |
+| T9.28/T9.30/T9.34 | ✅ | 会话流头；不存在 sessionID → 404（流与 prompt_stream） |
+| T9.31/T9.33 | ✅ | prompt_stream 服务端主动关流、末帧终态；并发隔离零交叉 |
+| T9.35 | ✅ | `after=0` 补发（PG event 2 行）；`after=-1`/`abc` → 400 |
+| T9.36 | ✅ 缺口关闭 | `follow=true` 收到 `log.synced`；renamed seq `[1,2,3,4,5]` 连续无重（补发 2 + 实时 3） |
+| T9.37 | ✅ | `session-stream` + `event-feed` 22 pass；本轮另有 runner 工具事件单测 24 pass |
+
+### 本轮两项产品决定（需知悉）
+
+1. **`session.tool.input.delta` 接线补齐（T9.27）**：schema 早已定义、CLI/TUI 有消费端，但 runner 创建 toolInput fragments 时未传 delta 发布器，事件从不发布；`session-runner-tool-events.test.ts` 原断言「累积不发布」与本契约及消费端矛盾。已补上发布（ephemeral、100ms 批量、end 前冲刷）并把该单测翻转为「批量发布且早于 ended」。
+2. **T9.11 架构边界（未修改产品）**：`filesystem.changed` 由宿主机 LocationWatcher 发布，watch 目标仅 VCS 元数据（`.git/HEAD`、`.hg/branch`）；沙箱 `/workspace` 内的 AI 写入不经过宿主文件系统，本就不产生该事件。原文期望需产品层决策（桥接沙箱 watch 或改文档），本轮仅记录。
+
+另：T9.35/36 此前因服务未开持久化而阻塞，本轮 `OPENCODE_EVENTS_PERSIST=1` 下全部通过；2026-09-30 记录的「follow=true 等待 log.synced 超时」未复现，缺口 #1 关闭。
+
+执行器要点：新库需导入 `credential` 表模型路由才可用；Dumper 需实现时长定时器（SSE 服务端不会主动关 `/api/event`）；T9.16 必须等沙箱 `running` 再 DELETE，否则 409。
+
 ## 需要讨论的 V2 缺口
 
-1. **T9.36 HTTP follow 行为待核实**：Core 的 bus/session-log 单测通过；但本轮 HTTP smoke 等待 `follow=true` 的 `log.synced` 超时，需在后续单独复现 HTTP/SSE 层行为。T9.35 已在 `OPENCODE_EVENTS_PERSIST=true` 环境通过。
+1. **T9.36 HTTP follow 行为**：~~本轮 HTTP smoke 等待 `follow=true` 的 `log.synced` 超时~~ 2026-10-25 已在 `OPENCODE_EVENTS_PERSIST=1` 阿里云环境通过（`log.synced` 正常、seq `[1..5]` 连续无重），缺口关闭。
 2. **无 dispose 端点**（T9.12）：`global.disposed` / `location.shutdown` 事件存在，但 HTTP 层没有触发入口；是否需要补一个处置端点。
 3. **无消息删除**（T9.17）：V2 没有删除消息/part 的端点与 `message.removed` 事件；`session.message.content.updated` 为 replay-only。如需前端撤销消息，需要新端点。
 4. **`session.idle` 已 deprecated**（T9.9）：当前服务路径以 `session.execution.succeeded/failed/interrupted` 判定回合结束；是否统一弃用 `session.idle`。

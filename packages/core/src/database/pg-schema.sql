@@ -244,10 +244,35 @@ CREATE TABLE "project" (
           "sandboxes" text NOT NULL,
           "commands" text
         );
+CREATE TABLE "aliyun_snapshot" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "provider_scope" text NOT NULL,
+          "sandbox_id" text NOT NULL,
+          "remote_name" text NOT NULL,
+          "snapshot_id" text,
+          "state" text NOT NULL,
+          "restored_count" bigint DEFAULT 0 NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
+CREATE TABLE "sandbox_command" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "sandbox_id" text NOT NULL,
+          "command_id" text NOT NULL,
+          "operation_id" text NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "sandbox" (
           "id" text PRIMARY KEY,
           "session_id" text NOT NULL,
           "host" text NOT NULL,
+          "provider" text DEFAULT 'opensandbox' NOT NULL,
+          "provider_scope" text,
+          "remote_name" text,
+          "endpoint_token" text,
           "state" text NOT NULL,
           "keep_alive" bigint DEFAULT false NOT NULL,
           "command_session_id" text,
@@ -350,6 +375,7 @@ CREATE TABLE "session_mcps" (
           "session_id" text NOT NULL,
           "name" text NOT NULL,
           "config" text NOT NULL,
+          "runtime_port" bigint,
           "time_created" bigint NOT NULL,
           "time_updated" bigint NOT NULL
         );
@@ -484,6 +510,8 @@ CREATE INDEX "hitl_request_decision_idx" ON "hitl_request" ("decision");
 CREATE INDEX "log_session_time_idx" ON "log" ("session_id","time_created");
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");
 CREATE UNIQUE INDEX "session_permission_approval_scope_idx" ON "session_permission_approval" ("session_id","action","resource");
+CREATE INDEX "aliyun_snapshot_session_idx" ON "aliyun_snapshot" ("session_id","time_created");
+CREATE INDEX "sandbox_command_session_idx" ON "sandbox_command" ("session_id","sandbox_id");
 CREATE UNIQUE INDEX "sandbox_session_id_idx" ON "sandbox" ("session_id");
 CREATE INDEX "sandbox_state_time_updated_idx" ON "sandbox" ("state","time_updated");
 CREATE UNIQUE INDEX "session_agents_session_agent_idx" ON "session_agents" ("session_id","agent_id");

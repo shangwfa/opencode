@@ -272,8 +272,17 @@ export const createLLMEventPublisher = (bus: Pick<Bus.Interface, "publish">, inp
         id,
         text: value,
       })
-    }),
-  )
+    }), (id, value) =>
+    Effect.gen(function* () {
+      const tool = tools.get(id)
+      if (!tool) return yield* Effect.die(new Error(`Tool input delta before start: ${id}`))
+      yield* bus.publish(SessionEvent.Tool.Input.Delta, {
+        sessionID: input.sessionID,
+        assistantMessageID,
+        id,
+        delta: value,
+      })
+    }))
 
   const flushFragments = Effect.fnUntraced(function* () {
     yield* text.flush()

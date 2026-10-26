@@ -46,7 +46,7 @@ const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: {
             ...(result.exitCode !== null ? { exit: result.exitCode } : {}),
             time: { ...info.time, completed: Date.now() },
           },
-          capture: { output: result.output, truncated: false },
+           capture: { output: result.output, truncated: result.truncated ?? false },
         }),
       ),
       // Mirrors the V1 exec contract: a failed sandbox run still completes the
@@ -63,7 +63,7 @@ const sandboxed = Effect.fn("SessionShell.sandboxed")(function* (input: {
   Effect.runForkWith(yield* Effect.context<never>())(execution)
   const bytes = (result: ShellResult.Result) => {
     const size = Buffer.byteLength(result.capture?.output ?? "")
-    return { output: result.capture?.output ?? "", cursor: size, size, truncated: false }
+      return { output: result.capture?.output ?? "", cursor: size, size, truncated: result.capture?.truncated ?? false }
   }
   return {
     info,

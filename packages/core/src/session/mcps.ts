@@ -2,6 +2,7 @@ export * as SessionMcps from "./mcps.js"
 
 import { and, eq, sql } from "drizzle-orm"
 import { isDeepStrictEqual } from "node:util"
+import { createHash } from "node:crypto"
 import { Cause, Context, Effect, Exit, FiberSet, Layer, Scope } from "effect"
 import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { Mcp } from "@opencode/schema/mcp"
@@ -10,10 +11,13 @@ import { Database } from "../database/database.js"
 import { KeyedMutex } from "../effect/keyed-mutex.js"
 import { McpClient } from "../mcp/client.js"
 import { SandboxProvider } from "../sandbox/provider.js"
+import { SandboxEndpoint } from "../sandbox/endpoint.js"
+import { McpHttpBridge } from "./mcp-http-bridge.js"
+import { McpInteractions } from "./mcp-interactions.js"
 import { SandboxConfig } from "../sandbox/config.js"
 import { Environment } from "../environment/index.js"
 import type { Session } from "../session.js"
-import { SessionMcpTable } from "./sql.js"
+import { SessionMcpTable, SessionTable } from "./sql.js"
 import { SessionResourceOwner } from "./resource-owner.js"
 
 export type Info = SessionMcp.Info
@@ -23,6 +27,7 @@ type Runtime = {
   readonly config: SessionMcp.Config
   readonly scope: Scope.Closeable
   readonly port?: number
+  readonly sandboxID?: string | null
   readonly client: McpClient.Connection
   readonly tools: ReadonlyArray<McpClient.Tool>
 }
@@ -79,43 +84,41 @@ const shellQuote = (value: string) => "'" + value.replaceAll("'", QUOTE_ESCAPE) 
 const pathFor = (name: string, port: number) => `/tmp/opencode-mcp/${name}-${port}`
 
 /** Builds the sandbox-side bridge start command; exported for quoting regression tests. */
-export function bridgeStartCommand(name: string, config: Mcp.LocalConfig, port: number): string {
-  const base = pathFor(name, port)
-  const stdio = config.command.map(shellQuote).join(" ")
-  const environment = Object.entries(config.environment ?? {})
-    .map(([key, value]) => `${shellQuote(key)}=${shellQuote(value)}`)
-    .join(" ")
-  // supergateway runs the stdio command through its own shell and inherits this
-  // process's environment, so no extra `sh -lc` quoting layer is needed.
-  const bridge = `${environment ? `env ${environment} ` : ""}supergateway --stdio ${shellQuote(stdio)} --outputTransport streamableHttp --stateful --port ${port} --logLevel none`
-  // Clear a stale bridge from a previous server lifetime before reusing the port: the exact
-  // pid file first, then any supergateway still holding the port. The `( |$)` word boundary
-  // keeps port 9100 from matching 91001, and the character class in "supergatewa[y]" stops the
-  // pattern from matching the launching shell's own command line. sleep waits out SIGTERM.
-  const stale = [
-    `if [ -f ${shellQuote(base + ".pid")} ]; then kill "$(cat ${shellQuote(base + ".pid")})" 2>/dev/null || true; fi`,
-    `pkill -f ${shellQuote(`supergatewa[y].*--port ${port}( |$)`)} 2>/dev/null || true`,
-    "sleep 0.5",
-  ].join("; ")
-  return `mkdir -p /tmp/opencode-mcp; ${stale}; nohup ${bridge} > ${shellQuote(base + ".log")} 2>&1 & echo $! > ${shellQuote(base + ".pid")}`
+const bridgeFingerprint = (config: Mcp.LocalConfig, generation: string) => createHash("sha256").update(JSON.stringify([
+  generation, config.command, Object.entries(config.environment ?? {}).sort(([a], [b]) => a.localeCompare(b)), McpHttpBridge.script,
+])).digest("hex")
+
+export function bridgeStartCommand(name: string, config: Mcp.LocalConfig, port: number, generation?: string): string {
+  return McpHttpBridge.startCommand({
+    base: pathFor(name, port),
+    name,
+    port,
+    stdio: config.command.map(shellQuote).join(" "),
+    environment: config.environment,
+    ...(generation === undefined ? {} : { fingerprint: bridgeFingerprint(config, generation) }),
+  })
 }
 
 /** Builds the sandbox-side bridge stop command; exported for quoting regression tests. */
-export function bridgeStopCommand(name: string, port: number): string {
+export function bridgeStopCommand(name: string, port: number, fingerprint?: string): string {
   const base = pathFor(name, port)
-  return `if [ -f ${shellQuote(base + ".pid")} ]; then kill "$(cat ${shellQuote(base + ".pid")})" 2>/dev/null || true; fi; rm -f ${shellQuote(base + ".pid")} ${shellQuote(base + ".log")}`
+  const stop = `if [ -f ${shellQuote(base + ".pid")} ]; then kill "$(cat ${shellQuote(base + ".pid")})" 2>/dev/null || true; fi; rm -f ${shellQuote(base + ".pid")} ${shellQuote(base + ".log")} ${shellQuote(base + ".meta")}`
+  if (!fingerprint) return `mkdir -p /tmp/opencode-mcp; flock --close -x /tmp/opencode-mcp/.registry.lock -c ${shellQuote(stop)}`
+  return `flock --close -x /tmp/opencode-mcp/.registry.lock -c ${shellQuote(`if [ "$(cat ${shellQuote(base + ".meta")} 2>/dev/null)" = ${shellQuote(fingerprint)} ]; then ${stop}; fi`)}`
 }
 
+export const canReplayCall = (error: Error) => error instanceof McpClient.SessionExpiredError && error.rejected === true
+
 /**
- * Sandbox-wide stale bridge sweep (V1's mcpCleanedSessions semantics, tightened for V2).
- * After a SaaS restart the in-memory runtimes are gone while keep-alive sandboxes still hold
- * the old bridges — including port-drift orphans that per-port cleanup can never reach. The
- * caller must only run this when the owner currently has NO live bridged runtime: every
- * supergateway in the sandbox is then stale by definition, so pid-file kills plus a
- * self-match-proof pkill are both safe. Exported for quoting regression tests.
+ * Initialize bridge ownership once per physical generation and bridge revision.
+ * The sandbox-side marker and flock, not a Pod's empty runtime cache, decide
+ * whether existing daemons are stale. The parameterless form is a legacy helper.
  */
-export function bridgeSweepCommand(): string {
-  return `for pidfile in /tmp/opencode-mcp/*.pid; do [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null; done; rm -f /tmp/opencode-mcp/*.pid; pkill -f ${shellQuote("supergatewa[y].*--stdio")} 2>/dev/null || true`
+export function bridgeSweepCommand(generation?: string): string {
+  const sweep = `for pidfile in /tmp/opencode-mcp/*.pid; do [ -f "$pidfile" ] && kill "$(cat "$pidfile")" 2>/dev/null; done; rm -f /tmp/opencode-mcp/*.pid; pkill -f ${shellQuote("mcp-http-bridg[e].*--stdio")} 2>/dev/null || true; pkill -f ${shellQuote("supergatewa[y].*--stdio")} 2>/dev/null || true`
+  if (generation === undefined) return sweep
+  const marker = createHash("sha256").update(generation).update(McpHttpBridge.script).digest("hex")
+  return `mkdir -p /tmp/opencode-mcp; flock --close -x /tmp/opencode-mcp/.registry.lock -c ${shellQuote(`if [ "$(cat /tmp/opencode-mcp/.generation 2>/dev/null)" = ${shellQuote(marker)} ]; then exit 0; fi; ${sweep}; printf %s ${shellQuote(marker)} > /tmp/opencode-mcp/.generation`)}`
 }
 
 /**
@@ -147,6 +150,7 @@ const layer = Layer.effect(
     const sandbox = yield* SandboxProvider.Service
     const sandboxConfig = SandboxConfig.load()
     const environment = yield* Environment.Service
+    const interactions = yield* McpInteractions.Service
     const root = yield* Effect.scope
     const fork = yield* FiberSet.makeRuntime<never, void, never>()
     // Runtimes are keyed by resource owner, not by session: child sessions share the owner's
@@ -159,8 +163,7 @@ const layer = Layer.effect(
     // Per-owner connect-failure backoff, guarded by the same lock as runtimes. Config-keyed so
     // an upsert that fixes a broken definition retries immediately instead of waiting out the TTL.
     const backoffs = new Map<Session.ID, Map<SessionMcp.Name, FailureBackoff>>()
-    // Owners whose sandbox has been swept once this server lifetime. Resets on restart — which
-    // is exactly the scenario the sweep exists for (in-memory runtimes gone, old bridges alive).
+    // Local shortcut only; the sandbox generation marker arbitrates across Pods/restarts.
     const swept = new Set<Session.ID>()
     // stop() is idempotent: connection callbacks (onClose) fire synchronously during
     // Scope.close, and the eviction path must not re-run teardown for a stopped runtime.
@@ -171,20 +174,52 @@ const layer = Layer.effect(
         .from(SessionMcpTable)
         .where(eq(SessionMcpTable.session_id, ownerID))
         .all()
-        .pipe(Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))), Effect.orDie)
-    const stored = (sessionID: Session.ID) =>
-      SessionResourceOwner.id(db, sessionID).pipe(Effect.flatMap(storedByOwner))
+        .pipe(
+          Effect.map((rows) => rows.map(fromRow).toSorted((a, b) => a.name.localeCompare(b.name))),
+          Effect.orDie,
+        )
+    const stored = (sessionID: Session.ID) => SessionResourceOwner.id(db, sessionID).pipe(Effect.flatMap(storedByOwner))
+    const localPorts = (ownerID: Session.ID) => db.transaction((tx) => Effect.gen(function* () {
+      yield* tx.update(SessionTable).set({ time_updated: sql`${SessionTable.time_updated}` })
+        .where(eq(SessionTable.id, ownerID)).run()
+      const rows = yield* tx.select().from(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).all()
+      const used = new Set(rows.flatMap((row) => row.runtime_port === null ? [] : [row.runtime_port]))
+      const ports = new Map<SessionMcp.Name, number>()
+      for (const row of rows.toSorted((a, b) => a.name.localeCompare(b.name))) {
+        if (row.config.type !== "local" || row.config.disabled) continue
+        let port = row.runtime_port ?? BASE_PORT
+        if (row.runtime_port === null) {
+          while (used.has(port)) port++
+          yield* tx.update(SessionMcpTable).set({ runtime_port: port, time_updated: sql`${SessionMcpTable.time_updated}` })
+            .where(eq(SessionMcpTable.id, row.id)).run()
+          used.add(port)
+        }
+        ports.set(row.name, port)
+      }
+      return ports
+    })).pipe(Effect.orDie)
+    const stopStored = (session: Session.Info, rows: ReadonlyArray<typeof SessionMcpTable.$inferSelect>) => Effect.gen(function* () {
+      if (!sandbox.enabled || !(yield* sandbox.sandboxId(session.id))) return
+      for (const row of rows) {
+        if (row.runtime_port === null) continue
+        yield* sandbox.run({ sessionID: session.id, hostWorkdir: session.location.directory,
+          command: bridgeStopCommand(row.name, row.runtime_port), timeoutMs: 10000 }).pipe(Effect.ignore)
+      }
+    })
 
-    const stop = Effect.fnUntraced(function* (session: Session.Info, name: SessionMcp.Name, runtime: Runtime) {
+    const stop = Effect.fnUntraced(function* (session: Session.Info, name: SessionMcp.Name, runtime: Runtime, stopDaemon = true) {
       if (stopped.has(runtime)) return
       stopped.add(runtime)
       yield* Scope.close(runtime.scope, Exit.void)
-      if (runtime.port === undefined || !sandbox.enabled) return
+      if (!stopDaemon || runtime.port === undefined || !sandbox.enabled) return
+      // A stale runtime must not stop a daemon in the replacement workspace.
+      if (runtime.sandboxID !== (yield* sandbox.sandboxId(session.id))) return
       yield* sandbox
         .run({
           sessionID: session.id,
           hostWorkdir: session.location.directory,
-          command: bridgeStopCommand(name, runtime.port),
+           command: bridgeStopCommand(name, runtime.port, runtime.config.type === "local" && runtime.sandboxID
+             ? bridgeFingerprint(runtime.config, runtime.sandboxID) : undefined),
           timeoutMs: 10_000,
         })
         .pipe(Effect.ignore)
@@ -199,13 +234,10 @@ const layer = Layer.effect(
       name: SessionMcp.Name,
       runtime: Runtime,
     ) {
-      // Under the owner lock: bridgeStopCommand kills by the pid file's CURRENT content, which
-      // a reconnecting reconcile could overwrite with the replacement's pid mid-flight —
-      // serializing against reconcile means the kill reads the runtime's own pid. Forked
-      // callbacks only ever queue behind the lock, never re-enter it, so this cannot deadlock.
+           // Eviction closes only this Pod's client, never another Pod's shared daemon.
       yield* locks.withLock(ownerID)(
         Effect.gen(function* () {
-          yield* stop(session, name, runtime)
+          yield* stop(session, name, runtime, false)
           const current = runtimes.get(ownerID)
           if (current?.get(name) === runtime) {
             current.delete(name)
@@ -223,10 +255,17 @@ const layer = Layer.effect(
       budgetMs: number,
     ) {
       if (!sandbox.enabled) return yield* McpClient.connect(name, config, session.location.directory)
+      // Materialize the bridge before launching it: the stock Vercel image has no
+      // bridge tooling, and a snapshot restore keeps the workspace copy.
+      const installed = yield* sandbox
+        .fileRead(session.id, McpHttpBridge.path)
+        .pipe(Effect.catch(() => Effect.succeed(null)))
+      if (installed !== McpHttpBridge.script)
+        yield* sandbox.fileWrite(session.id, McpHttpBridge.path, McpHttpBridge.script)
       const started = yield* sandbox.run({
         sessionID: session.id,
         hostWorkdir: session.location.directory,
-        command: bridgeStartCommand(name, config, port),
+        command: bridgeStartCommand(name, config, port, (yield* sandbox.sandboxId(session.id)) ?? undefined),
         timeoutMs: 10_000,
       })
       if (started.exitCode !== 0)
@@ -239,7 +278,7 @@ const layer = Layer.effect(
         // can keep every other channel direct (deployment modes A/B/C).
         const endpoint = yield* sandbox.endpoint(session.id, port, mcpUseServerProxy(sandboxConfig))
         if (endpoint._tag === "resolved") {
-          const url = `http://${endpoint.endpoint.replace(/\/$/, "")}/mcp`
+          const url = `${SandboxEndpoint.httpUrl(endpoint.endpoint.replace(/\/$/, ""))}/mcp`
           yield* Effect.logInfo("session MCP endpoint resolved", {
             sessionID: session.id,
             server: name,
@@ -250,10 +289,19 @@ const layer = Layer.effect(
             type: "remote",
             url,
             oauth: false,
+            headers: endpoint.headers ? { ...endpoint.headers } : undefined,
             codemode: config.codemode,
             timeout: config.timeout,
           })
-          const result = yield* McpClient.connect(name, remote, session.location.directory).pipe(Effect.exit)
+          const result = yield* McpClient.connect(
+            name,
+            remote,
+            session.location.directory,
+            undefined,
+            interactions.elicitation,
+            undefined,
+            interactions.sampling,
+          ).pipe(Effect.exit)
           if (Exit.isSuccess(result)) return result.value
           const cause = Cause.squash(result.cause)
           failure = cause instanceof Error ? cause : new Error(String(cause))
@@ -274,7 +322,15 @@ const layer = Layer.effect(
       const result = yield* (
         info.config.type === "local"
           ? connectLocal(session, info.name, info.config, port, budgetMs)
-          : McpClient.connect(info.name, info.config, session.location.directory)
+          : McpClient.connect(
+              info.name,
+              info.config,
+              session.location.directory,
+              undefined,
+              interactions.elicitation,
+              undefined,
+              interactions.sampling,
+            )
       ).pipe(Effect.provideService(Environment.Service, environment), Scope.provide(scope), Effect.exit)
       if (result._tag === "Failure") {
         yield* Scope.close(scope, Exit.void)
@@ -301,7 +357,7 @@ const layer = Layer.effect(
       const runtime = {
         config: info.config,
         scope,
-        ...(info.config.type === "local" && sandbox.enabled ? { port } : {}),
+        ...(info.config.type === "local" && sandbox.enabled ? { port, sandboxID: yield* sandbox.sandboxId(session.id) } : {}),
         client: result.value,
         tools,
       } satisfies Runtime
@@ -322,22 +378,32 @@ const layer = Layer.effect(
           const infos = yield* storedByOwner(ownerID)
           const desired = new Map(infos.filter((info) => !info.config.disabled).map((info) => [info.name, info]))
           const current = runtimes.get(ownerID) ?? new Map<SessionMcp.Name, Runtime>()
+          const hasLocal = desired.values().some((info) => info.config.type === "local")
+          const sandboxID = sandbox.enabled ? hasLocal ? yield* sandbox.boot(session.id).pipe(
+            Effect.tapError((error) => Effect.logWarning("session MCP sandbox is unavailable", { sessionID: session.id, error: error.message })),
+            Effect.catch(() => Effect.succeed(null)),
+          ) : yield* sandbox.sandboxId(session.id) : null
+          if (sandbox.enabled && hasLocal && !sandboxID) return new Map<SessionMcp.Name, Runtime>()
+          const ports = sandbox.enabled && hasLocal ? yield* localPorts(ownerID) : new Map<SessionMcp.Name, number>()
+          if (sandboxID) {
+            const inactive = yield* db.select().from(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).all().pipe(Effect.orDie)
+            yield* stopStored(session, inactive.filter((row) => row.config.disabled || row.config.type !== "local"))
+          }
           for (const [name, runtime] of current) {
             const info = desired.get(name)
-            if (info && isDeepStrictEqual(info.config, runtime.config)) continue
+            const stale = runtime.port !== undefined && runtime.sandboxID !== sandboxID
+            if (!stale && info && isDeepStrictEqual(info.config, runtime.config)) continue
             yield* stop(session, name, runtime)
             current.delete(name)
+            if (stale) { swept.delete(ownerID); backoffs.delete(ownerID) }
           }
           const usedPorts = new Set(
-            Array.from(current.values(), (runtime) => runtime.port).filter((port): port is number => port !== undefined),
+            Array.from(current.values(), (runtime) => runtime.port).filter(
+              (port): port is number => port !== undefined,
+            ),
           )
-          // One sandbox-wide sweep per owner per server lifetime (V1's mcpCleanedSessions
-          // semantics, tightened): after a restart, keep-alive sandboxes still hold bridges the
-          // lost runtimes pointed at — including port-drift orphans per-port cleanup can never
-          // reach. When this owner has no live bridged runtime, every supergateway in the
-          // sandbox is stale by definition, so sweep them all before the first reconnect.
-          // Safe under the owner lock: siblings cannot start concurrently, and a non-empty
-          // current (partially connected owner, e.g. a config-drift reconnect) skips the sweep.
+          // Reusing a healthy daemon after a Pod restart preserves in-flight calls on peers.
+          // Only a changed physical generation or bridge revision authorizes a global sweep.
           if (
             !swept.has(ownerID) &&
             sandbox.enabled &&
@@ -348,7 +414,7 @@ const layer = Layer.effect(
               .run({
                 sessionID: session.id,
                 hostWorkdir: session.location.directory,
-                command: bridgeSweepCommand(),
+                command: bridgeSweepCommand(sandboxID ?? undefined),
                 timeoutMs: 10_000,
               })
               .pipe(
@@ -379,9 +445,14 @@ const layer = Layer.effect(
               })
               continue
             }
-            let port = BASE_PORT
-            while (usedPorts.has(port)) port += 1
-            const outcome = yield* connect(session, ownerID, info, port, Math.min(remaining, BRIDGE_RETRY_BUDGET_MS)).pipe(Effect.exit)
+            const port = ports.get(info.name) ?? BASE_PORT
+            const outcome = yield* connect(
+              session,
+              ownerID,
+              info,
+              port,
+              Math.min(remaining, BRIDGE_RETRY_BUDGET_MS),
+            ).pipe(Effect.exit)
             if (Exit.isSuccess(outcome)) {
               current.set(info.name, outcome.value)
               if (outcome.value.port !== undefined) usedPorts.add(outcome.value.port)
@@ -443,6 +514,7 @@ const layer = Layer.effect(
       remove: (session, name) =>
         Effect.gen(function* () {
           const ownerID = yield* SessionResourceOwner.id(db, session.id)
+          const rows = yield* db.select().from(SessionMcpTable).where(and(eq(SessionMcpTable.session_id, ownerID), eq(SessionMcpTable.name, name))).all().pipe(Effect.orDie)
           // Removing a definition stops the owner's shared runtime inside the reconcile lock,
           // so a concurrent reconcile cannot resurrect it between the stop and the row delete.
           yield* locks.withLock(ownerID)(
@@ -457,6 +529,7 @@ const layer = Layer.effect(
               backoffs.get(ownerID)?.delete(name)
             }),
           )
+          yield* stopStored(session, rows)
           yield* db
             .delete(SessionMcpTable)
             .where(and(eq(SessionMcpTable.session_id, ownerID), eq(SessionMcpTable.name, name)))
@@ -466,6 +539,7 @@ const layer = Layer.effect(
       clear: (session) =>
         Effect.gen(function* () {
           const ownerID = yield* SessionResourceOwner.id(db, session.id)
+          const rows = yield* db.select().from(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).all().pipe(Effect.orDie)
           yield* locks.withLock(ownerID)(
             Effect.gen(function* () {
               const current = runtimes.get(ownerID)
@@ -476,6 +550,7 @@ const layer = Layer.effect(
               backoffs.delete(ownerID)
             }),
           )
+          yield* stopStored(session, rows)
           yield* db.delete(SessionMcpTable).where(eq(SessionMcpTable.session_id, ownerID)).run().pipe(Effect.orDie)
         }),
       release: (session) =>
@@ -497,53 +572,66 @@ const layer = Layer.effect(
       tools: (session) =>
         reconcile(session).pipe(
           Effect.map((entries) =>
-            Array.from(
-              entries,
-              ([server, runtime]) =>
-                // Mirror the global MCP service's toTool: codemode lives on the config, not on
-                // McpClient.Tool, so it must be carried onto each tool for the registry's
-                // direct-vs-catalog split (options.codemode === false) to see it.
-                runtime.tools.map((tool) => ({
-                  ...tool,
-                  server,
-                  ...(runtime.config.codemode === undefined ? {} : { codemode: runtime.config.codemode }),
-                })),
+            Array.from(entries, ([server, runtime]) =>
+              // Mirror the global MCP service's toTool: codemode lives on the config, not on
+              // McpClient.Tool, so it must be carried onto each tool for the registry's
+              // direct-vs-catalog split (options.codemode === false) to see it.
+              runtime.tools.map((tool) => ({
+                ...tool,
+                server,
+                ...(runtime.config.codemode === undefined ? {} : { codemode: runtime.config.codemode }),
+              })),
             ).flat(),
           ),
         ),
       call: (input) => {
         const ownerID = SessionResourceOwner.id(db, input.session.id)
-        // One transparent reconnect+retry when the call fails at the connection level (the
-        // global MCP service's recovering() pattern). A dead bridge surfaces as ECONNREFUSED
-        // which fires neither the onClose callback nor SessionExpiredError, so without this
-        // the runtime lingers in the map and the tool stays broken until a config change.
-        // Safe for any call failure: tool-level business errors travel inside a successful
-        // CallToolResult (isError) and never reach this catch.
+        // Only an explicit protocol session rejection proves the call was not
+        // accepted. A reset/5xx after dispatch may already have side effects.
+        const ready = (runtime: Runtime) => runtime.port === undefined ? Effect.succeed(true) : sandbox.run({
+          sessionID: input.session.id, hostWorkdir: input.session.location.directory,
+          command: McpHttpBridge.healthCommand(pathFor(input.server, runtime.port), runtime.port), timeoutMs: 5000,
+        }).pipe(Effect.flatMap((result) => result.exitCode === 0 && !result.timedOut ? Effect.succeed(true)
+          : result.exitCode === 1 && !result.timedOut ? Effect.succeed(false)
+          : Effect.fail(new Error(`Session MCP health is unknown; tool was not dispatched: ${input.server}`))))
         const attempt = (retry: boolean): Effect.Effect<McpClient.CallToolResult, Error> =>
           Effect.gen(function* () {
             const entries = yield* reconcile(input.session)
-            const runtime = entries.get(input.server)
+            let runtime = entries.get(input.server)
             if (!runtime) return yield* Effect.fail(new Error(`Session MCP server is not connected: ${input.server}`))
-            return yield* runtime.client
+            if (!(yield* ready(runtime))) {
+              const dead = runtime
+              yield* ownerID.pipe(Effect.flatMap((owner) => evict(input.session, owner, input.server, dead)))
+              runtime = (yield* reconcile(input.session)).get(input.server)
+              if (!runtime || !(yield* ready(runtime)))
+                return yield* Effect.fail(new Error(`Session MCP did not recover before dispatch: ${input.server}`))
+            }
+            const connected = runtime
+            return yield* connected.client
               .callTool({ name: input.name, args: input.args, sessionID: input.session.id })
               .pipe(
                 Effect.catchIf(
                   (error) => error instanceof Error,
                   (error) =>
-                    retry
-                      ? ownerID.pipe(
-                          Effect.flatMap((owner) =>
-                            evict(input.session, owner, input.server, runtime).pipe(
-                              Effect.tap(() => Effect.logWarning("session MCP call failed; evicted and retrying once", {
+                    ownerID.pipe(
+                      Effect.flatMap((owner) =>
+                        evict(input.session, owner, input.server, connected).pipe(
+                          Effect.tap(() =>
+                            Effect.logWarning(
+                                retry && canReplayCall(error)
+                                ? "session MCP connection failed; evicted and retrying once"
+                                : "session MCP call failed; evicted without replay",
+                              {
                                 sessionID: input.session.id,
                                 server: input.server,
                                 error: error.message,
-                              })),
-                              Effect.andThen(attempt(false)),
+                              },
                             ),
                           ),
-                        )
-                      : Effect.fail(error),
+                           Effect.andThen(retry && canReplayCall(error) ? attempt(false) : Effect.fail(error)),
+                        ),
+                      ),
+                    ),
                 ),
               )
           })
@@ -556,5 +644,5 @@ const layer = Layer.effect(
 export const node = makeLocationNode({
   service: Service,
   layer,
-  deps: [Database.node, SandboxProvider.node, Environment.node],
+  deps: [Database.node, SandboxProvider.node, Environment.node, McpInteractions.node],
 })

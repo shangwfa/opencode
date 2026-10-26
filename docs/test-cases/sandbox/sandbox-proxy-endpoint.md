@@ -84,6 +84,94 @@ run_shell() { # <sid> <command>
 
 > **执行注意（V2 shell 语义）**：后台启动命令必须用完全分离形态 `(nohup cmd >log 2>&1 </dev/null &) ; echo ok`——仅 `nohup … &` 会因后台进程持有 stdio 继承导致 shell API 响应挂起（命令实际已执行），后续命令排队阻塞，且 `interrupt` 后命令会话可能需要重建。Vite/Next 启动均已按此形式执行。
 
+### Vercel 后端：直接使用沙箱公网 URL（2026-10-24）
+
+Vercel 不使用 SaaS proxy 注入作为预览面。`GET /api/session/:id/endpoint/:port` 返回沙箱公网路由 `https://<route>/t/<token>`，浏览器/客户端直连；HTML 注入与路径重写不适用。SaaS proxy（`/api/session/:id/proxy/:port/*`）保留为 fallback 传输，但 Vercel 不承诺注入、重写或 WebSocket 中转。
+
+| 能力 | OpenSandbox | Vercel |
+| --- | --- | --- |
+| 预览访问方式 | SaaS proxy 注入 + 重写（或 direct） | 沙箱公网 URL 直连 |
+| HTML 注入 / fetch/XHR/WS patch | ✅ | ❌ 不适用（直连原始内容） |
+| JS/CSS/`export default` 路径重写 | ✅ | ❌ 不适用 |
+| 相对路径资源 | 经 prefix 重写 | 由应用自身设置 `base`/`publicPath`，或使用绝对路径 |
+| 任意端口 | provider 直接解析 | 首次 endpoint 时按需注册，15 端口上限 |
+| WebSocket | proxy 桥接 | 公网 URL 直连（`wss://`） |
+
+**端口注册**：Vercel 单沙箱最多 15 个暴露端口。实现不再预占 13 个 MCP 端口，而是只随创建注册 Code Mode Runner（9911）与 Tool Host（9912）；MCP 与预览端口在首次 `endpoint()` 时通过 `Sandbox.update({ ports })` 合并注册。`update` 是“完整列表替换”，因此按 sandbox generation 串行，并拒绝超过上限的请求（`withGatePort`）。
+
+**本轮修复的缺陷**：
+
+1. 任意预览端口（如 8080/5173）此前不在固定白名单内，`endpoint()` 直接 `resolve-failed`，proxy 返回 502，Vercel 上无法预览 dev server。已改为按需注册；8080/8081 直连验证通过。
+2. 诊断中出现的 `https://https://...` 双协议 URL 来自测试镜像只覆盖了 `core/src`、`server/src` 仍是旧版本；用当前工作区 core+server 重建镜像后 URL 正确。不是产品缺陷。
+
+**验收结果：25/25 通过**（脚本 `sandbox-vercel-preview-v2.mjs`，经包装器订阅公共 SSE、清理会话与远端资源）：
+
+| 用例 | 结论 |
+| --- | --- |
+| endpoint 结构 | `mode=direct`，`url=directUrl=proxyUrl`，单层 `https://<route>/t/<token>`，含 `sandboxId/port/fallback` |
+| 直连 HTML | 200，含原始 `hello-preview`，无 `data-oc-prefix` / `__OC_PROXY_PREFIX__` |
+| 直连 JS/CSS | 原样：`from "/helper.js"`、`url(/assets/bg.png)` 未被重写 |
+| 直连 JSON / 302 | JSON 透传；302 `location: /target` 原样 |
+| 直连 WebSocket | 8081 `wss://` echo 往返一致 |
+| 多端口 | 8080 与 8081 均按需注册并同时可用 |
+| proxy fallback | `/api/session/:id/proxy/8080/` 200（仅传输，不断言注入） |
+| 端口校验 | `0` / `99999` / `abc` → 400 |
+| 销毁 | endpoint/proxy 均 502，`SandboxUnreachableError`，落 1 条 `session.preview.down`，60s 内节流 |
+| 无沙箱 | endpoint 502 且只落 1 条事件；boot 后 200 且无新增 |
+
+> 经 SaaS proxy 的 `redirect location` 重写与 WebSocket 桥接在 Vercel 上未通过（Vercel 路由对升级与 302 的处理与 OpenSandbox 不同）。按“直连公网 URL”的产品语义，这两项不计入 Vercel 通过条件；OpenSandbox 仍按下方原有用例验收。
+>
+> 证据：`artifacts/vercel-proxy-20261024/final4/`；回归 `chain/`（Code Mode、Tool Host、Session MCP 在动态端口下仍通过）。
+
+复跑：
+
+```bash
+BASE=http://127.0.0.1:15112 OPENCODE_PASSWORD=... \
+PG_URL=postgresql://local@127.0.0.1:5432/<dedicated>-test \
+STRESS_OUT="$PWD/artifacts/vercel-proxy-20261024/final4" \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-vercel-preview-v2 \
+  "$PWD/artifacts/vercel-proxy-20261024/final4"
+```
+
+### Aliyun 后端：仅 SaaS proxy 预览面（2026-10-25）
+
+阿里云创建固定 `secure=true` + `allowPublicTraffic=false`，流量令牌只存 PG、仅服务端转发时使用，不返回浏览器；`GET /api/session/:id/endpoint/:port` 返回 `directUrl=null`、`url=previewUrl=SaaS proxy` 路径。HTML 注入与路径重写为产品语义的一部分（与 OpenSandbox 一致），直连不适用。
+
+| 能力 | Aliyun 实测 |
+| --- | --- |
+| T11.1–T11.7 注入/重写（受控 Node + 真实 Vite5） | PASS |
+| T11.9/T11.20 keepAlive 稳定 | PASS |
+| T11.30/T11.35 非 HTML 透传、`@vite/client` 占位符替换 | PASS |
+| T11.31 WebSocket 桥（受控 echo + 真实 Vite HMR `vite-hmr` 子协议 connected→update） | PASS |
+| T11.32 子路径 / T11.8 错误端点 | PASS |
+| T11.33 无服务端口 | 修复后 PASS：502 + 端口诊断 + 网关原始错误保留为 `originalError` |
+| T11.37/T11.40 动态 import / export default / Strict MIME 递归扫描（8 模块 0 残留） | PASS |
+| T11.11–T11.13 真实 Next14（首页/子路由、chunk 全 prefix、RSC 属性严格重写 + 运行时兜底） | PASS |
+| T17.1–T17.3/T17.6 端口校验、endpoint 结构、销毁 502 | PASS |
+| T11.38/T11.39 `session.preview.down` 落库与 60s 节流、proxy 热路径静默 | PASS |
+| T11.6/T11.10 浏览器级（Chromium 真实导航深链接 basename、hash 路由） | PASS |
+| T11.40 备注 | 当前 esbuild 丢弃 JSDoc 注释，注释挤行形态未端到端复现；以全模块 MIME 扫描为准 |
+
+**本轮修复的两个产品缺陷**（`packages/server/src/handlers/session-proxy.ts`）：
+
+1. 阿里云网关给用户端口响应强加裸 `Content-Disposition: attachment`（无 filename），Chrome 将代理导航判定为下载并中止（`ERR_ABORTED`）；curl/fetch 不受影响，仅浏览器级验证暴露。修复：剥离裸 `attachment` 头；带 filename 的真实下载不受影响。
+2. 阿里云网关对未监听端口返回自有 500 JSON（原样透传导致 T11.33 失败）。修复：5xx JSON 先跑沙箱内端口诊断，仅当确认无监听时转换为 502 + 诊断 + 原始错误；真实应用 500（端口有监听）原样透传。
+
+验收：基础脚本 41/41、真实应用 10/10、浏览器三项全过；证据 `artifacts/aliyun-proxy-20261025/`（`final/`、`apps4/`、`browser/`、`summary.json`）。运行方式与 Vercel 相同（`sandbox-vercel-t19.mjs` 包装器 + `EXPECT_PROVIDER=aliyun`），真实应用阶段用 `docs/test-cases/scripts/aliyun-proxy-apps.mjs`（需 `KEEP_PROXY_FIXTURE=1` 保留会话供浏览器验证）。
+
+复跑：
+
+```bash
+BASE=http://127.0.0.1:15124 OPENCODE_PASSWORD=... \
+PG_URL=postgresql://local@127.0.0.1:5432/<dedicated>-proxy-test \
+EXPECT_ENDPOINT_MODE=proxy EXPECT_PROVIDER=aliyun \
+STRESS_OUT="$PWD/artifacts/aliyun-proxy-20261025/final" \
+bun docs/test-cases/scripts/sandbox-vercel-t19.mjs sandbox-proxy-endpoint-v2 \
+  "$PWD/artifacts/aliyun-proxy-20261025/final"
+```
+
+
+
 ### 复测记录（2026-09-24，V2 首次实现验证：本地 PG + 本地 OpenSandbox Docker runtime）
 
 容器 `opencode-saas-proxy-e2e`（镜像 `opencode-saas-v2:proxy-endpoint`，14106 端口，需 `OPENCODE_EVENTS_PERSIST=1` 才会持久化 durable 事件）。脚本全绿：
