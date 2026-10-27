@@ -11,8 +11,9 @@ import { ProjectTable } from "../src/project/sql"
 import { SessionTable, SessionExecutionGateTable, SandboxExecutionGateTable } from "../src/session/sql"
 import { SandboxTable, SandboxCommandTable, AliyunSnapshotTable } from "../src/sandbox/sql"
 import { SandboxConfig } from "../src/sandbox/config"
-import { byteRange, make } from "../src/sandbox/aliyun/provider"
-import type { Api, Remote } from "../src/sandbox/aliyun/client"
+import { make } from "../src/sandbox/aliyun/provider"
+import { byteRange } from "../src/sandbox/e2b-shared/provider"
+import type { Api, Remote } from "../src/sandbox/e2b-shared/client"
 import type { Interface } from "../src/sandbox/contract"
 import { testEffect } from "./lib/effect"
 
@@ -44,6 +45,7 @@ const fixture = (options: { pause?: boolean; persistMode?: "none" | "snapshot" |
   const remote: Remote = {
     id: `sbx-${root}`,
     get token() { return state.token },
+    host: (port) => `${port}-${remote.id}.cn-hangzhou.sandbox.aliyuncs.com`,
     start: async (command) => {
       state.commands.push(command)
       if (command.includes(">'") && command.includes(".log'")) {

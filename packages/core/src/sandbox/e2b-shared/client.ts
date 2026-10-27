@@ -4,6 +4,7 @@ import type { SandboxConfig } from "../config.js"
 export interface Remote {
   readonly id: string
   readonly token: string | undefined
+  host(port: number): string
   start(command: string, opts: CommandStartOpts): Promise<{ pid: number; wait(): Promise<{ exitCode: number }> }>
   killCommand(pid: number): Promise<boolean>
   listCommands(): Promise<Array<{ pid: number }>>
@@ -31,6 +32,7 @@ function remote(sandbox: Sandbox): Remote {
   return {
     id: sandbox.sandboxId,
     token: sandbox.trafficAccessToken,
+    host: (port) => sandbox.getHost(port),
     start: async (command, opts) => {
       const handle = await sandbox.commands.run(command, { ...opts, background: true })
       return { pid: handle.pid, wait: async () => {
@@ -53,23 +55,17 @@ function remote(sandbox: Sandbox): Remote {
   }
 }
 
-export function client(config: NonNullable<SandboxConfig.Config["aliyun"]>, requestTimeoutMs: number): Api {
+export function client(config: NonNullable<SandboxConfig.Config["aliyun"]> | NonNullable<SandboxConfig.Config["e2b"]>, requestTimeoutMs: number): Api {
   const connection = { apiKey: config.apiKey, apiUrl: config.apiUrl, domain: config.domain, requestTimeoutMs }
-  // Static Snapshot opts do not publicly support apiUrl. Do not mutate the
-  // process environment: regional deployments configure E2B_API_URL at startup.
-  const snapshotConnection = () => {
-    if ((process.env.E2B_API_URL || `https://api.${config.domain}`) !== config.apiUrl)
-      throw new Error("Configure E2B_API_URL to match OPENCODE_ALIYUN_API_URL for static Snapshot APIs")
-    return { apiKey: config.apiKey, domain: config.domain, requestTimeoutMs }
-  }
   return {
     create: async (template, opts) => remote(await Sandbox.create(template, { ...connection, ...opts })),
     connect: async (id) => remote(await Sandbox.connect(id, connection)),
     info: (id) => Sandbox.getInfo(id, connection),
     kill: (id) => Sandbox.kill(id, connection),
-    deleteSnapshot: (id) => Sandbox.deleteSnapshot(id, snapshotConnection()),
+    // SDK 2.31 constructs ConnectionConfig from these options, including apiUrl.
+    deleteSnapshot: (id) => Sandbox.deleteSnapshot(id, connection),
     snapshots: async (id) => {
-      const pages = Sandbox.listSnapshots({ ...snapshotConnection(), sandboxId: id })
+      const pages = Sandbox.listSnapshots({ ...connection, sandboxId: id })
       const items: Array<{ snapshotId: string; names: string[] }> = []
       while (pages.hasNext) items.push(...await pages.nextItems())
       return items

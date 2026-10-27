@@ -121,7 +121,24 @@ const layer = Layer.effect(
             },
             catch: (cause) => cause instanceof Error ? cause : new Error(String(cause)),
           }).pipe(Effect.orElseSucceed(() => undefined))
-          if (health) return { endpoint, version: "agent", headers: resolved.headers }
+          if (health) {
+            // A relaunched or reused agent starts empty: configure before serving
+            // hooks, otherwise a killed agent silently disables every hook.
+            const rows = yield* stored(sessionID)
+            yield* Effect.tryPromise({
+              try: async () => {
+                const configured = await fetch(`${endpoint}/configure`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json", ...resolved.headers },
+                  body: JSON.stringify({ plugins: rows.map(({ name, source }) => ({ name, source })) }),
+                  signal: AbortSignal.timeout(120_000),
+                })
+                if (!configured.ok) throw new Error(`Plugin agent configure HTTP ${configured.status}`)
+              },
+              catch: (cause) => new Error(`Session plugin agent configuration failed: ${cause instanceof Error ? cause.message : String(cause)}`),
+            })
+            return { endpoint, version: "agent", headers: resolved.headers }
+          }
         }
         yield* Effect.sleep("250 millis")
       }

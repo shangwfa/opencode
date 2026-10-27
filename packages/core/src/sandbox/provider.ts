@@ -40,6 +40,7 @@ const layer = Layer.effect(Service, Effect.gen(function* () {
   const { db } = yield* Database.Service
   const vercel = config.vercel ? yield* (yield* Effect.promise(() => import("./vercel/provider.js"))).make(config) : undefined
   const aliyun = config.aliyun ? yield* (yield* Effect.promise(() => import("./aliyun/provider.js"))).make(config) : undefined
+  const e2b = config.e2b ? yield* (yield* Effect.promise(() => import("./e2b/provider.js"))).make(config) : undefined
   const route = <A, E, R>(sessionID: string, call: (provider: Interface) => Effect.Effect<A, E, R>) => Effect.gen(function* () {
     const root = yield* rootSessionID(sessionID, (id) => db.select({ parentID: SessionTable.parent_id }).from(SessionTable)
       .where(eq(SessionTable.id, SessionSchema.ID.make(id))).get().pipe(Effect.orDie))
@@ -49,7 +50,7 @@ const layer = Layer.effect(Service, Effect.gen(function* () {
       return yield* Effect.die(new Error("Existing OpenSandbox bindings require their original control-plane configuration"))
     }
     const name = row?.provider ?? config.provider
-    const selected = name === "vercel" ? vercel : name === "aliyun" ? aliyun : name === "opensandbox" ? opensandbox : undefined
+    const selected = name === "vercel" ? vercel : name === "aliyun" ? aliyun : name === "e2b" ? e2b : name === "opensandbox" ? opensandbox : undefined
     if (!selected) return yield* Effect.die(new Error(`${name} credentials for this persisted binding are not configured`))
     return yield* call(selected)
   })

@@ -3,6 +3,10 @@ import { execFileSync } from "node:child_process"
 import { mkdir, writeFile } from "node:fs/promises"
 
 assert.ok(process.env.PG_URL?.endsWith("-test"), "必须使用专用测试 PG")
+const provider = process.env.EXPECT_PROVIDER ?? "aliyun"
+assert.ok(["aliyun", "e2b"].includes(provider))
+const table = provider === "e2b" ? "e2b_snapshot" : "aliyun_snapshot"
+await mkdir(process.env.STRESS_OUT, { recursive: true })
 const bases = [process.env.BASE, process.env.BASE_SECOND]
 assert.ok(bases.every(Boolean), "需要两个 Docker SaaS 地址")
 const headers = { authorization: `Basic ${Buffer.from(`opencode:${process.env.OPENCODE_PASSWORD}`).toString("base64")}`, "content-type": "application/json" }
@@ -91,13 +95,34 @@ try {
     console.log(`快照验收 ✓ Docker SaaS ${index} 就绪`)
   }
   console.log("快照验收 ▶ 创建会话")
-  id = (await api(0, "/api/session", "POST", { title: "aliyun-independent-auto-snapshot", sandbox: { persistMode: "snapshot", cpu: "2", memory: "2Gi", image: "base-5wa5" } })).data.id
+  id = (await api(0, "/api/session", "POST", { title: `${provider}-independent-auto-snapshot`, sandbox: process.env.SESSION_SANDBOX ? JSON.parse(process.env.SESSION_SANDBOX) : { persistMode: "snapshot", cpu: "2", memory: "2Gi", image: "base-5wa5" } })).data.id
   report.sessionID = id
+  await writeFile(`${process.env.STRESS_OUT}/session.json`, JSON.stringify({ id }))
   await watch(0)
   await shell(0, "mkdir -p /workspace/snapshot-e2e; printf '中文独立快照\\n' > /workspace/snapshot-e2e/text.txt; printf '\\000\\001\\177\\200\\377' > /workspace/snapshot-e2e/data.bin; sha256sum /workspace/snapshot-e2e/* > /workspace/snapshot-e2e/checksums")
   const original = binding()
-  assert.equal(original.provider, "aliyun")
+  assert.equal(original.provider, provider)
   assert.equal(original.state, "running")
+  if (process.env.VERIFY_GATEWAY === "1") {
+    const text = await fetch(`${bases[0]}/api/session/${id}/fs/read/snapshot-e2e/text.txt`, { headers })
+    assert.equal(text.status, 200)
+    assert.equal(await text.text(), "中文独立快照\n")
+    const binary = await fetch(`${bases[0]}/api/session/${id}/fs/read/snapshot-e2e/data.bin`, { headers })
+    assert.deepEqual([...new Uint8Array(await binary.arrayBuffer())], [0,1,127,128,255])
+    const listing = (await api(0, `/api/session/${id}/fs/list?path=snapshot-e2e`)).data
+    assert.ok(listing.some((entry) => entry.path.endsWith("text.txt")))
+    await shell(0, `printf %s '${Buffer.from('require("node:http").createServer((q,s)=>s.end("E2B-PRIVATE-GATEWAY")).listen(8080,"0.0.0.0")').toString("base64")}' | base64 -d >/workspace/e2b-http.cjs; (nohup node /workspace/e2b-http.cjs >/tmp/e2b-http.log 2>&1 </dev/null &); sleep 1`)
+    const endpoint = await api(0, `/api/session/${id}/endpoint/8080`)
+    assert.ok(!JSON.stringify(endpoint).includes("e2b-traffic-access-token"))
+    const host = pg(`SELECT host FROM sandbox WHERE session_id='${id}'`).replace(/^0-/, "8080-")
+    const denied = await fetch(`https://${host}`, { signal: AbortSignal.timeout(15000) })
+    assert.equal(denied.status, 403)
+    const forwarded = await fetch(bases[0] + endpoint.fallback, { headers, signal: AbortSignal.timeout(15000) })
+    assert.equal(forwarded.status, 200)
+    assert.equal(await forwarded.text(), "E2B-PRIVATE-GATEWAY")
+    report.gateway = { anonymous: denied.status, saasProxy: forwarded.status, files: "text/binary/list verified" }
+    console.log("网关验收 ✓ 文件 API、匿名访问 403、SaaS 代理 200")
+  }
   // Explicit online snapshot must not destroy or replace the workspace.
   const online = await api(0, `/api/session/${id}/snapshot`, "POST", {})
   assert.equal(online.data.state, "ready")
@@ -119,11 +144,18 @@ try {
   assert.notEqual(restored.remote, original.remote)
   await shell(1, "cat /workspace/snapshot-e2e/text.txt", "中文独立快照")
   await shell(1, "cat /workspace/snapshot-e2e/latest.txt", "停止前的新文件")
+  if (process.env.VERIFY_GATEWAY === "1") {
+    const endpoint = await api(1, `/api/session/${id}/endpoint/8080`)
+    const restoredHTTP = await fetch(bases[1] + endpoint.fallback, { headers, signal: AbortSignal.timeout(15000) })
+    assert.equal(restoredHTTP.status, 200)
+    assert.equal(await restoredHTTP.text(), "E2B-PRIVATE-GATEWAY")
+    report.restoredGateway = true
+  }
   if (process.env.VERIFY_CODEMODE === "1") await model(1, "AFTER-RESTORE")
   assert.equal((await api(1, `/api/session/${id}/snapshot`)).data.restoredCount, 1)
   report.stats = (await api(1, `/api/session/${id}/snapshot/stats`)).data
   assert.equal(report.stats.restoredTotal, 1)
-  report.snapshots = JSON.parse(pg(`SELECT coalesce(json_agg(row_to_json(t)),'[]') FROM (SELECT id,snapshot_id,state,restored_count FROM aliyun_snapshot WHERE session_id='${id}') t`))
+  report.snapshots = JSON.parse(pg(`SELECT coalesce(json_agg(row_to_json(t)),'[]') FROM (SELECT id,snapshot_id,state,restored_count FROM ${table} WHERE session_id='${id}') t`))
   assert.equal(report.snapshots.length, 2)
   assert.ok(report.snapshots.every((value) => value.state === "ready" && value.snapshot_id))
   report.passed = true
@@ -132,7 +164,7 @@ finally {
   if (id) {
     try {
       await api(1, `/api/session/${id}`, "DELETE")
-      assert.equal(pg(`SELECT count(*) FROM aliyun_snapshot WHERE session_id='${id}'`), "0")
+      assert.equal(pg(`SELECT count(*) FROM ${table} WHERE session_id='${id}'`), "0")
       assert.equal(pg(`SELECT count(*) FROM session_v2 WHERE id='${id}'`), "0")
       report.cleanup = "会话与快照记录已清理"
     } catch (error) { report.cleanupError = error.message; report.passed = false; process.exitCode = 1 }

@@ -52,6 +52,8 @@ export interface Interface {
   readonly requests: LLMRequest[]
   readonly push: (...responses: readonly Response[]) => Effect.Effect<void>
   readonly always: (response: Response) => Effect.Effect<void>
+  /** Answers by request content once the one-shot queue is exhausted. */
+  readonly serve: (responder: Responder) => Effect.Effect<void>
   readonly wait: (count: number) => Effect.Effect<void>
   readonly gate: Effect.Effect<Gate, never, Scope.Scope>
   readonly client: ClientInterface
@@ -237,6 +239,7 @@ export const layer = (options: LayerOptions = {}) =>
         requests: implementation.requests,
         push: implementation.test.push,
         always: implementation.test.always,
+        serve: implementation.test.serve,
         wait: implementation.test.wait,
         gate: implementation.test.gate(),
         client: implementation.test,

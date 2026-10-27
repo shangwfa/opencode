@@ -54,6 +54,7 @@ ENV OPENCODE_DEFAULT_DIRECTORY=/workspace
 ENV OPENCODE_EVENTS_PERSIST=1
 ENV OPENCODE_CCR_ENABLED=true
 ENV OPENCODE_ALIYUN_RUNNER_ASSET=/app/packages/core/dist/sandbox-runner.mjs.gz
+ENV OPENCODE_E2B_RUNNER_ASSET=/app/packages/core/dist/sandbox-runner.mjs.gz
 ENV OPENCODE_DISABLE_AUTOUPDATE=1
 ENV BUN_RUNTIME_TRANSPILER_CACHE_PATH=/tmp/bun-transpile
 # 部署按需注入（不写入镜像层）：

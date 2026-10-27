@@ -435,17 +435,18 @@ const layer = Layer.unwrap(
           sessionID: Session.ID,
           force: boolean,
           continuation?: SessionRunner.Continuation,
+          promotable: SessionInbox.Promotable = "input",
         ): Effect.Effect<void, SessionRunner.RunError> {
           return sessionRunner
-            .drain({ sessionID, force, continuation })
+            .drain({ sessionID, force, continuation, promotable })
             .pipe(
               Effect.flatMap((result) =>
-                result._tag === "Complete" ? Effect.void : drain(sessionID, false, result.continuation),
+                result._tag === "Complete" ? Effect.void : drain(sessionID, false, result.continuation, promotable),
               ),
             )
         }
         const coordinator = yield* SessionRunCoordinator.make<Session.ID, SessionRunner.RunError>({
-          drain: (sessionID, force) => drain(sessionID, force),
+          drain: (sessionID, force, promotable) => drain(sessionID, force, undefined, promotable),
         })
         return SessionExecution.Service.of({
           active: coordinator.active,
@@ -946,6 +947,14 @@ const prepareTitleGeneration = Effect.gen(function* () {
   )
 })
 
+// 标题生成与首个 step 并发发起，到达顺序取决于数据库适配器（PG 会先发 step），
+// 因此按请求内容路由脚本，而不是依赖先进先出。
+const isTitleRequest = (request: LLMRequest) => request.system.some((part) => part.text === "Generate a title.")
+const serveTitle = (s: Scenario, responses: { title: () => TestLLM.Response; step: (index: number) => TestLLM.Response }) => {
+  let step = 0
+  return s.llm.serve((request) => (isTitleRequest(request) ? responses.title() : responses.step(step++)))
+}
+
 const watchRename = Effect.fnUntraced(function* (sessionID: Session.ID) {
   const bus = yield* Bus.Service
   return yield* bus.subscribe(SessionEvent.Renamed).pipe(
@@ -961,7 +970,7 @@ describe("SessionRunnerLLM", () => {
     yield* prepareTitleGeneration
 
     yield* s.admit("First prompt")
-    yield* s.llm.push(TestLLM.text("Generated title", "text-title"), Stream.never)
+    yield* serveTitle(s, { title: () => TestLLM.text("Generated title", "text-title"), step: () => Stream.never })
     const renamed = yield* watchRename(sessionID)
     const runner = yield* SessionRunner.Service
     const fiber = yield* runner.drain({ sessionID, force: true }).pipe(Effect.forkChild)
@@ -990,20 +999,20 @@ describe("SessionRunnerLLM", () => {
     const releaseTitle = yield* Deferred.make<void>()
     yield* Effect.gen(function* () {
       yield* s.admit("First prompt")
-      yield* s.llm.push(
-        Stream.unwrap(
-          Deferred.succeed(titleStarted, undefined).pipe(
-            Effect.andThen(Deferred.await(releaseTitle)),
-            Effect.as(Stream.fromIterable(TestLLM.text("Generated title", "text-title"))),
+      yield* serveTitle(s, {
+        title: () =>
+          Stream.unwrap(
+            Deferred.succeed(titleStarted, undefined).pipe(
+              Effect.andThen(Deferred.await(releaseTitle)),
+              Effect.as(Stream.fromIterable(TestLLM.text("Generated title", "text-title"))),
+            ),
           ),
-        ),
-        TestLLM.text("First response", "text-first"),
-        TestLLM.text("Second response", "text-second"),
-      )
+        step: (index) => (index === 0 ? TestLLM.text("First response", "text-first") : TestLLM.text("Second response", "text-second")),
+      })
 
       const first = yield* s.resume.pipe(Effect.forkChild)
       yield* Deferred.await(titleStarted).pipe(Effect.timeout("5 seconds"))
-      expect(s.requests[0]?.system.map((part) => part.text)).toContain("Generate a title.")
+      expect(s.requests.some(isTitleRequest)).toBe(true)
       yield* Fiber.join(first)
       yield* s.admit("Second prompt")
       yield* s.resume
@@ -1025,12 +1034,13 @@ describe("SessionRunnerLLM", () => {
 
     yield* s.admit("Second prompt")
     const titleFailed = yield* Deferred.make<void>()
-    yield* s.llm.push(
-      Stream.make(LLMEvent.providerError({ message: "Title provider unavailable" })).pipe(
-        Stream.ensuring(Deferred.succeed(titleFailed, undefined)),
-      ),
-      TestLLM.text("Recovered", "text-recovered"),
-    )
+    yield* serveTitle(s, {
+      title: () =>
+        Stream.make(LLMEvent.providerError({ message: "Title provider unavailable" })).pipe(
+          Stream.ensuring(Deferred.succeed(titleFailed, undefined)),
+        ),
+      step: () => TestLLM.text("Recovered", "text-recovered"),
+    })
     yield* s.resume
     yield* Deferred.await(titleFailed)
     yield* Effect.yieldNow
@@ -1038,16 +1048,18 @@ describe("SessionRunnerLLM", () => {
 
     const renamed = yield* watchRename(sessionID)
     yield* s.admit("Third prompt")
-    yield* s.llm.push(
-      TestLLM.text("Generated title", "text-title"),
-      TestLLM.text("Recovered again", "text-recovered-again"),
-    )
+    yield* serveTitle(s, {
+      title: () => TestLLM.text("Generated title", "text-title"),
+      step: () => TestLLM.text("Recovered again", "text-recovered-again"),
+    })
     yield* s.resume
     yield* Fiber.join(renamed)
 
     expect(s.requests).toHaveLength(6)
-    expect(s.requests[2]?.messages).toContainEqual(Message.user("First prompt"))
-    expect(s.requests[4]?.messages).toContainEqual(Message.user("First prompt"))
+    // 每次重试的标题请求都从首个用户消息重建，不依赖请求到达顺序。
+    const titles = s.requests.filter(isTitleRequest)
+    expect(titles).toHaveLength(3)
+    expect(titles.every((request) => JSON.stringify(request.messages).includes("First prompt"))).toBe(true)
     expect((yield* s.session.get(sessionID)).title).toBe("Generated title")
   })
 
@@ -3834,6 +3846,81 @@ describe("SessionRunnerLLM", () => {
     expect((yield* s.context).map((message) => message.type)).toEqual(["user", "assistant", "user", "assistant"])
   })
 
+  scenario("drains queued command templates after an idle shell notification without another wake", function* (s) {
+    const execution = yield* SessionExecution.Service
+    const notice = "The following shell command was executed by the user: echo ready"
+    yield* s.session.synthetic({ sessionID, text: notice, resume: false })
+    const first = yield* s.session.prompt({ sessionID, text: "COMMAND_FIRST", delivery: "queue", resume: false })
+    const second = yield* s.session.prompt({ sessionID, text: "COMMAND_SECOND", delivery: "queue", resume: false })
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop(), TestLLM.stop())
+
+    yield* execution.wake(sessionID)
+    yield* execution.awaitIdle(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([
+      [notice],
+      [notice, "COMMAND_FIRST"],
+      [notice, "COMMAND_FIRST", "COMMAND_SECOND"],
+    ])
+    const messages = yield* s.messages
+    for (const input of [first, second])
+      expect(messages.filter((message) => message.id === input.id)).toHaveLength(1)
+    expect(yield* s.inbox).toEqual([])
+    expect(yield* execution.isActive(sessionID)).toBe(false)
+  })
+
+  scenario("an input wake during a steer-scoped execution releases queued input exactly once", function* (s) {
+    const runner = yield* SessionRunner.Service
+    const execution = yield* SessionRunCoordinator.make({
+      drain: (sessionID: Session.ID, force, promotable) =>
+        runner.drain({ sessionID, force, promotable }).pipe(Effect.asVoid),
+    })
+    yield* s.session.synthetic({ sessionID, text: "Shell notification", resume: false })
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+    const gate = yield* s.llm.gate
+    yield* execution.wake(sessionID, "steer")
+    yield* gate.started
+
+    const queued = yield* s.session.prompt({ sessionID, text: "QUEUED_COMMAND", delivery: "queue", resume: false })
+    yield* execution.wake(sessionID)
+    // A narrower wake must not replace the pending input wake.
+    yield* execution.wake(sessionID, "steer")
+    yield* gate.release
+    yield* execution.awaitIdle(sessionID)
+
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Shell notification"],
+      ["Shell notification", "QUEUED_COMMAND"],
+    ])
+    expect((yield* s.messages).filter((message) => message.id === queued.id)).toHaveLength(1)
+    expect(yield* s.inbox).toEqual([])
+  })
+
+  scenario("a coordinated steer-only wake leaves queued input parked until an explicit input wake", function* (s) {
+    const runner = yield* SessionRunner.Service
+    const execution = yield* SessionRunCoordinator.make({
+      drain: (sessionID: Session.ID, force, promotable) =>
+        runner.drain({ sessionID, force, promotable }).pipe(Effect.asVoid),
+    })
+    yield* s.session.synthetic({ sessionID, text: "Shell notification", resume: false })
+    const queued = yield* s.session.prompt({ sessionID, text: "QUEUED_COMMAND", delivery: "queue", resume: false })
+    yield* s.llm.push(TestLLM.stop(), TestLLM.stop())
+
+    yield* execution.wake(sessionID, "steer")
+    yield* execution.awaitIdle(sessionID)
+    expect(s.requests.map(userTexts)).toEqual([["Shell notification"]])
+    expect((yield* s.inbox).map((item) => item.id)).toEqual([queued.id])
+    expect(yield* execution.isActive(sessionID)).toBe(false)
+
+    yield* execution.wake(sessionID)
+    yield* execution.awaitIdle(sessionID)
+    expect(s.requests.map(userTexts)).toEqual([
+      ["Shell notification"],
+      ["Shell notification", "QUEUED_COMMAND"],
+    ])
+    expect(yield* s.inbox).toEqual([])
+  })
+
   scenario("promotes queued input after continuation ends", function* (s) {
     yield* s.admit("Start working")
 
@@ -3926,6 +4013,9 @@ describe("SessionRunnerLLM", () => {
     })
     yield* s.session.interrupt(sessionID)
     expect(yield* Fiber.await(run)).toMatchObject({ _tag: "Failure" })
+    const execution = yield* SessionExecution.Service
+    yield* execution.awaitIdle(sessionID)
+    expect(yield* execution.isActive(sessionID)).toBe(false)
     expect(s.requests).toHaveLength(1)
     expect(yield* SessionInbox.has(s.db, sessionID, "queue")).toBe(true)
     const resumed = yield* s.resume.pipe(Effect.forkChild)
@@ -4281,14 +4371,36 @@ describe("SessionRunnerLLM", () => {
       input: { agent: "general" },
       executed: false,
     })
+    // 直接改写行数据；json_set 只在 SQLite 上存在，PG 下会失败。
+    const stale = yield* s.db
+      .select({ data: SessionMessageTable.data })
+      .from(SessionMessageTable)
+      .where(eq(SessionMessageTable.id, assistantMessageID))
+      .get()
+      .pipe(Effect.orDie)
+    if (!stale) throw new Error("missing assistant message")
+    if (!("content" in stale.data)) throw new Error("expected an assistant message")
+    const [first, ...rest] = stale.data.content
+    if (first?.type !== "tool") throw new Error("expected a tool part")
+    if (first.state.status !== "running") throw new Error("expected the prior process to leave the tool running")
+    // status=finished keeps the row readable as a prior process left it running.
     yield* s.db
       .update(SessionMessageTable)
       .set({
-        data: sql`json_set(
-          ${SessionMessageTable.data},
-          '$.content[0].state.metadata',
-          json('{"sessionID":"ses_existing_child","status":"running","internal":"private"}')
-        )`,
+        data: {
+          ...stale.data,
+          content: [
+            {
+              ...first,
+              state: {
+                status: "running" as const,
+                input: first.state.input,
+                metadata: { sessionID: "ses_existing_child", status: "running", internal: "private" },
+              },
+            },
+            ...rest,
+          ],
+        },
       })
       .where(eq(SessionMessageTable.id, assistantMessageID))
       .run()

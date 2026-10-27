@@ -2,6 +2,10 @@ import { afterEach, describe, expect, it } from "bun:test"
 import { SandboxConfig } from "@opencode/core/sandbox/config"
 
 const KEYS = [
+  "E2B_API_KEY",
+  "OPENCODE_E2B_TEMPLATE",
+  "OPENCODE_E2B_RUNNER_ASSET",
+  "OPENCODE_E2B_INSTALL_RIPGREP",
   "OPENCODE_SANDBOX_ENABLED",
   "OPENCODE_SANDBOX_PROVIDER",
   "VERCEL_TOKEN",
@@ -35,6 +39,26 @@ afterEach(() => {
 })
 
 describe("SandboxConfig.load", () => {
+  it("selects E2B with isolated official endpoints and rejects missing keys and PVC", () => {
+    process.env.OPENCODE_SANDBOX_ENABLED = "1"
+    process.env.OPENCODE_SANDBOX_PROVIDER = "e2b"
+    expect(() => SandboxConfig.load()).toThrow("requires E2B_API_KEY")
+    process.env.E2B_API_KEY = "test-e2b-only"
+    process.env.OPENCODE_ALIYUN_API_URL = "https://api.cn-hangzhou.sandbox.aliyuncs.com"
+    const config = SandboxConfig.load()
+    expect(config.provider).toBe("e2b")
+    expect(config.e2b?.apiUrl).toBe("https://api.e2b.app")
+    expect(config.e2b?.domain).toBe("e2b.app")
+    expect(config.e2b?.template).toBe("base")
+    expect(config.volumeType).toBe("snapshot")
+    expect(SandboxConfig.forOpenSandbox(config).volumeType).toBe("pvc")
+    process.env.OPENCODE_E2B_TEMPLATE = "custom-template"
+    process.env.OPENCODE_E2B_INSTALL_RIPGREP = "false"
+    expect(SandboxConfig.load().e2b?.template).toBe("custom-template")
+    expect(SandboxConfig.load().e2b?.installRipgrep).toBe(false)
+    process.env.OPENCODE_SANDBOX_VOLUME_TYPE = "pvc"
+    expect(() => SandboxConfig.load()).toThrow("does not support OpenSandbox PVC")
+  })
   it("requires Aliyun endpoint credentials and keeps pause explicitly opt-in", () => {
     process.env.OPENCODE_SANDBOX_ENABLED = "1"
     process.env.OPENCODE_SANDBOX_PROVIDER = "aliyun"

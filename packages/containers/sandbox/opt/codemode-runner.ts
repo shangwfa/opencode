@@ -79,6 +79,13 @@ const displayFetch = (args: ReadonlyArray<unknown>) => {
 }
 
 server.on("connection", (socket) => {
+  // Human approvals can be idle for minutes. Control frames keep provider
+  // gateways alive without exposing a new application message or credentials.
+  const heartbeat = setInterval(() => {
+    if (socket.readyState === 1) socket.ping()
+  }, 15_000)
+  heartbeat.unref()
+  socket.once("close", () => clearInterval(heartbeat))
   let active:
     | {
         executionID: string

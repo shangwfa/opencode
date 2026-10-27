@@ -79,6 +79,7 @@ import m76 from "./migration/20261024062646_vercel_sandbox_binding.js"
 import m77 from "./migration/20261024093925_vercel_endpoint_token.js"
 import m78 from "./migration/20261025091743_aliyun_snapshot.js"
 import m79 from "./migration/20261025152054_session_mcp_runtime_port.js"
+import m80 from "./migration/20261026114630_e2b_snapshot.js"
 
 export const migrations = [
   m00,
@@ -161,4 +162,5 @@ export const migrations = [
   m77,
   m78,
   m79,
+  m80,
 ] satisfies DatabaseMigration.Migration[]

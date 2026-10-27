@@ -17,7 +17,7 @@
 | `OPENCODE_ALIYUN_API_KEY` | Agent Sandbox API Key，非阿里云 AccessKey |
 | `OPENCODE_ALIYUN_API_URL` | `https://api.cn-hangzhou.sandbox.aliyuncs.com`，按地域修改 |
 | `OPENCODE_ALIYUN_DOMAIN` | `cn-hangzhou.sandbox.aliyuncs.com`，与 API URL 匹配 |
-| `E2B_API_URL` | 静态 Snapshot 接口使用；应与 `OPENCODE_ALIYUN_API_URL` 相同；未设置时 SDK 按 domain 推导，非标准端点必须显式配置 |
+| `E2B_API_URL` | 服务不再依赖该全局变量：共享 SDK 客户端为 create/connect/list/delete 显式传入各自的 API URL，允许 E2B 与阿里云同时配置；单独调用原生 SDK 的外部脚本仍需遵守其连接配置 |
 | `OPENCODE_ALIYUN_TEMPLATE` | 默认 `code-interpreter-v1`；生产建议固定自定义模板 |
 | `OPENCODE_ALIYUN_PAUSE_ENABLED` | 兼容旧配置；独立快照路径不使用暂停/恢复，无需开启 |
 | `OPENCODE_ALIYUN_RUNNER_ASSET` | gzip Runner bundle 的 SaaS 本地路径；标准 Dockerfile 自动构建并配置 |

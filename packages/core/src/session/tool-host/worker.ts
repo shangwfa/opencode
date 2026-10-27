@@ -1,6 +1,6 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
+import { pathToFileURL, fileURLToPath } from "node:url"
 import ts from "typescript"
 import type { Tool } from "@opencode/schema/tool"
 import { hash, versionHash, HostError } from "../tool-host-protocol"
@@ -8,7 +8,7 @@ import { hash, versionHash, HostError } from "../tool-host-protocol"
 const acks = new Map<string, { resolve: () => void; reject: (error: Error) => void }>()
 const controllers = new Map<string, AbortController>()
 const send = (frame: unknown) => process.send?.(frame)
-const runtime = pathToFileURL(path.join(import.meta.dirname, "session-tool-runtime.mjs")).href
+const runtime = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "session-tool-runtime.mjs")).href
 // User modules and the executor must share one Effect runtime (codec sentinel identity).
 const { Effect, SessionTool, definition, execute, isToolDefinition, toToolInfo }: typeof import("./runtime") =
   await import(runtime)

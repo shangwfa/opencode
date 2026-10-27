@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { client } from "../src/sandbox/aliyun/client"
+import { client } from "../src/sandbox/e2b-shared/client"
 
 test("E2B SDK uses the explicitly configured Aliyun API endpoint and native network policy", async () => {
   const calls: Array<{ method: string; path: string; auth: string | null; body: unknown }> = []
@@ -35,9 +35,24 @@ test("E2B SDK uses the explicitly configured Aliyun API endpoint and native netw
   } finally { server.stop(true) }
 })
 
-test("static Snapshot APIs reject an unsupported endpoint override instead of reaching another region", async () => {
-  const api = client({ apiKey: "not-a-real-key", apiUrl: "http://127.0.0.1:1", domain: "cn-hangzhou.sandbox.aliyuncs.com",
-    template: "base-5wa5", pauseEnabled: false }, 100)
-  await expect(api.snapshots("owned-source")).rejects.toThrow("Configure E2B_API_URL")
-  expect(() => api.deleteSnapshot("owned-snapshot")).toThrow("Configure E2B_API_URL")
+test("static snapshot APIs preserve the per-client endpoint without global environment changes", async () => {
+  const calls: string[] = []
+  const servers = [0, 1].map((region) => Bun.serve({ port: 0, fetch(request) {
+    const url = new URL(request.url)
+    calls.push(`${region} ${request.method} ${url.pathname}`)
+    if (request.method === "DELETE") return new Response(null, { status: 204 })
+    return Response.json([])
+  } }))
+  const before = process.env.E2B_API_URL
+  try {
+    for (const server of servers) {
+      const api = client({ apiKey: "e2b_0000000000000000000000000000000000000000", apiUrl: `http://127.0.0.1:${server.port}`,
+        domain: "e2b.app", template: "base" }, 5000)
+      expect(await api.snapshots("owned-source")).toEqual([])
+      expect(await api.deleteSnapshot("owned-snapshot")).toBe(true)
+    }
+    expect(calls).toHaveLength(4)
+    expect(calls.map((call) => call[0])).toEqual(["0", "0", "1", "1"])
+    expect(process.env.E2B_API_URL).toBe(before)
+  } finally { for (const server of servers) server.stop(true) }
 })

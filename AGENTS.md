@@ -21,6 +21,13 @@ opencode sass 作为一个code-agent ,主要负责跟AI打交道，通过各种�
 - skills mcps agent agent-md commands plugins等功能相关逻辑部分是类似的，如何可以服用且是最佳实践，尽量一起考虑下
 - opencode saas 是一个无状态的服务，线上部署(k8s 多pods）
 
+沙箱:(支持多沙箱opensandbox vercel sandbox 阿里沙箱等)
+
+- 为opencode saas 服务执行涉及文件操作相关工具执行脚本等
+- 为opencode saas 服务提供 local mcp ，skills中脚本执行, code-mode,tools等
+- 访问 opencode saas 访问沙箱中的各种能力,预览，各种服务
+- 沙箱的使用是昂贵的资源，要思考如何高效利用沙箱能力，不仅能提供产品需要的各种能力，还要能低成本高效的使用沙箱
+
 主要流程：
 
 - 用户创建会话

@@ -9,7 +9,15 @@ export * as SandboxConfig from "./config.js"
 
 export interface Config {
   readonly enabled: boolean
-  readonly provider: "opensandbox" | "vercel" | "aliyun"
+  readonly provider: "opensandbox" | "vercel" | "aliyun" | "e2b"
+  readonly e2b?: {
+    readonly apiKey: string
+    readonly apiUrl: string
+    readonly domain: string
+    readonly template: string
+    readonly runnerAsset?: string
+    readonly installRipgrep?: boolean
+  }
   readonly aliyun?: {
     readonly apiKey: string
     readonly apiUrl: string
@@ -138,7 +146,13 @@ const nonNegativeInteger = (value: string | undefined, fallback: number) => {
 export function load(): Config {
   const env = process.env
   const provider = env["OPENCODE_SANDBOX_PROVIDER"] || "opensandbox"
-  if (provider !== "opensandbox" && provider !== "vercel" && provider !== "aliyun") throw new Error("Unknown sandbox provider")
+  if (provider !== "opensandbox" && provider !== "vercel" && provider !== "aliyun" && provider !== "e2b") throw new Error("Unknown sandbox provider")
+  const e2bKey = env["E2B_API_KEY"]?.trim()
+  if (flag(env["OPENCODE_SANDBOX_ENABLED"]) && provider === "e2b") {
+    if (!e2bKey) throw new Error("E2B sandbox requires E2B_API_KEY")
+    if (env["OPENCODE_SANDBOX_VOLUME_TYPE"] && env["OPENCODE_SANDBOX_VOLUME_TYPE"] !== "snapshot")
+      throw new Error("E2B sandbox does not support OpenSandbox PVC persistence")
+  }
   const aliyunKey = env["OPENCODE_ALIYUN_API_KEY"]?.trim()
   const aliyunDomain = env["OPENCODE_ALIYUN_DOMAIN"]?.trim()
   const aliyunUrl = env["OPENCODE_ALIYUN_API_URL"]?.trim()
@@ -166,6 +180,12 @@ export function load(): Config {
   return {
     enabled: flag(env["OPENCODE_SANDBOX_ENABLED"]),
     provider,
+    e2b: e2bKey ? {
+      apiKey: e2bKey, apiUrl: "https://api.e2b.app", domain: "e2b.app",
+      template: env["OPENCODE_E2B_TEMPLATE"]?.trim() || "base",
+      runnerAsset: env["OPENCODE_E2B_RUNNER_ASSET"] || undefined,
+      installRipgrep: env["OPENCODE_E2B_INSTALL_RIPGREP"] === undefined ? true : flag(env["OPENCODE_E2B_INSTALL_RIPGREP"]),
+    } : undefined,
     aliyun: aliyunKey && aliyunDomain && aliyunUrl ? {
       apiKey: aliyunKey, apiUrl: aliyunUrl, domain: aliyunDomain,
       template: env["OPENCODE_ALIYUN_TEMPLATE"]?.trim() || "code-interpreter-v1",

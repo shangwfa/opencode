@@ -67,7 +67,7 @@ export interface Deps {
   /** Lease window; a crashed creator is taken over after it expires. */
   readonly leaseMs: number
   readonly host: string
-  readonly provider?: "opensandbox" | "vercel" | "aliyun"
+  readonly provider?: "opensandbox" | "vercel" | "aliyun" | "e2b"
   readonly providerScope?: string
 }
 

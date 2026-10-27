@@ -256,6 +256,18 @@ CREATE TABLE "aliyun_snapshot" (
           "time_created" bigint NOT NULL,
           "time_updated" bigint NOT NULL
         );
+CREATE TABLE "e2b_snapshot" (
+          "id" text PRIMARY KEY,
+          "session_id" text NOT NULL,
+          "provider_scope" text NOT NULL,
+          "sandbox_id" text NOT NULL,
+          "remote_name" text NOT NULL,
+          "snapshot_id" text,
+          "state" text NOT NULL,
+          "restored_count" bigint DEFAULT 0 NOT NULL,
+          "time_created" bigint NOT NULL,
+          "time_updated" bigint NOT NULL
+        );
 CREATE TABLE "sandbox_command" (
           "id" text PRIMARY KEY,
           "session_id" text NOT NULL,
@@ -511,6 +523,7 @@ CREATE INDEX "log_session_time_idx" ON "log" ("session_id","time_created");
 CREATE UNIQUE INDEX "permission_project_action_resource_idx" ON "permission" ("project_id","action","resource");
 CREATE UNIQUE INDEX "session_permission_approval_scope_idx" ON "session_permission_approval" ("session_id","action","resource");
 CREATE INDEX "aliyun_snapshot_session_idx" ON "aliyun_snapshot" ("session_id","time_created");
+CREATE INDEX "e2b_snapshot_session_idx" ON "e2b_snapshot" ("session_id","time_created");
 CREATE INDEX "sandbox_command_session_idx" ON "sandbox_command" ("session_id","sandbox_id");
 CREATE UNIQUE INDEX "sandbox_session_id_idx" ON "sandbox" ("session_id");
 CREATE INDEX "sandbox_state_time_updated_idx" ON "sandbox" ("state","time_updated");

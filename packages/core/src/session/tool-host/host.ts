@@ -2,6 +2,7 @@ import http from "node:http"
 import { fork, type ChildProcess } from "node:child_process"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { fileURLToPath } from "node:url"
 import { budgets, prefix, protocolVersion, versionHash, HostError } from "../tool-host-protocol"
 
 type Frame = Record<string, any>
@@ -32,7 +33,7 @@ type Session = { epoch: number; generation: number; closed: boolean }
 export function createHost(options: { sandboxID: string; root?: string; worker?: string }) {
   const hostEpoch = crypto.randomUUID()
   const root = options.root ?? "/workspace"
-  const workerFile = options.worker ?? path.join(import.meta.dirname, "session-tool-worker.mjs")
+  const workerFile = options.worker ?? path.join(path.dirname(fileURLToPath(import.meta.url)), "session-tool-worker.mjs")
   const sessions = new Map<string, Session>()
   const owners = new Map<string, { expires: number; leaseID: string }>()
   const workers = new Map<string, Worker>()

@@ -12,7 +12,7 @@ import { SessionTable, SessionExecutionGateTable, SandboxExecutionGateTable } fr
 import { SandboxTable } from "../src/sandbox/sql"
 import { SandboxConfig } from "../src/sandbox/config"
 import { make } from "../src/sandbox/aliyun/provider"
-import type { Api, Remote } from "../src/sandbox/aliyun/client"
+import type { Api, Remote } from "../src/sandbox/e2b-shared/client"
 
 if (!process.env.OPENCODE_DATABASE_URL?.endsWith("-cas-test")) throw new Error("需要独立 -cas-test 数据库")
 const report: Record<string, unknown> = { passed: false, mode: "fake cloud + real PG", assertion: "刷新已选中的空闲候选后不得回收" }
@@ -34,6 +34,7 @@ const run = Effect.gen(function* () {
   let pause = false
   const killed: string[] = []
   const remote = (id: string): Remote => ({ id, token: "fake-token",
+    host: (port) => `${port}-${id}.cas.invalid`,
     start: async () => ({ pid: 1, wait: async () => ({ exitCode: 0 }) }), killCommand: async () => true,
     listCommands: async () => [],
     snapshot: async () => { throw new Error("本用例不创建快照") }, extend: async () => {},

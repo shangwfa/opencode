@@ -9,7 +9,7 @@ export const SandboxTable = sqliteTable(
     id: text().primaryKey(),
     session_id: text().notNull(),
     host: text().notNull(),
-    provider: text().$type<"opensandbox" | "vercel" | "aliyun">().notNull().default("opensandbox"),
+    provider: text().$type<"opensandbox" | "vercel" | "aliyun" | "e2b">().notNull().default("opensandbox"),
     provider_scope: text(),
     remote_name: text(),
     endpoint_token: text(),
@@ -45,3 +45,16 @@ export const AliyunSnapshotTable = sqliteTable("aliyun_snapshot", {
   restored_count: integer().notNull().default(0),
   ...Timestamps,
 }, (table) => [index("aliyun_snapshot_session_idx").on(table.session_id, table.time_created)])
+
+/** E2B checkpoints are isolated from Aliyun and OpenSandbox catalogs. */
+export const E2BSnapshotTable = sqliteTable("e2b_snapshot", {
+  id: text().primaryKey(),
+  session_id: text().notNull(),
+  provider_scope: text().notNull(),
+  sandbox_id: text().notNull(),
+  remote_name: text().notNull(),
+  snapshot_id: text(),
+  state: text().$type<"creating" | "ready">().notNull(),
+  restored_count: integer().notNull().default(0),
+  ...Timestamps,
+}, (table) => [index("e2b_snapshot_session_idx").on(table.session_id, table.time_created)])
