@@ -20,6 +20,36 @@ const getRequestUrl = (source: RequestSource | undefined) => {
   return baseUrl || "";
 };
 
+// 工作台知识库使用老帮助中心页面，但身份和权限统一交给基础服务。
+function legacyKnowledgeRequest(method: string, url: string, options?: any) {
+  // 服务端渲染没有浏览器地址，从 brandCode 参数取知识库 ID；取不到则不接管。
+  const brandCode = options?.params?.brandCode;
+  const baseId =
+    typeof brandCode === "string" && /^kb_[A-Za-z0-9_-]+$/.test(brandCode)
+      ? brandCode
+      : typeof window !== "undefined"
+        ? window.location.pathname.split("/").find((part) => /^kb_[A-Za-z0-9_-]+$/.test(part))
+        : undefined;
+  if (!baseId) return null;
+  const mappings = [
+    ["/boss/api/v3/cornerstone/helpdoc/", "boss/helpdoc/"],
+    ["/api/v3/cornerstone/helpdoc/", "boss/helpdoc/"],
+    ["/api/noauth/v1/yddoc/", "yddoc/"],
+    ["/api/noauth/v1/ep/config/queryOem", "oem/query"],
+    ["/api/v1/sys/", "sys/"],
+    ["/api/noauth/v1/sys/", "sys/"],
+  ];
+  const match = mappings.find(([prefix]) => url.startsWith(prefix));
+  if (!match) return null;
+  const base = (process.env.NEXT_PUBLIC_HN_BASE_URL || "http://localhost:3201").replace(/\/+$/, "");
+  return axios.request({
+    method, url: `${base}/api/knowledge-legacy/${encodeURIComponent(baseId)}/${match[1]}${url.slice(match[0].length)}`,
+    withCredentials: true,
+    ...(method === "GET" ? { params: options?.params } : method === "DELETE" ? options : { data: options }),
+    headers: { Authorization: undefined },
+  });
+}
+
 const queryToken = async () => {
   if (!typeof window || typeof window === "undefined")
     return Promise.resolve("");
@@ -36,6 +66,8 @@ const queryToken = async () => {
 };
 
 export const get = (url: string, options?: any, source?: RequestSource) => {
+  const legacy = legacyKnowledgeRequest("GET", url, options);
+  if (legacy) return legacy;
   let requestUrl = getRequestUrl(source);
   // 如果 requestUrl 为空，使用 BASE_URL 作为后备
   if (!requestUrl) {
@@ -74,6 +106,8 @@ export const get = (url: string, options?: any, source?: RequestSource) => {
 };
 
 export const post = (url: string, options?: any, source?: RequestSource) => {
+  const legacy = legacyKnowledgeRequest("POST", url, options);
+  if (legacy) return legacy;
   let requestUrl = getRequestUrl(source);
   if (!requestUrl) {
     requestUrl = env.BASE_URL || "";
@@ -101,6 +135,8 @@ export const deleteFetch = (
   options?: any,
   source?: RequestSource
 ) => {
+  const legacy = legacyKnowledgeRequest("DELETE", url, options);
+  if (legacy) return legacy;
   let requestUrl = getRequestUrl(source);
   if (!requestUrl) {
     requestUrl = env.BASE_URL || "";

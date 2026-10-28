@@ -38,15 +38,17 @@ export class SyncWorkerService {
     documentId: string,
     operation: "upsert" | "delete",
     published: boolean,
+    store: Pick<typeof db, "select" | "insert"> = db,
+    schedule = true,
   ): Promise<void> {
-    const modes = await db
+    const modes = await store
       .select({ mode: kbModes.mode })
       .from(kbModes)
       .where(and(eq(kbModes.knowledgeBaseId, kbId), eq(kbModes.enabled, 1)))
     if (!modes.length) return
 
     for (const { mode } of modes) {
-      await db.insert(documentSyncTasks).values({
+      await store.insert(documentSyncTasks).values({
         id: newId("dst"),
         knowledgeBaseId: kbId,
         documentId,
@@ -56,6 +58,11 @@ export class SyncWorkerService {
         status: "pending",
       })
     }
+    if (schedule) this.schedule()
+  }
+
+  /** 事务提交后再唤醒，避免 worker 读取未提交或旧正文。 */
+  wake(): void {
     this.schedule()
   }
 

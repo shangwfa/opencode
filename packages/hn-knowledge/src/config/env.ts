@@ -62,6 +62,11 @@ export function getDefaultChatModel(): string {
   return process.env["KNOWLEDGE_DEFAULT_CHAT_MODEL"] || "openai/gpt-5.6"
 }
 
+/** KNOWLEDGE_SERVICE_TOKEN：基础服务到知识服务的内网凭据，不下发前端。 */
+export function getKnowledgeServiceToken(): string {
+  return process.env["KNOWLEDGE_SERVICE_TOKEN"]?.trim() ?? ""
+}
+
 export function getDefaultEmbeddingModel(): string {
   return process.env["KNOWLEDGE_DEFAULT_EMBEDDING_MODEL"] || "openai/text-embedding-3-small"
 }

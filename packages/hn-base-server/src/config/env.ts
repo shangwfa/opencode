@@ -41,6 +41,21 @@ export const env = {
   get saasUrl(): string {
     return readEnv("OPENCODE_SAAS_URL") || "http://localhost:14096"
   },
+  /** hn-knowledge 知识服务地址（知识库/检索/Wiki/图谱） */
+  get knowledgeUrl(): string {
+    return readEnv("KNOWLEDGE_URL") || "http://localhost:14200"
+  },
+  /** 文档前端的可信来源；与工作台共用基础服务登录态。 */
+  get docsUrl(): string {
+    return readEnv("HN_DOCS_URL") || "http://localhost:3004/yddoc"
+  },
+  get trustedOrigins(): string[] {
+    return [...new Set([new URL(this.webOrigin).origin, new URL(this.docsUrl).origin])]
+  },
+  /** 仅服务间使用，不下发浏览器。 */
+  get knowledgeServiceToken(): string {
+    return readEnv("KNOWLEDGE_SERVICE_TOKEN") || ""
+  },
   /** OAuth App 凭据；两者都配置才会启用对应 provider */
   get googleClientId(): string {
     return readEnv("GOOGLE_CLIENT_ID") ?? ""

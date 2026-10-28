@@ -42,6 +42,22 @@ afterAll(async () => {
 })
 
 describe("authz/check", () => {
+  it("知识库复用基础服务关系：owner 管理，editor 编辑，viewer 只读，陌生用户不可见", async () => {
+    const resourceId = uid("kb")
+    const users = [uid("owner"), uid("editor"), uid("viewer"), uid("other")]
+    for (const user of users) await insertUser(user, `${user}@e.com`)
+    await writeTuples(db, users.slice(0, 3).map((user, index) => ({
+      resourceType: "knowledge_base" as const, resourceId, relation: ["owner", "editor", "viewer"][index]!, subjectType: "user" as const, subjectId: user,
+    })))
+    const allows = (id: string, permission: string) => check(db, { subject: { type: "user", id }, object: { type: "knowledge_base", id: resourceId }, permission })
+    expect(await allows(users[0]!, "manage")).toBe(true)
+    expect(await allows(users[1]!, "write")).toBe(true)
+    expect(await allows(users[1]!, "manage")).toBe(false)
+    expect(await allows(users[2]!, "read")).toBe(true)
+    expect(await allows(users[2]!, "write")).toBe(false)
+    expect(await allows(users[3]!, "read")).toBe(false)
+    expect(await listObjects(db, { subject: { type: "user", id: users[2]! }, permission: "read", type: "knowledge_base" })).toContain(resourceId)
+  })
   it("owner 可读；其他人不可读", async () => {
     const alice = uid("user")
     const bob = uid("user")

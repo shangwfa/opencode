@@ -22,18 +22,23 @@ export type AppEnv = {
 type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>
 
 export async function readSession(headers: Headers): Promise<NonNullable<SessionResult>> {
-  const session = await auth.api.getSession({ headers })
+  const session = await auth.api.getSession({ headers, query: { disableCookieCache: true } })
   if (!session) throw errors.unauthorized()
   return session
 }
 
-export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
+/** 供个别路由按需校验会话（票据放行的接口不走全局中间件）。 */
+export async function requireSession(c: Context<AppEnv>): Promise<void> {
   const session = await readSession(c.req.raw.headers)
   const status = (session.user as { status?: string }).status
   if (status === "disabled") throw errors.unauthorized("账号已禁用")
   c.set("userId", session.user.id)
   c.set("orgId", session.session.activeOrganizationId ?? null)
   c.set("userRole", (session.user as { role?: string }).role ?? "user")
+}
+
+export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
+  await requireSession(c)
   await next()
 })
 

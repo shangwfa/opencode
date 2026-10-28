@@ -89,7 +89,7 @@ export async function signIn(email: string, password: string): Promise<{ error?:
   const r = await parse(
     await fetch(`${hnBaseUrl}/api/auth/sign-in/email`, {
       method: "POST",
-      credentials: "omit",
+      credentials: "include",
       headers: { "content-type": "application/json", origin: location.origin },
       body: JSON.stringify({ email, password }),
     }),
@@ -108,7 +108,7 @@ export async function signUp(email: string, password: string, name: string): Pro
   const r = await parse(
     await fetch(`${hnBaseUrl}/api/auth/sign-up/email`, {
       method: "POST",
-      credentials: "omit",
+      credentials: "include",
       headers: { "content-type": "application/json", origin: location.origin },
       body: JSON.stringify({ email, password, name }),
     }),
@@ -141,6 +141,15 @@ export async function fetchSession(): Promise<AuthUser | null> {
     if (data?.session?.token) {
       authToken = data.session.token
       writeToken(data.session.token)
+    }
+    if (authToken && data?.user) {
+      // 兼容已有的仅 Bearer 登录：复用同一会话补齐独立文档前端需要的 Cookie。
+      await fetch(`${hnBaseUrl}/api/auth/browser-session`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", authorization: `Bearer ${authToken}` },
+        body: "{}",
+      })
     }
     authUser = data?.user ?? null
     return authUser

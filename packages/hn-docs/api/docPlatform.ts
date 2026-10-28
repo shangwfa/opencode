@@ -37,6 +37,9 @@ export async function kbFetch<T = any>(
 
 // 4xx/5xx 也进 unwrap 统一解析(取后端 message,而非 axios 默认错误文案)
 const http = axios.create({ baseURL: "/api/doc-platform", validateStatus: () => true });
+/** 管理请求只经过基础服务，Cookie 复用同站点部署下的 better-auth 会话。 */
+export const baseServiceUrl = (process.env.NEXT_PUBLIC_HN_BASE_URL || "http://localhost:3201").replace(/\/+$/, "");
+const adminHttp = axios.create({ baseURL: `${baseServiceUrl}/api/doc-platform`, withCredentials: true, validateStatus: () => true });
 
 interface KbResponse<T = any> {
   code: number;
@@ -84,7 +87,7 @@ export interface KnowledgeBaseItem {
 // ── 知识库 ──
 
 export function listKnowledgeBases(): Promise<KnowledgeBaseItem[]> {
-  return unwrap(http.get("/kb-admin/knowledge-bases"));
+  return unwrap(adminHttp.get("/kb-admin/knowledge-bases"));
 }
 
 export function createKnowledgeBase(params: {
@@ -93,46 +96,46 @@ export function createKnowledgeBase(params: {
   languageCode?: string;
   description?: string;
 }): Promise<KnowledgeBaseItem> {
-  return unwrap(http.post("/kb-admin/knowledge-bases", params));
+  return unwrap(adminHttp.post("/kb-admin/knowledge-bases", params));
 }
 
 export function deleteKnowledgeBase(kbId: string): Promise<null> {
-  return unwrap(http.delete(`/kb-admin/knowledge-bases/${kbId}`));
+  return unwrap(adminHttp.delete(`/kb-admin/knowledge-bases/${kbId}`));
 }
 
 export function setKnowledgeBasePublic(
   kbId: string,
   isPublic: boolean,
 ): Promise<KnowledgeBaseItem> {
-  return unwrap(http.post(`/kb-admin/knowledge-bases/${kbId}/public`, { isPublic }));
+  return unwrap(adminHttp.post(`/kb-admin/knowledge-bases/${kbId}/public`, { isPublic }));
 }
 
 // ── 菜单/文档 ──
 
 export function getAdminMenuTree(kbId: string): Promise<MenuTreeNode[]> {
-  return unwrap(http.get(`/kb-admin/knowledge-bases/${kbId}/menus/tree`, { params: { includeDisabled: 1 } }));
+  return unwrap(adminHttp.get(`/kb-admin/knowledge-bases/${kbId}/menus/tree`, { params: { includeDisabled: 1 } }));
 }
 
 export function createMenu(
   kbId: string,
   params: { name: string; type: "folder" | "doc"; parentId?: string | null; previousId?: string | null },
-) {
-  return unwrap(http.post(`/kb-admin/knowledge-bases/${kbId}/menus`, params));
+): Promise<{ id: string }> {
+  return unwrap(adminHttp.post(`/kb-admin/knowledge-bases/${kbId}/menus`, params));
 }
 
 export function deleteMenu(kbId: string, menuId: string): Promise<null> {
-  return unwrap(http.delete(`/kb-admin/knowledge-bases/${kbId}/menus/${menuId}`));
+  return unwrap(adminHttp.delete(`/kb-admin/knowledge-bases/${kbId}/menus/${menuId}`));
 }
 
 export function setMenuEnable(kbId: string, menuId: string, enable: boolean): Promise<null> {
-  return unwrap(http.post(`/kb-admin/knowledge-bases/${kbId}/menus/${menuId}/${enable ? "enable" : "disable"}`));
+  return unwrap(adminHttp.post(`/kb-admin/knowledge-bases/${kbId}/menus/${menuId}/${enable ? "enable" : "disable"}`));
 }
 
 export function reorderMenu(
   kbId: string,
   params: { menuId: string; targetParentId: string | null; targetPreviousId: string | null },
 ) {
-  return unwrap(http.post(`/kb-admin/knowledge-bases/${kbId}/menus/reorder`, params));
+  return unwrap(adminHttp.post(`/kb-admin/knowledge-bases/${kbId}/menus/reorder`, params));
 }
 
 export interface AdminDocument {
@@ -148,23 +151,23 @@ export interface AdminDocument {
 }
 
 export function getAdminDocument(kbId: string, menuId: string): Promise<AdminDocument> {
-  return unwrap(http.get(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}`));
+  return unwrap(adminHttp.get(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}`));
 }
 
 export function saveDraft(
   kbId: string,
   menuId: string,
   params: { contentJson: unknown; contentType?: string },
-) {
-  return unwrap(http.put(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}/draft`, params));
+): Promise<AdminDocument> {
+  return unwrap(adminHttp.put(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}/draft`, params));
 }
 
 export function publishDocument(
   kbId: string,
   menuId: string,
   params: { contentJson: unknown; contentType?: string; plainTextContent?: string },
-) {
-  return unwrap(http.post(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}/publish`, params));
+): Promise<AdminDocument> {
+  return unwrap(adminHttp.post(`/kb-admin/knowledge-bases/${kbId}/documents/${menuId}/publish`, params));
 }
 
 // ── 公开搜索(智能检索,rag 混合检索) ──

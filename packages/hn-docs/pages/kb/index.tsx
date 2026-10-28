@@ -1,12 +1,10 @@
-import { Button, Form, Input, List, Modal, Select, Space, Switch, Tag, message } from "antd";
-import type { GetServerSideProps } from "next";
+import { Button, List, Modal, Space, Switch, Tag, message } from "antd";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import BaseSessionGate from "@/components/BaseSessionGate";
 
 import {
-  createKnowledgeBase,
   deleteKnowledgeBase,
-  knowledgeInternalBaseUrl,
   listKnowledgeBases,
   setKnowledgeBasePublic,
   type KnowledgeBaseItem,
@@ -17,11 +15,12 @@ interface Props {
   error?: string;
 }
 
-export default function KbIndexPage({ initialList, error }: Props) {
+export default function KbIndexPage() {
+  return <BaseSessionGate><KbIndexContent initialList={[]} /></BaseSessionGate>;
+}
+
+function KbIndexContent({ initialList, error }: Props) {
   const [list, setList] = useState<KnowledgeBaseItem[]>(initialList ?? []);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [form] = Form.useForm();
-  const [submitting, setSubmitting] = useState(false);
 
   const refresh = async () => {
     try {
@@ -30,21 +29,7 @@ export default function KbIndexPage({ initialList, error }: Props) {
       message.error(e?.message || "刷新失败");
     }
   };
-
-  const onCreate = async (values: { name: string; slug: string; languageCode: string }) => {
-    setSubmitting(true);
-    try {
-      await createKnowledgeBase(values);
-      message.success("创建成功");
-      setCreateOpen(false);
-      form.resetFields();
-      await refresh();
-    } catch (e: any) {
-      message.error(e?.message || "创建失败");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  useEffect(() => { void refresh(); }, []);
 
   const onTogglePublic = async (item: KnowledgeBaseItem, checked: boolean) => {
     try {
@@ -76,8 +61,8 @@ export default function KbIndexPage({ initialList, error }: Props) {
     <div style={{ maxWidth: 880, margin: "40px auto", padding: "0 16px" }}>
       <Space style={{ marginBottom: 16, width: "100%", justifyContent: "space-between" }}>
         <h2 style={{ margin: 0 }}>我的知识库</h2>
-        <Button type="primary" onClick={() => setCreateOpen(true)}>
-          新建知识库
+        <Button type="primary" href={`${process.env.NEXT_PUBLIC_HN_APP_URL || "http://localhost:3001"}/#/knowledge/bases`}>
+          前往工作台新建
         </Button>
       </Space>
 
@@ -85,7 +70,7 @@ export default function KbIndexPage({ initialList, error }: Props) {
 
       <List
         dataSource={list}
-        locale={{ emptyText: "还没有知识库,点击右上角新建" }}
+        locale={{ emptyText: "还没有知识库，请前往工作台统一创建" }}
         renderItem={(item) => (
           <List.Item
             actions={[
@@ -120,54 +105,6 @@ export default function KbIndexPage({ initialList, error }: Props) {
         )}
       />
 
-      <Modal
-        title="新建知识库"
-        open={createOpen}
-        onCancel={() => setCreateOpen(false)}
-        onOk={() => form.submit()}
-        confirmLoading={submitting}
-        destroyOnClose
-      >
-        <Form form={form} layout="vertical" onFinish={onCreate} initialValues={{ languageCode: "zh-cn" }}>
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}>
-            <Input placeholder="例如:产品帮助中心" maxLength={255} />
-          </Form.Item>
-          <Form.Item
-            name="slug"
-            label="访问地址(slug)"
-            rules={[
-              { required: true, message: "请输入 slug" },
-              { pattern: /^[a-z0-9][a-z0-9-]{2,63}$/, message: "3-64 位小写字母/数字,可含连字符" },
-            ]}
-            extra="公开访问地址:/kb/{slug}"
-          >
-            <Input placeholder="例如:product-help" addonBefore="/kb/" />
-          </Form.Item>
-          <Form.Item name="languageCode" label="语言">
-            <Select
-              options={[
-                { value: "zh-cn", label: "简体中文" },
-                { value: "en-us", label: "English" },
-              ]}
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 }
-
-export const getServerSideProps: GetServerSideProps<Props> = async () => {
-  try {
-    const res = await fetch(`${knowledgeInternalBaseUrl()}/api/doc-platform/kb-admin/knowledge-bases`, {
-      cache: "no-store",
-    });
-    const json = await res.json();
-    if (json?.code === 200) {
-      return { props: { initialList: json.data ?? [] } };
-    }
-    return { props: { initialList: [], error: json?.message || "未知错误" } };
-  } catch (e: any) {
-    return { props: { initialList: [], error: e?.message || "knowledge 服务不可达" } };
-  }
-};

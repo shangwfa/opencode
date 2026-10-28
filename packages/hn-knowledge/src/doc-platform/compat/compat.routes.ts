@@ -360,6 +360,8 @@ compatApp.post("/boss/helpdoc/menu/save", async (c) => {
     .set({
       contentJson: upload.payload as object,
       content: String(body.plainTextContent ?? ""),
+      // 发布即覆盖草稿，避免后续进入编辑时仍提示“有未发布内容”。
+      draftContentJson: null,
       type: body.contentType === "oss" ? "tiptap" : body.contentType || "tiptap",
       publishedAt: new Date(),
       status: "published",

@@ -19,6 +19,9 @@ import { auditRoutes } from "./routes/audit.js"
 import { requirementRoutes } from "./routes/requirements.js"
 import { sessionRoutes } from "./routes/sessions.js"
 import { connectorRoutes } from "./routes/connectors.js"
+import { knowledgeRoutes } from "./routes/knowledge.js"
+import { knowledgeLegacyRoutes } from "./routes/knowledge-legacy.js"
+import { docPlatformRoutes } from "./routes/doc-platform.js"
 import { saasFetch, saasJson, saasMcpFetch } from "./lib/saas.js"
 
 export function createApp() {
@@ -27,9 +30,10 @@ export function createApp() {
   app.use(
     "/api/*",
     cors({
-      origin: env.webOrigin,
+      origin: env.trustedOrigins,
       credentials: true,
-      allowHeaders: ["content-type", "authorization", "x-org-id"],
+      // 兼容老编辑页上传正文时使用的空 contenttype 头（非标准拼写，会触发预检）。
+      allowHeaders: ["content-type", "contenttype", "authorization", "x-org-id"],
       exposeHeaders: ["set-auth-token"],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     }),
@@ -117,6 +121,16 @@ export function createApp() {
   })
   app.route("/api/sessions", sessionRoutes)
   app.route("/api/connectors", connectorRoutes)
+  app.route("/api/knowledge", knowledgeRoutes)
+  app.route("/api/knowledge-legacy", knowledgeLegacyRoutes)
+  /**
+   * 老编辑页发布后的旧知识同步入口：发布流程已在知识服务内建派生任务，
+   * 此处只做兼容应答，不读写数据。
+   */
+  app.post("/api/knowledge-base/sync-from-doc-platform", (c) =>
+    c.json({ code: 200, success: true, message: "发布流程已提交派生任务", data: { taskId: "", knowledgeBaseId: "", operation: "upsertDocument", documentCount: 0, status: "accepted" } }),
+  )
+  app.route("/api/doc-platform", docPlatformRoutes)
   app.route("/api/git-providers/oauth", gitOAuthRoutes)
   app.route("/api/git-providers", gitProviderRoutes)
   app.route("/api/models", modelRoutes)

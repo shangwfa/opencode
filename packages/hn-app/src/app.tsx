@@ -14,6 +14,10 @@ import { GitProvidersPage } from "@/pages/git-providers"
 import { AppsPage } from "@/pages/apps"
 import { ConnectorsPage } from "@/pages/connectors"
 import { ConnectorDetailPage } from "@/pages/connector-detail"
+import { KnowledgeOverviewPage } from "@/pages/knowledge/overview"
+import { KnowledgeBasesPage } from "@/pages/knowledge/bases"
+import { KnowledgeBaseDetailPage } from "@/pages/knowledge/base-detail"
+import { KnowledgeTasksPage } from "@/pages/knowledge/tasks"
 import { RequirementsPage } from "@/pages/requirements"
 import { AppDetailPage } from "@/pages/app-detail"
 import { AgentRegistryPage } from "@/pages/agent-registry"
@@ -52,6 +56,10 @@ export function App() {
         <Route path="/apps" element={<AppsPage />} />
         <Route path="/connectors" element={<ConnectorsPage />} />
         <Route path="/connectors/:service" element={<ConnectorDetailPage />} />
+        <Route path="/knowledge" element={<KnowledgeOverviewPage />} />
+        <Route path="/knowledge/bases" element={<KnowledgeBasesPage />} />
+        <Route path="/knowledge/bases/:baseId" element={<KnowledgeBaseDetailPage />} />
+        <Route path="/knowledge/tasks" element={<KnowledgeTasksPage />} />
         <Route path="/requirements" element={<RequirementsPage />} />
         <Route path="/agent-registry" element={<AgentRegistryPage />} />
         <Route path="/cdp" element={<CdpPage />} />

@@ -173,11 +173,13 @@ const AppContent = (props) => {
 
 const DocApp = (props) => {
   const { Component, pageProps } = props;
+  const router = useRouter();
+  const isKnowledgePage = router.pathname === "/kb" || router.pathname.startsWith("/kb/");
 
   return (
     <ConfigProvider locale={zhCN}>
       <SharedDataProvider>
-        <AppContent Component={Component} pageProps={pageProps} />
+        {isKnowledgePage ? <Component {...pageProps} /> : <AppContent Component={Component} pageProps={pageProps} />}
       </SharedDataProvider>
     </ConfigProvider>
   );

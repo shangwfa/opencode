@@ -4,12 +4,17 @@
  * 新增资源/权限只改本文件，不改判定代码。
  */
 
-export type ResourceType = "org" | "project" | "requirement" | "session" | "git_provider" | "app"
+export type ResourceType = "org" | "project" | "requirement" | "session" | "git_provider" | "app" | "knowledge_base"
 /** 主体可以是人/组织/团队/公开，也可以是另一个资源（parent 关系） */
 export type SubjectType = "user" | "org" | "team" | "public" | ResourceType
 
 /** 关系的合法主体类型 */
 export const relations: Record<ResourceType, Record<string, SubjectType[]>> = {
+  knowledge_base: {
+    owner: ["user"],
+    editor: ["user", "org", "team"],
+    viewer: ["user", "org", "team"],
+  },
   org: {
     owner: ["user"],
     admin: ["user"],
@@ -49,6 +54,12 @@ export const relations: Record<ResourceType, Record<string, SubjectType[]>> = {
  *  - "parent->perm"：沿 parent 关系找父对象，再判父对象的 perm
  */
 export const permissions: Record<ResourceType, Record<string, string[]>> = {
+  knowledge_base: {
+    read: ["owner", "editor", "viewer"],
+    write: ["owner", "editor"],
+    manage: ["owner"],
+    delete: ["owner"],
+  },
   org: {
     read: ["owner", "admin", "member"],
     manage: ["owner", "admin"],

@@ -25,7 +25,7 @@ export class KbService {
     if (!slug) throw new DocPlatformError("VALIDATION_ERROR", "slug 不能为空")
     validateKbSlug(slug)
 
-    const modes = request.modes?.length ? request.modes : (["rag"] as KbMode[])
+    const modes = request.modes ?? (["rag"] as KbMode[])
     const unsupported = modes.filter((m) => !SUPPORTED_MODES.includes(m))
     if (unsupported.length) {
       throw new DocPlatformError("UNSUPPORTED_MODE", `暂不支持检索模式: ${unsupported.join(", ")}(当前仅 rag)`)
@@ -50,7 +50,9 @@ export class KbService {
         slug,
         languageCode: request.languageCode ?? "zh-cn",
         isPublic: 0,
-        settings: {},
+        settings: request.settings ?? {},
+        ...(request.defaultChunkStrategy ? { defaultChunkStrategy: request.defaultChunkStrategy } : {}),
+        ...(request.defaultChunkConfig ? { defaultChunkConfig: request.defaultChunkConfig } : {}),
       })
       .returning()
 

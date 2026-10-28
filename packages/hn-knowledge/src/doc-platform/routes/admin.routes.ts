@@ -26,6 +26,9 @@ export const kbAdminApp = new Hono()
       languageCode: body.languageCode,
       description: body.description,
       modes: body.modes,
+      settings: body.settings,
+      defaultChunkStrategy: body.defaultChunkStrategy,
+      defaultChunkConfig: body.defaultChunkConfig,
     })
     return c.json({ code: 200, success: true, message: "ok", data: kb })
   })
@@ -98,6 +101,10 @@ export const kbAdminApp = new Hono()
   })
 
   // ── 文档:草稿/发布/读取 ──
+  .get("/knowledge-bases/:kbId/documents", async (c) => {
+    const items = await documentService.listForAdmin(c.req.param("kbId"))
+    return c.json({ code: 200, success: true, message: "ok", data: items })
+  })
   .put("/knowledge-bases/:kbId/documents/:menuId/draft", async (c) => {
     const body = await c.req.json()
     const doc = await documentService.saveDraft(c.req.param("kbId"), c.req.param("menuId"), {

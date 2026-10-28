@@ -11,6 +11,7 @@ import {
   Terminal,
   GitBranch,
   Cable,
+  BookOpen,
   ChartNoAxesCombined,
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -28,6 +29,7 @@ const navGroups: NavItem[][] = [
     { to: "/project-intake", label: "项目接入", icon: FolderInput },
     { to: "/apps", label: "应用", icon: Boxes },
     { to: "/connectors", label: "连接器", icon: Cable },
+    { to: "/knowledge", label: "知识", icon: BookOpen },
     { to: "/dashboard", label: "仪表盘", icon: LayoutDashboard },
     { to: "/context-insights", label: "上下文洞察", icon: ChartNoAxesCombined },
 

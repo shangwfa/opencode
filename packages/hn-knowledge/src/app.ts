@@ -20,6 +20,7 @@ import { databaseApp } from "./data-table/routes/index.js"
 import { llmWikiApp } from "./llm-wiki/routes/index.js"
 import { graphApp } from "./graph/routes/index.js"
 import { docPlatformApp } from "./doc-platform/index.js"
+import { requireKnowledgeService } from "./middleware/service-auth.js"
 
 /** API 子应用:各业务域子应用按域前缀挂载（basePath 之下） */
 export const api = new Hono()
@@ -67,6 +68,12 @@ export async function createKnowledgeApp(options: KnowledgeAppOptions = {}): Pro
   }
 
   const app = new Hono()
+
+  // 仅明确的公开文档读取不要求服务凭据；公开 handler 另行校验 isPublic。
+  app.use(`${basePath}/doc-platform/*`, async (c, next) => {
+    if (c.req.path.startsWith(`${basePath}/doc-platform/kb/`)) return next()
+    return requireKnowledgeService(c, next)
+  })
 
   app.get("/health", (c) => c.json({ code: 200, success: true, message: "ok", data: null }))
 

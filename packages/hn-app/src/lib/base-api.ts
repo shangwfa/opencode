@@ -57,6 +57,29 @@ export async function baseFetch<T>(path: string, init?: RequestInit): Promise<T>
 
 // ---------- 类型 ----------
 
+export type HnKnowledgeBase = {
+  editorUrl?: string | null
+  documentCount?: number
+  publishedCount?: number
+  failedCount?: number
+  pendingCount?: number
+  id: string
+  name: string
+  slug: string | null
+  description?: string
+  settings?: { sourceType?: "documents" | "structured"; capabilities?: import("./knowledge").KnowledgeCapability[] }
+  updatedAt: string
+}
+
+export type HnKnowledgeDocument = {
+  id: string
+  name: string
+  status: string
+  publishedAt: string | null
+  hasDraft: boolean
+  editorUrl: string
+}
+
 export type HnRequirement = {
   id: string
   title: string
@@ -328,6 +351,29 @@ export const hnApi = {
   rotateConnectorMcp: (id: string, revision: number) =>
     baseFetch<ConnectorMcpIssued>(`/api/connectors/mcp-deployments/${encodeURIComponent(id)}/rotate-token`, { method: "POST", body: JSON.stringify({ revision }) }),
   deleteConnectorMcp: (id: string) => baseFetch<void>(`/api/connectors/mcp-deployments/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  knowledgeBases: () => baseFetch<{ bases: HnKnowledgeBase[] }>("/api/knowledge/bases"),
+  knowledgeOverview: () =>
+    baseFetch<{
+      overview: {
+        baseCount: number
+        documentCount: number
+        publishedCount: number
+        pendingCount: number
+        failedCount: number
+        recent: Array<{ baseId: string; baseName: string; id: string; name: string; status: string; publishedAt: string | null; updatedAt: string }>
+      }
+    }>("/api/knowledge/overview"),
+  knowledgeBase: (id: string) => baseFetch<{ base: HnKnowledgeBase; editorUrl: string }>(`/api/knowledge/bases/${encodeURIComponent(id)}`),
+  knowledgeDocuments: (id: string) => baseFetch<{ documents: HnKnowledgeDocument[] }>(`/api/knowledge/bases/${encodeURIComponent(id)}/documents`),
+  createKnowledgeBase: (input: {
+    name: string
+    description?: string
+    sourceType: "documents" | "structured"
+    capabilities: string[]
+    chunkStrategy?: string
+    chunkSize?: number
+    chunkOverlap?: number
+  }) => baseFetch<{ base: { id: string; name: string }; editorUrl: string | null }>("/api/knowledge/bases", { method: "POST", body: JSON.stringify(input) }),
   attachSessionMcp: (sessionId: string, input: { name: string; config: Record<string, unknown> }) =>
     baseFetch<unknown>(`/api/sessions/${encodeURIComponent(sessionId)}/mcp`, {
       method: "POST",

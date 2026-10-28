@@ -10,6 +10,21 @@ import { extractPlainText } from "../utils.js"
 import { syncWorkerService } from "./sync-worker.service.js"
 
 export class DocumentService {
+  /** 列表不返回草稿正文；写作状态和派生状态分开呈现。 */
+  async listForAdmin(kbId: string) {
+    const rows = await db.select({
+      id: documents.id,
+      name: menus.name,
+      status: documents.status,
+      publishedAt: documents.publishedAt,
+      draftContentJson: documents.draftContentJson,
+      updatedAt: documents.updatedAt,
+    }).from(documents)
+      .innerJoin(menus, and(eq(documents.menuId, menus.id), eq(menus.knowledgeBaseId, kbId)))
+      .where(eq(documents.knowledgeBaseId, kbId))
+    return rows.map(({ draftContentJson, ...row }) => ({ ...row, hasDraft: draftContentJson != null }))
+  }
+
   /** 保存草稿:仅写 draft_content_json,不影响已发布内容 */
   async saveDraft(kbId: string, menuId: string, request: SaveDraftRequest) {
     const doc = await this.getDocRow(kbId, menuId)
@@ -50,13 +65,13 @@ export class DocumentService {
       throw new DocPlatformError("VALIDATION_ERROR", "发布内容不能为空")
     }
 
-    // M2:落库后按启用模式写派生任务(worker 异步消费:rag 向量化;草稿任务不进索引)
-    await syncWorkerService.enqueueDocumentSync(kbId, menuId, "upsert", true)
-
-    const [updated] = await db
+    // 正文与任务原子落库；worker 必须在事务提交后才启动。
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
       .update(documents)
       .set({
         contentJson: request.contentJson as object,
+        draftContentJson: null,
         content: plainText,
         ...(request.contentType ? { type: request.contentType } : {}),
         publishedAt: new Date(),
@@ -65,6 +80,10 @@ export class DocumentService {
       })
       .where(and(eq(documents.id, menuId), eq(documents.knowledgeBaseId, kbId)))
       .returning()
+      await syncWorkerService.enqueueDocumentSync(kbId, menuId, "upsert", true, tx, false)
+      return row
+    })
+    syncWorkerService.wake()
     return this.serialize(updated)
   }
 

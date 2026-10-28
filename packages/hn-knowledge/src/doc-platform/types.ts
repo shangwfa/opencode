@@ -27,6 +27,9 @@ export interface CreateKbRequest {
   description?: string
   /** 检索模式集合,默认 ['rag'];当前仅支持 rag */
   modes?: KbMode[]
+  settings?: Record<string, unknown>
+  defaultChunkStrategy?: string
+  defaultChunkConfig?: Record<string, unknown>
 }
 
 export interface UpdateKbRequest {

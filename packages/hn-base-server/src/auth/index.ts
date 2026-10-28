@@ -11,6 +11,7 @@ import { drizzleAdapter } from "@better-auth/drizzle-adapter"
 import { bearer, organization } from "better-auth/plugins"
 import { env } from "../config/env.js"
 import { db } from "../db/index.js"
+import { browserSession } from "./browser-session.js"
 import { account, invitation, member, organization as orgTable, session, user, verification } from "../db/schema.js"
 
 /** 只把 better-auth 需要的模型交给 adapter */
@@ -83,11 +84,12 @@ export const auth = betterAuth({
 
   socialProviders,
 
-  trustedOrigins: [env.webOrigin],
+  trustedOrigins: env.trustedOrigins,
 
   plugins: [
     // Authorization: Bearer <session.token>
     bearer(),
+    browserSession,
     organization({
       allowUserToCreateOrganization: true,
       creatorRole: "owner",

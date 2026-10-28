@@ -5,6 +5,15 @@ import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import XybotEditor from "@/components/XybotEditor/editor";
+import BaseSessionGate from "@/components/BaseSessionGate";
+import type { GetServerSideProps } from "next";
+
+// 兼容已有书签，入口统一回到原帮助中心页面，不再展示这套管理壳。
+export const getServerSideProps: GetServerSideProps = async ({ params, query }) => {
+  const baseId = String(params?.kbSlug ?? "");
+  const menuId = typeof query.menuId === "string" ? `/${encodeURIComponent(query.menuId)}` : "";
+  return { redirect: { destination: `/${encodeURIComponent(baseId)}/zh-cn${menuId}?from=boss`, permanent: false } };
+};
 import {
   createMenu,
   deleteMenu,
@@ -45,6 +54,10 @@ function resolveParentId(nodes: MenuTreeNode[], selectedId: string | null): stri
 }
 
 export default function KbAdminPage() {
+  return <BaseSessionGate><KbAdminContent /></BaseSessionGate>;
+}
+
+function KbAdminContent() {
   const router = useRouter();
   const kbSlug = router.query.kbSlug as string;
 
@@ -70,7 +83,7 @@ export default function KbAdminPage() {
     import("@/api/docPlatform").then(({ listKnowledgeBases }) =>
       listKnowledgeBases()
         .then((list) => {
-          const found = list.find((k) => k.slug === kbSlug) ?? null;
+          const found = list.find((k) => k.id === kbSlug || k.slug === kbSlug) ?? null;
           if (!found) {
             message.error(`知识库不存在: ${kbSlug}`);
             return;
@@ -85,6 +98,14 @@ export default function KbAdminPage() {
     refreshTree();
   }, [refreshTree]);
 
+  useEffect(() => {
+    const id = typeof router.query.menuId === "string" ? router.query.menuId : null;
+    if (id && !selectedId && findNode(tree, id)?.type === "doc") {
+      setSelectedId(id);
+      setSelectedType("doc");
+    }
+  }, [router.query.menuId, tree, selectedId]);
+
   // 选中节点变化:加载文档内容(doc 才加载)
   useEffect(() => {
     if (!kb || !selectedId || selectedType !== "doc") {
@@ -92,14 +113,18 @@ export default function KbAdminPage() {
       setDocStatus("");
       return;
     }
+    let active = true;
     setLoading(true);
+    setEditorJson(null);
     getAdminDocument(kb.id, selectedId)
       .then((doc) => {
-        setEditorJson((doc.draftContentJson ?? doc.contentJson) as object | null);
+        if (!active) return;
+        setEditorJson((doc.draftContentJson ?? doc.contentJson ?? { type: "doc", content: [{ type: "paragraph" }] }) as object);
         setDocStatus(doc.status);
       })
-      .catch((e) => message.error(e?.message || "加载文档失败"))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (active) message.error(e?.message || "加载文档失败"); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [kb, selectedId, selectedType]);
 
   const onCreate = (type: "folder" | "doc") => {
@@ -111,20 +136,21 @@ export default function KbAdminPage() {
           id="kb-admin-new-name"
           placeholder="名称"
           autoFocus
-          onChange={(e) => e.target.setAttribute("data-value", e.target.value)}
         />
       ),
       onOk: async () => {
         const input = document.getElementById("kb-admin-new-name") as HTMLInputElement | null;
-        const name = input?.getAttribute("data-value")?.trim();
+        const name = input?.value.trim();
         if (!name) {
           message.warning("请输入名称");
           return Promise.reject();
         }
         const parentId = resolveParentId(tree, selectedId);
         try {
-          await createMenu(kb.id, { name, type, parentId });
+          const created = await createMenu(kb.id, { name, type, parentId }) as { id: string };
           await refreshTree();
+          setSelectedId(created.id);
+          setSelectedType(type);
           message.success("已创建");
         } catch (e: any) {
           message.error(e?.message || "创建失败");
@@ -169,7 +195,8 @@ export default function KbAdminPage() {
     setSaving(true);
     try {
       await saveDraft(kb.id, selectedId, { contentJson: editorJson, contentType: "tiptap" });
-      setDocStatus("draft");
+      const latest = await getAdminDocument(kb.id, selectedId);
+      setDocStatus(latest.status);
       message.success("草稿已保存");
     } catch (e: any) {
       message.error(e?.message || "保存失败");
@@ -211,7 +238,7 @@ export default function KbAdminPage() {
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <div style={{ width: 300, borderRight: "1px solid #f0f0f0", padding: 16, flexShrink: 0, overflowY: "auto" }}>
-        <Link href="/kb">← 我的知识库</Link>
+        <a href={`${process.env.NEXT_PUBLIC_HN_APP_URL || "http://localhost:3001"}/#/knowledge/bases/${encodeURIComponent(kb?.id || kbSlug || "")}`}>← 返回知识库</a>
         <h3 style={{ margin: "8px 0" }}>{kb?.name || kbSlug} · 管理</h3>
         <Space size={4} wrap style={{ marginBottom: 12 }}>
           <Button size="small" onClick={() => onCreate("folder")}>
@@ -249,10 +276,10 @@ export default function KbAdminPage() {
           <Tag color={docStatus === "indexed" ? "green" : docStatus === "failed" ? "red" : "blue"}>
             {docStatus || "未选择"}
           </Tag>
-          <Button disabled={selectedType !== "doc"} loading={saving} onClick={onSaveDraft}>
+          <Button disabled={selectedType !== "doc" || loading || !editorJson} loading={saving} onClick={onSaveDraft}>
             保存草稿
           </Button>
-          <Button disabled={selectedType !== "doc"} type="primary" loading={saving} onClick={onPublish}>
+          <Button disabled={selectedType !== "doc" || loading || !editorJson} type="primary" loading={saving} onClick={onPublish}>
             发布
           </Button>
           {selectedNode && (
@@ -264,7 +291,7 @@ export default function KbAdminPage() {
         {loading ? (
           <div style={{ color: "#999" }}>加载中…</div>
         ) : selectedType === "doc" && editorJson ? (
-          <XybotEditor embedded value={editorJson as any} onChange={(json) => setEditorJson(json as object)} />
+          <XybotEditor key={selectedId} embedded editable value={editorJson as any} onChange={(json) => setEditorJson(json as object)} />
         ) : (
           <div style={{ color: "#999", marginTop: 80, textAlign: "center" }}>
             {selectedType === "folder" ? "已选中文件夹,可在左侧新建子节点" : "请选择左侧文档进行编辑"}

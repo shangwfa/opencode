@@ -182,27 +182,36 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   } else {
     let menuData = {} as MenuData | null;
-    const result = await queryMenusTrees({
-      brandCode: brandCode as string,
-      languageCode: languageCode as string,
-    });
+    // 服务端渲染取不到登录态，目录改为客户端补齐；此处失败不阻断页面。
+    try {
+      const result = await queryMenusTrees({
+        brandCode: brandCode as string,
+        languageCode: languageCode as string,
+      });
 
-    if (result.code === 200) {
-      menuData = findMenuData(result.data, id as string);
+      if (result.code === 200) {
+        menuData = findMenuData(result.data, id as string);
+      }
+    } catch {
+      menuData = null;
     }
     let content = {
       content: "",
     };
     if (menuData?.id) {
-      const { data } = await queryDocContent({ menuId: menuData.id });
-      // 兼容接口可能只返回 content；旧文档页用 docInfo.menuId 判断是否挂载编辑器，
-      // 因此从菜单树补齐稳定的标识与标题，避免正文有数据但页面仍空白。
-      content = {
-        ...data,
-        menuId: data?.menuId || menuData.id,
-        docUniqueId: data?.docUniqueId || menuData.docUniqueId || menuData.id,
-        name: data?.name || menuData.name || "",
-      };
+      try {
+        const { data } = await queryDocContent({ menuId: menuData.id });
+        // 兼容接口可能只返回 content；旧文档页用 docInfo.menuId 判断是否挂载编辑器，
+        // 因此从菜单树补齐稳定的标识与标题，避免正文有数据但页面仍空白。
+        content = {
+          ...data,
+          menuId: data?.menuId || menuData.id,
+          docUniqueId: data?.docUniqueId || menuData.docUniqueId || menuData.id,
+          name: data?.name || menuData.name || "",
+        };
+      } catch {
+        content = { content: "" };
+      }
     }
     const contentJson = await getDocData(content?.content);
     return {

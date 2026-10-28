@@ -1,11 +1,11 @@
-import { PDFParse } from 'pdf-parse'
-
 export class FileParser {
   /**
    * 解析 PDF 文件
    */
   static async parsePDF(buffer: Buffer): Promise<string> {
     try {
+      // PDF 的原生依赖只在解析 PDF 时加载，不能阻止纯文档服务启动。
+      const { PDFParse } = await import('pdf-parse')
       const pdfParse = new PDFParse({ data: buffer })
       const result = await pdfParse.getText()
       return result.text
