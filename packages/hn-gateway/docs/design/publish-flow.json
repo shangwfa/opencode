@@ -1,0 +1,40 @@
+{
+  "type": "sequence",
+  "title": "k8s 多实例应用发布与配置生效",
+  "numbered": true,
+  "participants": [
+    { "id": "admin", "label": "管理端", "sub": "运营控制台", "kind": "external" },
+    { "id": "podA", "label": "网关 Pod A", "sub": "Hono :3101", "focal": true },
+    { "id": "pg", "label": "PostgreSQL", "sub": "hn_gateway 源真相", "kind": "store" },
+    { "id": "approver", "label": "审批系统", "sub": "webhook 回调", "kind": "external" },
+    { "id": "podB", "label": "网关 Pod B", "sub": "LISTEN 独立连接" },
+    { "id": "user", "label": "浏览器", "sub": "微前端宿主", "kind": "external" }
+  ],
+  "messages": [
+    ["admin", "podA", "POST /apps/publish/:id", "primary"],
+    ["podA", "pg", "INSERT publishes(pending)"],
+    ["approver", "podB", "callback?_status=approved"],
+    ["podB", "pg", "同事务: 写 apps+publishes+pg_notify", "primary"],
+    ["pg", "podA", "NOTIFY gateway_config_changed", "async"],
+    ["podA", "podA", "失效内存 TTL 缓存"],
+    ["podA", "podA", "60s TTL 到期兜底"],
+    ["user", "podA", "GET 宿主页"],
+    ["podA", "podA", "灰度策略选版本"],
+    ["podA", "podA", "指纹换 key · 回源新版"],
+    ["podA", "user", "新版 HTML + window.YD", "reply"]
+  ],
+  "fragments": [
+    { "kind": "critical", "label": "同事务提交才 NOTIFY（回滚不通知）", "from": 3, "to": 3 },
+    { "kind": "opt", "label": "NOTIFY 丢失 / LISTEN 断连 5s 重建", "from": 6, "to": 6 }
+  ],
+  "notes": [
+    { "at": 4, "over": ["podB"], "text": "自身写后本地缓存同步失效 apps/service.ts:164" }
+  ],
+  "evidence": [
+    { "id": "callback", "file": "packages/hn-gateway/src/domains/webhook/index.ts", "line": 13 },
+    { "id": "notify", "file": "packages/hn-gateway/src/domains/apps/service.ts", "line": 281 },
+    { "id": "ttl", "file": "packages/hn-gateway/src/domains/apps/service.ts", "line": 31 },
+    { "id": "bus", "file": "packages/hn-gateway/src/hosting/notify.ts", "line": 4 },
+    { "id": "fingerprint", "file": "packages/hn-gateway/src/hosting/handlers/app-hosting.ts", "line": 97 }
+  ]
+}

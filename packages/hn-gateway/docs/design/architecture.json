@@ -1,0 +1,84 @@
+{
+  "type": "architecture",
+  "title": "hn-gateway 前端网关架构",
+  "dir": "LR",
+  "groups": [{"id":"gw","label":"GATEWAY PROCESS :3101","style":"dashed"}],
+  "nodes": [
+    {"id":"client","label":"浏览器 / 前端","sub":"SPA + micro-fe host","kind":"input","row":1,"col":0},
+    {
+      "id": "gwapi",
+      "label": "管理面 /gw-api",
+      "sub": "platform·apps·ap·pipelines",
+      "tag": "ADMIN",
+      "group": "gw",
+      "row": 0,
+      "col": 1
+    },
+    {
+      "id": "hosting",
+      "label": "hosting 责任链 ×9",
+      "sub": "api-proxy·static·sso·html 兜底",
+      "tag": "CHAIN",
+      "focal": true,
+      "group": "gw",
+      "row": 1,
+      "col": 1
+    },
+    {
+      "id": "report",
+      "label": "report-api 上报",
+      "sub": "rsa+aes · elk 透传",
+      "tag": "REPORT",
+      "group": "gw",
+      "row": 2,
+      "col": 1
+    },
+    {
+      "id": "ws",
+      "label": "ws 透传 /socket.io",
+      "sub": "→ chatbot:3000 · node only",
+      "kind": "optional",
+      "group": "gw",
+      "row": 3,
+      "col": 1
+    },
+    {
+      "id": "pg",
+      "label": "PostgreSQL · hn_gateway",
+      "sub": "apps·gray_features·publishes·configs",
+      "kind": "store",
+      "focal": true,
+      "row": 0,
+      "col": 2
+    },
+    {
+      "id": "upstream",
+      "label": "外部后端",
+      "sub": "api.yingdao.com · cos · ai-tools",
+      "kind": "external",
+      "row": 1,
+      "col": 2
+    },
+    {"id":"integ","label":"集成服务","sub":"云效 · gitlab · elk · 飞书","kind":"external","row":2,"col":2}
+  ],
+  "edges": [
+    ["client","hosting","页面托管","primary"],
+    ["client","gwapi","管理接口"],
+    ["client","report","前端上报"],
+    ["client","ws","ws 透传","async"],
+    ["gwapi","pg","配置读写"],
+    ["hosting","upstream","代理 · 回源","link"],
+    ["report","integ","ELK 查询","link"],
+    ["gwapi","integ","云效 · gitlab"],
+    ["pg","hosting","NOTIFY 失效缓存","async"]
+  ],
+  "evidence": [
+    {"id":"gwapi","file":"packages/hn-gateway/src/app.ts","line":30},
+    {"id":"hosting","file":"packages/hn-gateway/src/hosting/middleware.ts"},
+    {"id":"report","file":"packages/hn-gateway/src/domains/report/index.ts"},
+    {"id":"ws","file":"packages/hn-gateway/src/ws-proxy.ts"},
+    {"id":"pg","file":"packages/hn-gateway/src/db/schema.ts"},
+    {"id":"upstream","file":"packages/hn-gateway/src/config/env.ts"},
+    {"id":"integ","file":"packages/hn-gateway/src/integrations"}
+  ]
+}
