@@ -201,6 +201,7 @@ export type SessionCreateInput = {
   readonly metadata?: Session.Metadata | undefined
   readonly permissions?: Permission.Ruleset | undefined
   readonly sandbox?: Session.SandboxResource | undefined
+  readonly summaryFrom?: Session.ID | undefined
 }
 export type SessionCreateOutput = Session.Info
 export type SessionCreateOperation<E = never> = (input?: SessionCreateInput) => Effect.Effect<SessionCreateOutput, E>
@@ -262,6 +263,15 @@ export type SessionMoveInput = {
 export type SessionMoveOutput = void
 export type SessionMoveOperation<E = never> = (input: SessionMoveInput) => Effect.Effect<SessionMoveOutput, E>
 
+export type SessionPermissionsPresetInput = { readonly sessionID: Session.ID; readonly preset: Permission.Preset }
+export type SessionPermissionsPresetOutput = {
+  readonly preset: Permission.Preset
+  readonly permissions: Permission.Ruleset
+}
+export type SessionPermissionsPresetOperation<E = never> = (
+  input: SessionPermissionsPresetInput,
+) => Effect.Effect<SessionPermissionsPresetOutput, E>
+
 export type SessionPromptInput = {
   readonly sessionID: Session.ID
   readonly id?: SessionMessage.ID | undefined
@@ -279,6 +289,8 @@ export type SessionPromptInput = {
           }
       )
     | undefined
+  readonly preset?: Permission.Preset | undefined
+  readonly permissions?: Permission.Ruleset | undefined
   readonly model?: Model.Ref | undefined
   readonly userName?: string | undefined
   readonly userId?: string | undefined
@@ -306,6 +318,8 @@ export type SessionCommandInput = {
           }
       )
     | undefined
+  readonly preset?: Permission.Preset | undefined
+  readonly permissions?: Permission.Ruleset | undefined
   readonly delivery?: SessionInbox.Delivery | undefined
 }
 export type SessionCommandOutput = void
@@ -379,6 +393,319 @@ export type SessionRevertCommitOperation<E = never> = (
 export type SessionContextInput = { readonly sessionID: Session.ID }
 export type SessionContextOutput = ReadonlyArray<SessionMessage.Info>
 export type SessionContextOperation<E = never> = (input: SessionContextInput) => Effect.Effect<SessionContextOutput, E>
+
+export type SessionContextInsightsOverviewInput = {
+  readonly sessionIDs: ReadonlyArray<Session.ID>
+  readonly from: number
+  readonly to: number
+}
+export type SessionContextInsightsOverviewOutput = {
+  readonly sessions: ReadonlyArray<{
+    readonly sessionID: Session.ID
+    readonly title: string
+    readonly parentID: Session.ID | null
+    readonly forkID: Session.ID | null
+    readonly running: boolean
+    readonly outcome: "succeeded" | "failed" | "interrupted" | null
+    readonly updated: number
+    readonly usage: {
+      readonly tokens: {
+        readonly input: number
+        readonly output: number
+        readonly reasoning: number
+        readonly cache: { readonly read: number; readonly write: number }
+      }
+      readonly cost: number & Brand.Brand<"Money.USD">
+    }
+    readonly latest: {
+      readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+      readonly sessionID: Session.ID
+      readonly kind: "primary" | "compaction" | "generate" | "title"
+      readonly agent: Agent.ID
+      readonly model: Model.Ref
+      readonly assistantMessageID?: SessionMessage.ID | undefined
+      readonly time: number
+      readonly boundary: "model-call-semantic-request"
+      readonly estimation: "text-characters-div-4"
+      readonly estimatedTokens: number
+      readonly composition: {
+        readonly system: number
+        readonly tools: number
+        readonly user: number
+        readonly inject: number
+        readonly assistant: number
+        readonly tool: number
+      }
+      readonly incomplete: boolean
+      readonly itemCount: number
+      readonly contextWindow?: number | undefined
+    } | null
+  }>
+  readonly days: ReadonlyArray<{
+    readonly date: string
+    readonly tokens: number
+    readonly cost: number & Brand.Brand<"Money.USD">
+    readonly settlements: number
+    readonly sessionIDs: ReadonlyArray<Session.ID>
+  }>
+  readonly range: { readonly from: number; readonly to: number }
+  readonly attribution: "settlement-utc"
+  readonly coverage: "available-durable-events"
+}
+export type SessionContextInsightsOverviewOperation<E = never> = (
+  input: SessionContextInsightsOverviewInput,
+) => Effect.Effect<SessionContextInsightsOverviewOutput, E>
+
+export type SessionContextInsightsAnalysisInput = {
+  readonly sessionID: Session.ID
+  readonly before?: number | undefined
+  readonly limit?: number | undefined
+}
+export type SessionContextInsightsAnalysisOutput = {
+  readonly points: ReadonlyArray<{
+    readonly request: {
+      readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+      readonly sessionID: Session.ID
+      readonly kind: "primary" | "compaction" | "generate" | "title"
+      readonly agent: Agent.ID
+      readonly model: Model.Ref
+      readonly assistantMessageID?: SessionMessage.ID | undefined
+      readonly time: number
+      readonly boundary: "model-call-semantic-request"
+      readonly estimation: "text-characters-div-4"
+      readonly estimatedTokens: number
+      readonly composition: {
+        readonly system: number
+        readonly tools: number
+        readonly user: number
+        readonly inject: number
+        readonly assistant: number
+        readonly tool: number
+      }
+      readonly incomplete: boolean
+      readonly itemCount: number
+      readonly contextWindow?: number | undefined
+    }
+    readonly seq: number
+    readonly delta: number | null
+    readonly turn: number
+    readonly status: "unknown" | "running" | "completed" | "failed" | "retried" | "interrupted"
+    readonly actual: {
+      readonly tokens: {
+        readonly input: number
+        readonly output: number
+        readonly reasoning: number
+        readonly cache: { readonly read: number; readonly write: number }
+      }
+      readonly cost: number & Brand.Brand<"Money.USD">
+    } | null
+    readonly elapsedMs: number | null
+    readonly firstContentMs: number | null
+    readonly modelMs: number | null
+    readonly toolMs: number | null
+  }>
+  readonly events: ReadonlyArray<{
+    readonly seq: number
+    readonly time: number
+    readonly type: "compaction" | "inject" | "skill" | "model" | "agent" | "execution"
+    readonly label: string
+  }>
+  readonly files: ReadonlyArray<{
+    readonly path: string
+    readonly action: "read" | "write" | "search"
+    readonly target: "file" | "scope"
+    readonly calls: number
+    readonly failed: number
+    readonly nested: number
+    readonly lastSeq: number
+  }>
+  readonly eventsTruncated: boolean
+  readonly next?: number | undefined
+  readonly scope: "request-page"
+}
+export type SessionContextInsightsAnalysisOperation<E = never> = (
+  input: SessionContextInsightsAnalysisInput,
+) => Effect.Effect<SessionContextInsightsAnalysisOutput, E>
+
+export type SessionContextInsightsFamilyInput = { readonly sessionID: Session.ID }
+export type SessionContextInsightsFamilyOutput = {
+  readonly rootID: Session.ID
+  readonly members: ReadonlyArray<{
+    readonly sessionID: Session.ID
+    readonly title: string
+    readonly parentID: Session.ID | null
+    readonly forkID: Session.ID | null
+    readonly running: boolean
+    readonly outcome: "succeeded" | "failed" | "interrupted" | null
+    readonly updated: number
+    readonly usage: {
+      readonly tokens: {
+        readonly input: number
+        readonly output: number
+        readonly reasoning: number
+        readonly cache: { readonly read: number; readonly write: number }
+      }
+      readonly cost: number & Brand.Brand<"Money.USD">
+    }
+    readonly latest: {
+      readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+      readonly sessionID: Session.ID
+      readonly kind: "primary" | "compaction" | "generate" | "title"
+      readonly agent: Agent.ID
+      readonly model: Model.Ref
+      readonly assistantMessageID?: SessionMessage.ID | undefined
+      readonly time: number
+      readonly boundary: "model-call-semantic-request"
+      readonly estimation: "text-characters-div-4"
+      readonly estimatedTokens: number
+      readonly composition: {
+        readonly system: number
+        readonly tools: number
+        readonly user: number
+        readonly inject: number
+        readonly assistant: number
+        readonly tool: number
+      }
+      readonly incomplete: boolean
+      readonly itemCount: number
+      readonly contextWindow?: number | undefined
+    } | null
+  }>
+  readonly complete: boolean
+}
+export type SessionContextInsightsFamilyOperation<E = never> = (
+  input: SessionContextInsightsFamilyInput,
+) => Effect.Effect<SessionContextInsightsFamilyOutput, E>
+
+export type SessionContextInsightsSummaryInput = { readonly sessionID: Session.ID }
+export type SessionContextInsightsSummaryOutput = {
+  readonly capturedRequests: number
+  readonly latest: {
+    readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+    readonly sessionID: Session.ID
+    readonly kind: "primary" | "compaction" | "generate" | "title"
+    readonly agent: Agent.ID
+    readonly model: Model.Ref
+    readonly assistantMessageID?: SessionMessage.ID | undefined
+    readonly time: number
+    readonly boundary: "model-call-semantic-request"
+    readonly estimation: "text-characters-div-4"
+    readonly estimatedTokens: number
+    readonly composition: {
+      readonly system: number
+      readonly tools: number
+      readonly user: number
+      readonly inject: number
+      readonly assistant: number
+      readonly tool: number
+    }
+    readonly incomplete: boolean
+    readonly itemCount: number
+    readonly contextWindow?: number | undefined
+  } | null
+  readonly history: "captured-requests-only"
+}
+export type SessionContextInsightsSummaryOperation<E = never> = (
+  input: SessionContextInsightsSummaryInput,
+) => Effect.Effect<SessionContextInsightsSummaryOutput, E>
+
+export type SessionContextInsightsRequestsInput = {
+  readonly sessionID: Session.ID
+  readonly before?: number | undefined
+  readonly limit?: number | undefined
+}
+export type SessionContextInsightsRequestsOutput = {
+  readonly data: ReadonlyArray<{
+    readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+    readonly sessionID: Session.ID
+    readonly kind: "primary" | "compaction" | "generate" | "title"
+    readonly agent: Agent.ID
+    readonly model: Model.Ref
+    readonly assistantMessageID?: SessionMessage.ID | undefined
+    readonly time: number
+    readonly boundary: "model-call-semantic-request"
+    readonly estimation: "text-characters-div-4"
+    readonly estimatedTokens: number
+    readonly composition: {
+      readonly system: number
+      readonly tools: number
+      readonly user: number
+      readonly inject: number
+      readonly assistant: number
+      readonly tool: number
+    }
+    readonly incomplete: boolean
+    readonly itemCount: number
+    readonly contextWindow?: number | undefined
+  }>
+  readonly next?: number | undefined
+}
+export type SessionContextInsightsRequestsOperation<E = never> = (
+  input: SessionContextInsightsRequestsInput,
+) => Effect.Effect<SessionContextInsightsRequestsOutput, E>
+
+export type SessionContextInsightsRequestInput = {
+  readonly sessionID: Session.ID
+  readonly requestID: string & Brand.Brand<"SessionContextInsights.RequestID">
+}
+export type SessionContextInsightsRequestOutput = {
+  readonly request: {
+    readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+    readonly sessionID: Session.ID
+    readonly kind: "primary" | "compaction" | "generate" | "title"
+    readonly agent: Agent.ID
+    readonly model: Model.Ref
+    readonly assistantMessageID?: SessionMessage.ID | undefined
+    readonly time: number
+    readonly boundary: "model-call-semantic-request"
+    readonly estimation: "text-characters-div-4"
+    readonly estimatedTokens: number
+    readonly composition: {
+      readonly system: number
+      readonly tools: number
+      readonly user: number
+      readonly inject: number
+      readonly assistant: number
+      readonly tool: number
+    }
+    readonly incomplete: boolean
+    readonly itemCount: number
+    readonly contextWindow?: number | undefined
+  }
+  readonly items: ReadonlyArray<{
+    readonly index: number
+    readonly category: "system" | "tools" | "user" | "inject" | "assistant" | "tool"
+    readonly name: string
+    readonly estimatedTokens: number
+    readonly bytes: number
+    readonly hash?: string | undefined
+    readonly omitted?: "size-limit" | "opaque-content" | "unsupported-content" | undefined
+  }>
+}
+export type SessionContextInsightsRequestOperation<E = never> = (
+  input: SessionContextInsightsRequestInput,
+) => Effect.Effect<SessionContextInsightsRequestOutput, E>
+
+export type SessionContextInsightsContentInput = {
+  readonly sessionID: Session.ID
+  readonly requestID: string & Brand.Brand<"SessionContextInsights.RequestID">
+  readonly index: number
+}
+export type SessionContextInsightsContentOutput = {
+  readonly item: {
+    readonly index: number
+    readonly category: "system" | "tools" | "user" | "inject" | "assistant" | "tool"
+    readonly name: string
+    readonly estimatedTokens: number
+    readonly bytes: number
+    readonly hash?: string | undefined
+    readonly omitted?: "size-limit" | "opaque-content" | "unsupported-content" | undefined
+  }
+  readonly content: string | null
+}
+export type SessionContextInsightsContentOperation<E = never> = (
+  input: SessionContextInsightsContentInput,
+) => Effect.Effect<SessionContextInsightsContentOutput, E>
 
 export type SessionCommandDefinitionsListInput = { readonly sessionID: Session.ID }
 export type SessionCommandDefinitionsListOutput = ReadonlyArray<{
@@ -555,6 +882,38 @@ export type SessionKillSandboxOperation<E = never> = (
   input: SessionKillSandboxInput,
 ) => Effect.Effect<SessionKillSandboxOutput, E>
 
+export type SessionSnapshotCreateInput = { readonly sessionID: Session.ID }
+export type SessionSnapshotCreateOutput = { readonly snapshotID: string; readonly state: string }
+export type SessionSnapshotCreateOperation<E = never> = (
+  input: SessionSnapshotCreateInput,
+) => Effect.Effect<SessionSnapshotCreateOutput, E>
+
+export type SessionSnapshotGetInput = { readonly sessionID: Session.ID }
+export type SessionSnapshotGetOutput = {
+  readonly id: string
+  readonly state: string
+  readonly reason: string | null
+  readonly createdAt: number
+  readonly restoredCount: number
+} | null
+export type SessionSnapshotGetOperation<E = never> = (
+  input: SessionSnapshotGetInput,
+) => Effect.Effect<SessionSnapshotGetOutput, E>
+
+export type SessionSnapshotStatsInput = { readonly sessionID: Session.ID }
+export type SessionSnapshotStatsOutput = {
+  readonly snapshots: { readonly [x: string]: number }
+  readonly total: number
+  readonly restoredTotal: number
+  readonly operations: {
+    readonly destroy: { readonly byState: { readonly [x: string]: number }; readonly total: number }
+    readonly refresh: { readonly byState: { readonly [x: string]: number }; readonly total: number }
+  }
+}
+export type SessionSnapshotStatsOperation<E = never> = (
+  input: SessionSnapshotStatsInput,
+) => Effect.Effect<SessionSnapshotStatsOutput, E>
+
 export type SessionDiffInput = {
   readonly sessionID: Session.ID
   readonly from?: SessionMessage.ID | undefined
@@ -563,6 +922,23 @@ export type SessionDiffInput = {
 }
 export type SessionDiffOutput = ReadonlyArray<FileDiff.Info>
 export type SessionDiffOperation<E = never> = (input: SessionDiffInput) => Effect.Effect<SessionDiffOutput, E>
+
+export type SessionAgentDefinitionsPermissionPresetInput = {
+  readonly sessionID: Session.ID
+  readonly agentID: Agent.ID
+  readonly preset: Permission.Preset
+}
+export type SessionAgentDefinitionsPermissionPresetOutput = {
+  readonly preset: Permission.Preset
+  readonly agent: {
+    readonly agent: Agent.Info
+    readonly source: "global" | "session" | "sandbox"
+    readonly sourcePath?: string | undefined
+  }
+}
+export type SessionAgentDefinitionsPermissionPresetOperation<E = never> = (
+  input: SessionAgentDefinitionsPermissionPresetInput,
+) => Effect.Effect<SessionAgentDefinitionsPermissionPresetOutput, E>
 
 export type SessionInboxListInput = { readonly sessionID: Session.ID }
 export type SessionInboxListOutput = ReadonlyArray<SessionInbox.Info>
@@ -753,6 +1129,50 @@ export type SessionToolDefinitionsClearOutput = void
 export type SessionToolDefinitionsClearOperation<E = never> = (
   input: SessionToolDefinitionsClearInput,
 ) => Effect.Effect<SessionToolDefinitionsClearOutput, E>
+
+export type SessionPluginDefinitionsListInput = { readonly sessionID: Session.ID }
+export type SessionPluginDefinitionsListOutput = ReadonlyArray<{
+  readonly id: string & Brand.Brand<"SessionPlugin.ID">
+  readonly name: string & Brand.Brand<"SessionPlugin.Name">
+  readonly description: string
+  readonly source: { readonly type: "code" } | { readonly type: "npm"; readonly spec: string }
+  readonly time: { readonly created: number; readonly updated: number }
+}>
+export type SessionPluginDefinitionsListOperation<E = never> = (
+  input: SessionPluginDefinitionsListInput,
+) => Effect.Effect<SessionPluginDefinitionsListOutput, E>
+
+export type SessionPluginDefinitionsCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionPlugin.Name">
+  readonly description: string
+  readonly source: { readonly type: "code"; readonly code: string } | { readonly type: "npm"; readonly spec: string }
+}
+export type SessionPluginDefinitionsCreateOutput = {
+  readonly id: string & Brand.Brand<"SessionPlugin.ID">
+  readonly name: string & Brand.Brand<"SessionPlugin.Name">
+  readonly description: string
+  readonly source: { readonly type: "code" } | { readonly type: "npm"; readonly spec: string }
+  readonly time: { readonly created: number; readonly updated: number }
+}
+export type SessionPluginDefinitionsCreateOperation<E = never> = (
+  input: SessionPluginDefinitionsCreateInput,
+) => Effect.Effect<SessionPluginDefinitionsCreateOutput, E>
+
+export type SessionPluginDefinitionsDeleteInput = {
+  readonly sessionID: Session.ID
+  readonly name: string & Brand.Brand<"SessionPlugin.Name">
+}
+export type SessionPluginDefinitionsDeleteOutput = void
+export type SessionPluginDefinitionsDeleteOperation<E = never> = (
+  input: SessionPluginDefinitionsDeleteInput,
+) => Effect.Effect<SessionPluginDefinitionsDeleteOutput, E>
+
+export type SessionPluginDefinitionsClearInput = { readonly sessionID: Session.ID }
+export type SessionPluginDefinitionsClearOutput = void
+export type SessionPluginDefinitionsClearOperation<E = never> = (
+  input: SessionPluginDefinitionsClearInput,
+) => Effect.Effect<SessionPluginDefinitionsClearOutput, E>
 
 export type SessionSkillDefinitionsCreateInput = {
   readonly sessionID: Session.ID
@@ -987,6 +1407,45 @@ export type SessionLogOutput =
               }
             | undefined
           readonly data: { readonly sessionID: Session.ID; readonly idle: number }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.context.captured"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?:
+            | {
+                readonly directory: AbsolutePath
+                readonly workspaceID?: (string & Brand.Brand<"Workspace.ID">) | undefined
+              }
+            | undefined
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly request: {
+              readonly id: string & Brand.Brand<"SessionContextInsights.RequestID">
+              readonly sessionID: Session.ID
+              readonly kind: "primary" | "compaction" | "generate" | "title"
+              readonly agent: Agent.ID
+              readonly model: Model.Ref
+              readonly assistantMessageID?: SessionMessage.ID | undefined
+              readonly time: number
+              readonly boundary: "model-call-semantic-request"
+              readonly estimation: "text-characters-div-4"
+              readonly estimatedTokens: number
+              readonly composition: {
+                readonly system: number
+                readonly tools: number
+                readonly user: number
+                readonly inject: number
+                readonly assistant: number
+                readonly tool: number
+              }
+              readonly incomplete: boolean
+              readonly itemCount: number
+              readonly contextWindow?: number | undefined
+            }
+          }
         }
       | {
           readonly id: Event.ID
@@ -1277,6 +1736,7 @@ export type SessionLogOutput =
           readonly data: {
             readonly sessionID: Session.ID
             readonly assistantMessageID: SessionMessage.ID
+            readonly promptMessageID?: SessionMessage.ID | undefined
             readonly agent: Agent.ID
             readonly model: Model.Ref
             readonly snapshot?: (string & Brand.Brand<"Snapshot.ID">) | undefined
@@ -1778,6 +2238,72 @@ export type SessionLogOutput =
   | EventLog.Synced
 export type SessionLogOperation<E = never> = (input: SessionLogInput) => Stream.Stream<SessionLogOutput, E>
 
+export type SessionLogsInput = {
+  readonly sessionID: Session.ID
+  readonly limit?: number | undefined
+  readonly after?: (string & Brand.Brand<"Log.ID">) | undefined
+}
+export type SessionLogsOutput = ReadonlyArray<{
+  readonly id: string & Brand.Brand<"Log.ID">
+  readonly sessionID: Session.ID
+  readonly source:
+    | "session.create"
+    | "session.update"
+    | "session.move"
+    | "session.fork"
+    | "session.import"
+    | "session.interrupt"
+    | "session.background"
+    | "session.killSandbox"
+    | "session.keepAlive"
+    | "session.snapshot.create"
+    | "session.view"
+    | "session.environment"
+    | "session.permissions"
+    | "session.terminal.create"
+    | "session.prompt"
+    | "session.synthetic"
+    | "session.command"
+    | "session.skill"
+    | "session.shell"
+    | "session.compact"
+    | "session.revert.stage"
+    | "session.revert.commit"
+    | "session.revert.clear"
+    | "session.agentDefinition.create"
+    | "session.agentDefinition.delete"
+    | "session.agentDefinition.clear"
+    | "session.agentDefinition.permissionPreset"
+    | "session.commandDefinition.create"
+    | "session.commandDefinition.delete"
+    | "session.commandDefinition.clear"
+    | "session.toolDefinition.create"
+    | "session.toolDefinition.delete"
+    | "session.toolDefinition.clear"
+    | "session.skillDefinition.create"
+    | "session.skillDefinition.delete"
+    | "session.skillDefinition.clear"
+    | "session.mcpDefinition.create"
+    | "session.mcpDefinition.delete"
+    | "session.mcpDefinition.clear"
+    | "session.pluginDefinition.create"
+    | "session.pluginDefinition.delete"
+    | "session.pluginDefinition.clear"
+    | "session.agentsMd.update"
+    | "session.agentsMd.remove"
+    | "permission.respond"
+    | "session.form.reply"
+    | "session.form.cancel"
+    | "session.inbox.update"
+    | "session.inbox.cancel"
+    | "session.agent.select"
+    | "session.model.select"
+  readonly detail?: { readonly [x: string]: unknown } | undefined
+  readonly traceId?: string | undefined
+  readonly time: { readonly created: number }
+}>
+export type SessionLogsOperation<E = never> = (input: SessionLogsInput) => Effect.Effect<SessionLogsOutput, E>
+
 export type SessionInterruptInput = { readonly sessionID: Session.ID; readonly resume?: boolean | undefined }
 export type SessionInterruptOutput = { readonly interrupted: boolean }
 export type SessionInterruptOperation<E = never> = (
@@ -1868,6 +2394,8 @@ export type SessionPromptStreamInput = {
           }
       )
     | undefined
+  readonly preset?: Permission.Preset | undefined
+  readonly permissions?: Permission.Ruleset | undefined
   readonly model?: Model.Ref | undefined
   readonly userName?: string | undefined
   readonly userId?: string | undefined
@@ -1894,6 +2422,7 @@ export interface SessionApi<E = never> {
   readonly switchModel: SessionSwitchModelOperation<E>
   readonly update: SessionUpdateOperation<E>
   readonly move: SessionMoveOperation<E>
+  readonly permissions: { readonly preset: SessionPermissionsPresetOperation<E> }
   readonly prompt: SessionPromptOperation<E>
   readonly command: SessionCommandOperation<E>
   readonly skill: SessionSkillOperation<E>
@@ -1907,6 +2436,15 @@ export interface SessionApi<E = never> {
     readonly commit: SessionRevertCommitOperation<E>
   }
   readonly context: SessionContextOperation<E>
+  readonly contextInsights: {
+    readonly overview: SessionContextInsightsOverviewOperation<E>
+    readonly analysis: SessionContextInsightsAnalysisOperation<E>
+    readonly family: SessionContextInsightsFamilyOperation<E>
+    readonly summary: SessionContextInsightsSummaryOperation<E>
+    readonly requests: SessionContextInsightsRequestsOperation<E>
+    readonly request: SessionContextInsightsRequestOperation<E>
+    readonly content: SessionContextInsightsContentOperation<E>
+  }
   readonly commandDefinitions: {
     readonly list: SessionCommandDefinitionsListOperation<E>
     readonly create: SessionCommandDefinitionsCreateOperation<E>
@@ -1920,11 +2458,17 @@ export interface SessionApi<E = never> {
     readonly delete: SessionAgentDefinitionsDeleteOperation<E>
     readonly clear: SessionAgentDefinitionsClearOperation<E>
     readonly refresh: SessionAgentDefinitionsRefreshOperation<E>
+    readonly permissionPreset: SessionAgentDefinitionsPermissionPresetOperation<E>
   }
   readonly keepAlive: SessionKeepAliveOperation<E>
   readonly keepAliveStatus: SessionKeepAliveStatusOperation<E>
   readonly sandbox: SessionSandboxOperation<E>
   readonly killSandbox: SessionKillSandboxOperation<E>
+  readonly snapshot: {
+    readonly create: SessionSnapshotCreateOperation<E>
+    readonly get: SessionSnapshotGetOperation<E>
+    readonly stats: SessionSnapshotStatsOperation<E>
+  }
   readonly diff: SessionDiffOperation<E>
   readonly inbox: {
     readonly list: SessionInboxListOperation<E>
@@ -1962,8 +2506,15 @@ export interface SessionApi<E = never> {
     readonly delete: SessionToolDefinitionsDeleteOperation<E>
     readonly clear: SessionToolDefinitionsClearOperation<E>
   }
+  readonly pluginDefinitions: {
+    readonly list: SessionPluginDefinitionsListOperation<E>
+    readonly create: SessionPluginDefinitionsCreateOperation<E>
+    readonly delete: SessionPluginDefinitionsDeleteOperation<E>
+    readonly clear: SessionPluginDefinitionsClearOperation<E>
+  }
   readonly generate: SessionGenerateOperation<E>
   readonly log: SessionLogOperation<E>
+  readonly logs: SessionLogsOperation<E>
   readonly interrupt: SessionInterruptOperation<E>
   readonly background: SessionBackgroundOperation<E>
   readonly message: { readonly get: SessionMessageGetOperation<E> }
@@ -2411,6 +2962,437 @@ export interface CredentialApi<E = never> {
   readonly update: CredentialUpdateOperation<E>
   readonly activate: CredentialActivateOperation<E>
   readonly remove: CredentialRemoveOperation<E>
+}
+
+export type ConnectorAppMcpListInput = { readonly sessionID: Session.ID }
+export type ConnectorAppMcpListOutput = {
+  readonly deployments: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly service: string
+    readonly connectionId: string | null
+    readonly status: string
+    readonly revision: number
+    readonly tools: ReadonlyArray<{ readonly actionId: string; readonly name: string; readonly contractHash: string }>
+    readonly tokenPrefix: string
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }>
+}
+export type ConnectorAppMcpListOperation<E = never> = (
+  input: ConnectorAppMcpListInput,
+) => Effect.Effect<ConnectorAppMcpListOutput, E>
+
+export type ConnectorAppMcpCreateInput = {
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly service: string
+  readonly connectionId?: string | undefined
+  readonly actionIds: ReadonlyArray<string>
+}
+export type ConnectorAppMcpCreateOutput = {
+  readonly deployment: {
+    readonly id: string
+    readonly name: string
+    readonly service: string
+    readonly connectionId: string | null
+    readonly status: string
+    readonly revision: number
+    readonly tools: ReadonlyArray<{ readonly actionId: string; readonly name: string; readonly contractHash: string }>
+    readonly tokenPrefix: string
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }
+  readonly token: string
+}
+export type ConnectorAppMcpCreateOperation<E = never> = (
+  input: ConnectorAppMcpCreateInput,
+) => Effect.Effect<ConnectorAppMcpCreateOutput, E>
+
+export type ConnectorAppMcpUpdateInput = {
+  readonly sessionID: Session.ID
+  readonly deploymentID: string
+  readonly revision: number
+  readonly name?: string | undefined
+  readonly status?: "active" | "disabled" | undefined
+  readonly actionIds?: ReadonlyArray<string> | undefined
+  readonly confirmContracts?: boolean | undefined
+}
+export type ConnectorAppMcpUpdateOutput = {
+  readonly id: string
+  readonly name: string
+  readonly service: string
+  readonly connectionId: string | null
+  readonly status: string
+  readonly revision: number
+  readonly tools: ReadonlyArray<{ readonly actionId: string; readonly name: string; readonly contractHash: string }>
+  readonly tokenPrefix: string
+  readonly timeCreated: number
+  readonly timeUpdated: number
+}
+export type ConnectorAppMcpUpdateOperation<E = never> = (
+  input: ConnectorAppMcpUpdateInput,
+) => Effect.Effect<ConnectorAppMcpUpdateOutput, E>
+
+export type ConnectorAppMcpRotateInput = {
+  readonly sessionID: Session.ID
+  readonly deploymentID: string
+  readonly revision: number
+}
+export type ConnectorAppMcpRotateOutput = {
+  readonly deployment: {
+    readonly id: string
+    readonly name: string
+    readonly service: string
+    readonly connectionId: string | null
+    readonly status: string
+    readonly revision: number
+    readonly tools: ReadonlyArray<{ readonly actionId: string; readonly name: string; readonly contractHash: string }>
+    readonly tokenPrefix: string
+    readonly timeCreated: number
+    readonly timeUpdated: number
+  }
+  readonly token: string
+}
+export type ConnectorAppMcpRotateOperation<E = never> = (
+  input: ConnectorAppMcpRotateInput,
+) => Effect.Effect<ConnectorAppMcpRotateOutput, E>
+
+export type ConnectorAppMcpRemoveInput = { readonly sessionID: Session.ID; readonly deploymentID: string }
+export type ConnectorAppMcpRemoveOutput = void
+export type ConnectorAppMcpRemoveOperation<E = never> = (
+  input: ConnectorAppMcpRemoveInput,
+) => Effect.Effect<ConnectorAppMcpRemoveOutput, E>
+
+export type ConnectorAppMcpCallInput = { readonly deploymentID: string }
+export type ConnectorAppMcpCallOutput = Schema.Json
+export type ConnectorAppMcpCallOperation<E = never> = (
+  input: ConnectorAppMcpCallInput,
+) => Effect.Effect<ConnectorAppMcpCallOutput, E>
+
+export type ConnectorAppMcpListenInput = { readonly deploymentID: string }
+export type ConnectorAppMcpListenOutput = Schema.Json
+export type ConnectorAppMcpListenOperation<E = never> = (
+  input: ConnectorAppMcpListenInput,
+) => Effect.Effect<ConnectorAppMcpListenOutput, E>
+
+export type ConnectorConnectionCreateInput = {
+  readonly sessionID: Session.ID
+  readonly service: string
+  readonly authType: "api_key" | "custom_credential"
+  readonly values: { readonly [x: string]: string }
+  readonly alias?: string | undefined
+}
+export type ConnectorConnectionCreateOutput = {
+  readonly id: string & Brand.Brand<"ConnectorConnection.ID">
+  readonly service: string
+  readonly alias: string
+  readonly authType: "api_key" | "custom_credential" | "oauth2"
+  readonly status: "creating" | "active" | "deleting" | "deleted"
+  readonly engineConnectionID: string
+  readonly engineStatus: string
+  readonly accountLabel?: string | undefined
+  readonly time: { readonly created: number; readonly updated: number }
+}
+export type ConnectorConnectionCreateOperation<E = never> = (
+  input: ConnectorConnectionCreateInput,
+) => Effect.Effect<ConnectorConnectionCreateOutput, E>
+
+export type ConnectorConnectionListInput = { readonly sessionID: Session.ID }
+export type ConnectorConnectionListOutput = {
+  readonly connections: ReadonlyArray<{
+    readonly id: string & Brand.Brand<"ConnectorConnection.ID">
+    readonly service: string
+    readonly alias: string
+    readonly authType: "api_key" | "custom_credential" | "oauth2"
+    readonly status: "creating" | "active" | "deleting" | "deleted"
+    readonly engineConnectionID: string
+    readonly engineStatus: string
+    readonly accountLabel?: string | undefined
+    readonly time: { readonly created: number; readonly updated: number }
+  }>
+}
+export type ConnectorConnectionListOperation<E = never> = (
+  input: ConnectorConnectionListInput,
+) => Effect.Effect<ConnectorConnectionListOutput, E>
+
+export type ConnectorConnectionRemoveInput = {
+  readonly sessionID: Session.ID
+  readonly connectionID: string & Brand.Brand<"ConnectorConnection.ID">
+}
+export type ConnectorConnectionRemoveOutput = void
+export type ConnectorConnectionRemoveOperation<E = never> = (
+  input: ConnectorConnectionRemoveInput,
+) => Effect.Effect<ConnectorConnectionRemoveOutput, E>
+
+export type ConnectorMcpAttachInput = { readonly sessionID: Session.ID }
+export type ConnectorMcpAttachOutput = {
+  readonly name: string & Brand.Brand<"SessionMcp.Name">
+  readonly config:
+    | Mcp.LocalConfig
+    | {
+        readonly type: "remote"
+        readonly url: string
+        readonly headers?: { readonly [x: string]: string } | undefined
+        readonly oauth: false
+        readonly disabled?: boolean | undefined
+        readonly codemode?: boolean | undefined
+        readonly timeout?: Mcp.TimeoutConfig | undefined
+        readonly protocol?: Mcp.Protocol | undefined
+      }
+}
+export type ConnectorMcpAttachOperation<E = never> = (
+  input: ConnectorMcpAttachInput,
+) => Effect.Effect<ConnectorMcpAttachOutput, E>
+
+export type ConnectorMcpCallInput = { readonly authorization: string; readonly payload: Schema.Json }
+export type ConnectorMcpCallOutput = { readonly status: number; readonly body: Schema.Json }
+export type ConnectorMcpCallOperation<E = never> = (
+  input: ConnectorMcpCallInput,
+) => Effect.Effect<ConnectorMcpCallOutput, E>
+
+export type ConnectorOauthStartInput = {
+  readonly sessionID: Session.ID
+  readonly service: string
+  readonly alias?: string | undefined
+  readonly authorizationOptionIds?: ReadonlyArray<string> | undefined
+}
+export type ConnectorOauthStartOutput = {
+  readonly authorizationUrl: string
+  readonly connectionRequestID: string
+  readonly expiresAt: string
+}
+export type ConnectorOauthStartOperation<E = never> = (
+  input: ConnectorOauthStartInput,
+) => Effect.Effect<ConnectorOauthStartOutput, E>
+
+export type ConnectorOauthCompleteInput = {
+  readonly sessionID: Session.ID
+  readonly connectionRequestID: string
+  readonly alias?: string | undefined
+}
+export type ConnectorOauthCompleteOutput = {
+  readonly status: string
+  readonly errorCode?: string | undefined
+  readonly connection?:
+    | {
+        readonly id: string & Brand.Brand<"ConnectorConnection.ID">
+        readonly service: string
+        readonly alias: string
+        readonly authType: "api_key" | "custom_credential" | "oauth2"
+        readonly status: "creating" | "active" | "deleting" | "deleted"
+        readonly engineConnectionID: string
+        readonly engineStatus: string
+        readonly accountLabel?: string | undefined
+        readonly time: { readonly created: number; readonly updated: number }
+      }
+    | undefined
+}
+export type ConnectorOauthCompleteOperation<E = never> = (
+  input: ConnectorOauthCompleteInput,
+) => Effect.Effect<ConnectorOauthCompleteOutput, E>
+
+export type ConnectorOauthClientInput = {
+  readonly service: string
+  readonly clientId: string
+  readonly clientSecret: string
+  readonly extra?: { readonly [x: string]: string } | undefined
+  readonly requestedScopes?: ReadonlyArray<string> | undefined
+  readonly redirectUri?: string | undefined
+}
+export type ConnectorOauthClientOutput = void
+export type ConnectorOauthClientOperation<E = never> = (
+  input: ConnectorOauthClientInput,
+) => Effect.Effect<ConnectorOauthClientOutput, E>
+
+export type ConnectorOauthCallbackOutput = void
+export type ConnectorOauthCallbackOperation<E = never> = () => Effect.Effect<ConnectorOauthCallbackOutput, E>
+
+export type ConnectorConnectionReconnectInput = {
+  readonly sessionID: Session.ID
+  readonly connectionID: string & Brand.Brand<"ConnectorConnection.ID">
+}
+export type ConnectorConnectionReconnectOutput = {
+  readonly authorizationUrl: string
+  readonly connectionRequestID: string
+}
+export type ConnectorConnectionReconnectOperation<E = never> = (
+  input: ConnectorConnectionReconnectInput,
+) => Effect.Effect<ConnectorConnectionReconnectOutput, E>
+
+export type ConnectorRunsInput = { readonly cursor?: string | undefined; readonly limit?: number | undefined }
+export type ConnectorRunsOutput = {
+  readonly items: ReadonlyArray<Schema.Json>
+  readonly nextCursor?: string | undefined
+}
+export type ConnectorRunsOperation<E = never> = (input?: ConnectorRunsInput) => Effect.Effect<ConnectorRunsOutput, E>
+
+export type ConnectorProvidersInput = {
+  readonly service?: string | undefined
+  readonly authType?: "no_auth" | "api_key" | "custom_credential" | "oauth2" | undefined
+  readonly category?: string | undefined
+}
+export type ConnectorProvidersOutput = {
+  readonly providers: ReadonlyArray<{
+    readonly service: string
+    readonly displayName: string
+    readonly description?: string | undefined
+    readonly categories: ReadonlyArray<string>
+    readonly authTypes: ReadonlyArray<"no_auth" | "api_key" | "custom_credential" | "oauth2">
+    readonly iconUrl?: string | undefined
+    readonly homepageUrl?: string | undefined
+  }>
+}
+export type ConnectorProvidersOperation<E = never> = (
+  input?: ConnectorProvidersInput,
+) => Effect.Effect<ConnectorProvidersOutput, E>
+
+export type ConnectorProviderInput = { readonly service: string }
+export type ConnectorProviderOutput = Schema.Json
+export type ConnectorProviderOperation<E = never> = (
+  input: ConnectorProviderInput,
+) => Effect.Effect<ConnectorProviderOutput, E>
+
+export type ConnectorCategoriesOutput = {
+  readonly categories: ReadonlyArray<{
+    readonly id: string
+    readonly displayName: string
+    readonly providerCount: number
+  }>
+}
+export type ConnectorCategoriesOperation<E = never> = () => Effect.Effect<ConnectorCategoriesOutput, E>
+
+export type ConnectorProxyInput = {
+  readonly service: string
+  readonly sessionID: Session.ID
+  readonly endpoint: string
+  readonly method: string
+  readonly query?: { readonly [x: string]: string } | undefined
+  readonly headers?: { readonly [x: string]: string } | undefined
+  readonly body?: Schema.Json | undefined
+  readonly connectionID?: (string & Brand.Brand<"ConnectorConnection.ID">) | undefined
+}
+export type ConnectorProxyOutput = Schema.Json
+export type ConnectorProxyOperation<E = never> = (input: ConnectorProxyInput) => Effect.Effect<ConnectorProxyOutput, E>
+
+export type ConnectorFileUploadInput = {
+  readonly sessionID: Session.ID
+  readonly name: string
+  readonly mimeType?: string | undefined
+  readonly data: string
+}
+export type ConnectorFileUploadOutput = {
+  readonly fileId: string
+  readonly downloadUrl: string
+  readonly sizeBytes: number
+  readonly name: string
+  readonly mimeType: string
+}
+export type ConnectorFileUploadOperation<E = never> = (
+  input: ConnectorFileUploadInput,
+) => Effect.Effect<ConnectorFileUploadOutput, E>
+
+export type ConnectorFileDownloadInput = { readonly fileID: string }
+export type ConnectorFileDownloadOutput = globalThis.Uint8Array
+export type ConnectorFileDownloadOperation<E = never> = (
+  input: ConnectorFileDownloadInput,
+) => Effect.Effect<ConnectorFileDownloadOutput, E>
+
+export type ConnectorTriggerCreateInput = {
+  readonly sessionID: Session.ID
+  readonly service: string
+  readonly triggerId: string
+  readonly config?: Schema.Json | undefined
+  readonly connectionID?: (string & Brand.Brand<"ConnectorConnection.ID">) | undefined
+}
+export type ConnectorTriggerCreateOutput = {
+  readonly id: string & Brand.Brand<"ConnectorTrigger.ID">
+  readonly service: string
+  readonly triggerId: string
+  readonly status: string
+  readonly config: Schema.Json
+  readonly nextRunAt: number
+  readonly lastResult?: Schema.Json | undefined
+  readonly time: { readonly created: number; readonly updated: number }
+}
+export type ConnectorTriggerCreateOperation<E = never> = (
+  input: ConnectorTriggerCreateInput,
+) => Effect.Effect<ConnectorTriggerCreateOutput, E>
+
+export type ConnectorTriggerListInput = { readonly sessionID: Session.ID }
+export type ConnectorTriggerListOutput = {
+  readonly triggers: ReadonlyArray<{
+    readonly id: string & Brand.Brand<"ConnectorTrigger.ID">
+    readonly service: string
+    readonly triggerId: string
+    readonly status: string
+    readonly config: Schema.Json
+    readonly nextRunAt: number
+    readonly lastResult?: Schema.Json | undefined
+    readonly time: { readonly created: number; readonly updated: number }
+  }>
+}
+export type ConnectorTriggerListOperation<E = never> = (
+  input: ConnectorTriggerListInput,
+) => Effect.Effect<ConnectorTriggerListOutput, E>
+
+export type ConnectorTriggerCancelInput = {
+  readonly sessionID: Session.ID
+  readonly triggerID: string & Brand.Brand<"ConnectorTrigger.ID">
+}
+export type ConnectorTriggerCancelOutput = void
+export type ConnectorTriggerCancelOperation<E = never> = (
+  input: ConnectorTriggerCancelInput,
+) => Effect.Effect<ConnectorTriggerCancelOutput, E>
+
+export type ConnectorTriggerWebhookInput = { readonly scheduleID: string & Brand.Brand<"ConnectorTrigger.ID"> }
+export type ConnectorTriggerWebhookOutput = void
+export type ConnectorTriggerWebhookOperation<E = never> = (
+  input: ConnectorTriggerWebhookInput,
+) => Effect.Effect<ConnectorTriggerWebhookOutput, E>
+
+export type ConnectorReconcileOutput = { readonly removed: number }
+export type ConnectorReconcileOperation<E = never> = () => Effect.Effect<ConnectorReconcileOutput, E>
+
+export interface ConnectorApi<E = never> {
+  readonly appMcp: {
+    readonly list: ConnectorAppMcpListOperation<E>
+    readonly create: ConnectorAppMcpCreateOperation<E>
+    readonly update: ConnectorAppMcpUpdateOperation<E>
+    readonly rotate: ConnectorAppMcpRotateOperation<E>
+    readonly remove: ConnectorAppMcpRemoveOperation<E>
+    readonly call: ConnectorAppMcpCallOperation<E>
+    readonly listen: ConnectorAppMcpListenOperation<E>
+  }
+  readonly connection: {
+    readonly create: ConnectorConnectionCreateOperation<E>
+    readonly list: ConnectorConnectionListOperation<E>
+    readonly remove: ConnectorConnectionRemoveOperation<E>
+    readonly reconnect: ConnectorConnectionReconnectOperation<E>
+  }
+  readonly mcp: { readonly attach: ConnectorMcpAttachOperation<E>; readonly call: ConnectorMcpCallOperation<E> }
+  readonly oauth: {
+    readonly start: ConnectorOauthStartOperation<E>
+    readonly complete: ConnectorOauthCompleteOperation<E>
+    readonly client: ConnectorOauthClientOperation<E>
+    readonly callback: ConnectorOauthCallbackOperation<E>
+  }
+  readonly runs: ConnectorRunsOperation<E>
+  readonly providers: ConnectorProvidersOperation<E>
+  readonly provider: ConnectorProviderOperation<E>
+  readonly categories: ConnectorCategoriesOperation<E>
+  readonly proxy: ConnectorProxyOperation<E>
+  readonly file: {
+    readonly upload: ConnectorFileUploadOperation<E>
+    readonly download: ConnectorFileDownloadOperation<E>
+  }
+  readonly trigger: {
+    readonly create: ConnectorTriggerCreateOperation<E>
+    readonly list: ConnectorTriggerListOperation<E>
+    readonly cancel: ConnectorTriggerCancelOperation<E>
+    readonly webhook: ConnectorTriggerWebhookOperation<E>
+  }
+  readonly reconcile: ConnectorReconcileOperation<E>
 }
 
 export type ProjectListOutput = ReadonlyArray<Project.Info>
@@ -3040,6 +4022,7 @@ export interface AppApi<E = never> {
   readonly integration: IntegrationApi<E>
   readonly mcp: McpApi<E>
   readonly credential: CredentialApi<E>
+  readonly connector: ConnectorApi<E>
   readonly project: ProjectApi<E>
   readonly form: FormApi<E>
   readonly permission: PermissionApi<E>

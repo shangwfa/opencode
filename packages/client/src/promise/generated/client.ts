@@ -38,6 +38,8 @@ import type {
   SessionUpdateOutput,
   SessionMoveInput,
   SessionMoveOutput,
+  SessionPermissionsPresetInput,
+  SessionPermissionsPresetOutput,
   SessionPromptInput,
   SessionPromptOutput,
   SessionCommandInput,
@@ -60,6 +62,20 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionContextInsightsOverviewInput,
+  SessionContextInsightsOverviewOutput,
+  SessionContextInsightsAnalysisInput,
+  SessionContextInsightsAnalysisOutput,
+  SessionContextInsightsFamilyInput,
+  SessionContextInsightsFamilyOutput,
+  SessionContextInsightsSummaryInput,
+  SessionContextInsightsSummaryOutput,
+  SessionContextInsightsRequestsInput,
+  SessionContextInsightsRequestsOutput,
+  SessionContextInsightsRequestInput,
+  SessionContextInsightsRequestOutput,
+  SessionContextInsightsContentInput,
+  SessionContextInsightsContentOutput,
   SessionCommandDefinitionsListInput,
   SessionCommandDefinitionsListOutput,
   SessionCommandDefinitionsCreateInput,
@@ -88,8 +104,16 @@ import type {
   SessionSandboxOutput,
   SessionKillSandboxInput,
   SessionKillSandboxOutput,
+  SessionSnapshotCreateInput,
+  SessionSnapshotCreateOutput,
+  SessionSnapshotGetInput,
+  SessionSnapshotGetOutput,
+  SessionSnapshotStatsInput,
+  SessionSnapshotStatsOutput,
   SessionDiffInput,
   SessionDiffOutput,
+  SessionAgentDefinitionsPermissionPresetInput,
+  SessionAgentDefinitionsPermissionPresetOutput,
   SessionInboxListInput,
   SessionInboxListOutput,
   SessionInboxCancelInput,
@@ -122,6 +146,14 @@ import type {
   SessionToolDefinitionsDeleteOutput,
   SessionToolDefinitionsClearInput,
   SessionToolDefinitionsClearOutput,
+  SessionPluginDefinitionsListInput,
+  SessionPluginDefinitionsListOutput,
+  SessionPluginDefinitionsCreateInput,
+  SessionPluginDefinitionsCreateOutput,
+  SessionPluginDefinitionsDeleteInput,
+  SessionPluginDefinitionsDeleteOutput,
+  SessionPluginDefinitionsClearInput,
+  SessionPluginDefinitionsClearOutput,
   SessionSkillDefinitionsCreateInput,
   SessionSkillDefinitionsCreateOutput,
   SessionSkillDefinitionsDeleteInput,
@@ -138,6 +170,8 @@ import type {
   SessionGenerateOutput,
   SessionLogInput,
   SessionLogOutput,
+  SessionLogsInput,
+  SessionLogsOutput,
   SessionInterruptInput,
   SessionInterruptOutput,
   SessionBackgroundInput,
@@ -242,6 +276,61 @@ import type {
   CredentialActivateOutput,
   CredentialRemoveInput,
   CredentialRemoveOutput,
+  ConnectorAppMcpListInput,
+  ConnectorAppMcpListOutput,
+  ConnectorAppMcpCreateInput,
+  ConnectorAppMcpCreateOutput,
+  ConnectorAppMcpUpdateInput,
+  ConnectorAppMcpUpdateOutput,
+  ConnectorAppMcpRotateInput,
+  ConnectorAppMcpRotateOutput,
+  ConnectorAppMcpRemoveInput,
+  ConnectorAppMcpRemoveOutput,
+  ConnectorAppMcpCallInput,
+  ConnectorAppMcpCallOutput,
+  ConnectorAppMcpListenInput,
+  ConnectorAppMcpListenOutput,
+  ConnectorConnectionCreateInput,
+  ConnectorConnectionCreateOutput,
+  ConnectorConnectionListInput,
+  ConnectorConnectionListOutput,
+  ConnectorConnectionRemoveInput,
+  ConnectorConnectionRemoveOutput,
+  ConnectorMcpAttachInput,
+  ConnectorMcpAttachOutput,
+  ConnectorMcpCallInput,
+  ConnectorMcpCallOutput,
+  ConnectorOauthStartInput,
+  ConnectorOauthStartOutput,
+  ConnectorOauthCompleteInput,
+  ConnectorOauthCompleteOutput,
+  ConnectorOauthClientInput,
+  ConnectorOauthClientOutput,
+  ConnectorOauthCallbackOutput,
+  ConnectorConnectionReconnectInput,
+  ConnectorConnectionReconnectOutput,
+  ConnectorRunsInput,
+  ConnectorRunsOutput,
+  ConnectorProvidersInput,
+  ConnectorProvidersOutput,
+  ConnectorProviderInput,
+  ConnectorProviderOutput,
+  ConnectorCategoriesOutput,
+  ConnectorProxyInput,
+  ConnectorProxyOutput,
+  ConnectorFileUploadInput,
+  ConnectorFileUploadOutput,
+  ConnectorFileDownloadInput,
+  ConnectorFileDownloadOutput,
+  ConnectorTriggerCreateInput,
+  ConnectorTriggerCreateOutput,
+  ConnectorTriggerListInput,
+  ConnectorTriggerListOutput,
+  ConnectorTriggerCancelInput,
+  ConnectorTriggerCancelOutput,
+  ConnectorTriggerWebhookInput,
+  ConnectorTriggerWebhookOutput,
+  ConnectorReconcileOutput,
   ProjectListOutput,
   ProjectUpdateInput,
   ProjectUpdateOutput,
@@ -649,6 +738,7 @@ export function make(options: ClientOptions) {
               metadata: input?.["metadata"],
               permissions: input?.["permissions"],
               sandbox: input?.["sandbox"],
+              summaryFrom: input?.["summaryFrom"],
             },
             successStatus: 200,
             declaredStatuses: [400, 401, 404],
@@ -708,7 +798,7 @@ export function make(options: ClientOptions) {
             method: "DELETE",
             path: `/api/session/${encodeURIComponent(input.sessionID)}`,
             successStatus: 204,
-            declaredStatuses: [400, 401, 404],
+            declaredStatuses: [400, 401, 404, 409],
             empty: true,
           },
           requestOptions,
@@ -778,6 +868,20 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      permissions: {
+        preset: (input: SessionPermissionsPresetInput, requestOptions?: RequestOptions) =>
+          request<SessionPermissionsPresetOutput>(
+            {
+              method: "PUT",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/permissions/preset`,
+              body: { preset: input["preset"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
       prompt: (input: SessionPromptInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionPromptOutput }>(
           {
@@ -790,6 +894,8 @@ export function make(options: ClientOptions) {
               agents: input["agents"],
               skills: input["skills"],
               format: input["format"],
+              preset: input["preset"],
+              permissions: input["permissions"],
               model: input["model"],
               userName: input["userName"],
               userId: input["userId"],
@@ -815,6 +921,8 @@ export function make(options: ClientOptions) {
               agents: input["agents"],
               skills: input["skills"],
               format: input["format"],
+              preset: input["preset"],
+              permissions: input["permissions"],
               delivery: input["delivery"],
             },
             successStatus: 204,
@@ -936,6 +1044,88 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      contextInsights: {
+        overview: (input: SessionContextInsightsOverviewInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsOverviewOutput }>(
+            {
+              method: "POST",
+              path: `/api/context-insights/overview`,
+              body: { sessionIDs: input["sessionIDs"], from: input["from"], to: input["to"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        analysis: (input: SessionContextInsightsAnalysisInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsAnalysisOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights/analysis`,
+              query: { before: input["before"], limit: input["limit"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        family: (input: SessionContextInsightsFamilyInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsFamilyOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights/family`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        summary: (input: SessionContextInsightsSummaryInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsSummaryOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        requests: (input: SessionContextInsightsRequestsInput, requestOptions?: RequestOptions) =>
+          request<SessionContextInsightsRequestsOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights/requests`,
+              query: { before: input["before"], limit: input["limit"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        request: (input: SessionContextInsightsRequestInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsRequestOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights/requests/${encodeURIComponent(input.requestID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        content: (input: SessionContextInsightsContentInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionContextInsightsContentOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/context-insights/requests/${encodeURIComponent(input.requestID)}/items/${encodeURIComponent(input.index)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+      },
       commandDefinitions: {
         list: (input: SessionCommandDefinitionsListInput, requestOptions?: RequestOptions) =>
           request<{ readonly data: SessionCommandDefinitionsListOutput }>(
@@ -964,7 +1154,7 @@ export function make(options: ClientOptions) {
                 hints: input["hints"],
               },
               successStatus: 200,
-              declaredStatuses: [400, 401, 404, 500],
+              declaredStatuses: [400, 401, 404, 413, 500],
               empty: false,
             },
             requestOptions,
@@ -1060,6 +1250,18 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ).then((value) => value.data),
+        permissionPreset: (input: SessionAgentDefinitionsPermissionPresetInput, requestOptions?: RequestOptions) =>
+          request<SessionAgentDefinitionsPermissionPresetOutput>(
+            {
+              method: "PUT",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/agents/${encodeURIComponent(input.agentID)}/permissions/preset`,
+              body: { preset: input["preset"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 413, 500],
+              empty: false,
+            },
+            requestOptions,
+          ),
       },
       keepAlive: (input: SessionKeepAliveInput, requestOptions?: RequestOptions) =>
         request<SessionKeepAliveOutput>(
@@ -1106,6 +1308,41 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      snapshot: {
+        create: (input: SessionSnapshotCreateInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionSnapshotCreateOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/snapshot`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        get: (input: SessionSnapshotGetInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionSnapshotGetOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/snapshot`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        stats: (input: SessionSnapshotStatsInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionSnapshotStatsOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/snapshot/stats`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+      },
       diff: (input: SessionDiffInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionDiffOutput }>(
           {
@@ -1387,6 +1624,53 @@ export function make(options: ClientOptions) {
             requestOptions,
           ),
       },
+      pluginDefinitions: {
+        list: (input: SessionPluginDefinitionsListInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionPluginDefinitionsListOutput }>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/plugins`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        create: (input: SessionPluginDefinitionsCreateInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: SessionPluginDefinitionsCreateOutput }>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/plugins`,
+              body: { name: input["name"], description: input["description"], source: input["source"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 413, 500],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        delete: (input: SessionPluginDefinitionsDeleteInput, requestOptions?: RequestOptions) =>
+          request<SessionPluginDefinitionsDeleteOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/plugins/${encodeURIComponent(input.name)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        clear: (input: SessionPluginDefinitionsClearInput, requestOptions?: RequestOptions) =>
+          request<SessionPluginDefinitionsClearOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/plugins`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
       generate: (input: SessionGenerateInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionGenerateOutput }>(
           {
@@ -1411,6 +1695,18 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+      logs: (input: SessionLogsInput, requestOptions?: RequestOptions) =>
+        request<{ readonly data: SessionLogsOutput }>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/logs`,
+            query: { limit: input["limit"], after: input["after"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404],
+            empty: false,
+          },
+          requestOptions,
+        ).then((value) => value.data),
       interrupt: (input: SessionInterruptInput, requestOptions?: RequestOptions) =>
         request<SessionInterruptOutput>(
           {
@@ -1556,6 +1852,8 @@ export function make(options: ClientOptions) {
               agents: input["agents"],
               skills: input["skills"],
               format: input["format"],
+              preset: input["preset"],
+              permissions: input["permissions"],
               model: input["model"],
               userName: input["userName"],
               userId: input["userId"],
@@ -2088,6 +2386,398 @@ export function make(options: ClientOptions) {
             successStatus: 204,
             declaredStatuses: [400, 401],
             empty: true,
+          },
+          requestOptions,
+        ),
+    },
+    connector: {
+      appMcp: {
+        list: (input: ConnectorAppMcpListInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpListOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp-deployments`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input: ConnectorAppMcpCreateInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp-deployments`,
+              body: {
+                name: input["name"],
+                service: input["service"],
+                connectionId: input["connectionId"],
+                actionIds: input["actionIds"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        update: (input: ConnectorAppMcpUpdateInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpUpdateOutput>(
+            {
+              method: "PATCH",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp-deployments/${encodeURIComponent(input.deploymentID)}`,
+              body: {
+                revision: input["revision"],
+                name: input["name"],
+                status: input["status"],
+                actionIds: input["actionIds"],
+                confirmContracts: input["confirmContracts"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        rotate: (input: ConnectorAppMcpRotateInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpRotateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp-deployments/${encodeURIComponent(input.deploymentID)}/rotate-token`,
+              body: { revision: input["revision"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        remove: (input: ConnectorAppMcpRemoveInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp-deployments/${encodeURIComponent(input.deploymentID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        call: (input: ConnectorAppMcpCallInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpCallOutput>(
+            {
+              method: "POST",
+              path: `/api/connector/mcp/${encodeURIComponent(input.deploymentID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        listen: (input: ConnectorAppMcpListenInput, requestOptions?: RequestOptions) =>
+          request<ConnectorAppMcpListenOutput>(
+            {
+              method: "GET",
+              path: `/api/connector/mcp/${encodeURIComponent(input.deploymentID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      connection: {
+        create: (input: ConnectorConnectionCreateInput, requestOptions?: RequestOptions) =>
+          request<ConnectorConnectionCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections`,
+              body: {
+                service: input["service"],
+                authType: input["authType"],
+                values: input["values"],
+                alias: input["alias"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        list: (input: ConnectorConnectionListInput, requestOptions?: RequestOptions) =>
+          request<ConnectorConnectionListOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        remove: (input: ConnectorConnectionRemoveInput, requestOptions?: RequestOptions) =>
+          request<ConnectorConnectionRemoveOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections/${encodeURIComponent(input.connectionID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        reconnect: (input: ConnectorConnectionReconnectInput, requestOptions?: RequestOptions) =>
+          request<ConnectorConnectionReconnectOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections/${encodeURIComponent(input.connectionID)}/reconnect`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      mcp: {
+        attach: (input: ConnectorMcpAttachInput, requestOptions?: RequestOptions) =>
+          request<ConnectorMcpAttachOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/mcp`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        call: (input: ConnectorMcpCallInput, requestOptions?: RequestOptions) =>
+          request<ConnectorMcpCallOutput>(
+            {
+              method: "POST",
+              path: `/api/connector/mcp`,
+              headers: { authorization: input["authorization"] },
+              body: input["payload"],
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
+      oauth: {
+        start: (input: ConnectorOauthStartInput, requestOptions?: RequestOptions) =>
+          request<ConnectorOauthStartOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections/oauth`,
+              body: {
+                service: input["service"],
+                alias: input["alias"],
+                authorizationOptionIds: input["authorizationOptionIds"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        complete: (input: ConnectorOauthCompleteInput, requestOptions?: RequestOptions) =>
+          request<ConnectorOauthCompleteOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/connections/oauth/${encodeURIComponent(input.connectionRequestID)}/complete`,
+              body: { alias: input["alias"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        client: (input: ConnectorOauthClientInput, requestOptions?: RequestOptions) =>
+          request<ConnectorOauthClientOutput>(
+            {
+              method: "PUT",
+              path: `/api/connector/oauth/clients/${encodeURIComponent(input.service)}`,
+              body: {
+                clientId: input["clientId"],
+                clientSecret: input["clientSecret"],
+                extra: input["extra"],
+                requestedScopes: input["requestedScopes"],
+                redirectUri: input["redirectUri"],
+              },
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        callback: (requestOptions?: RequestOptions) =>
+          request<ConnectorOauthCallbackOutput>(
+            {
+              method: "GET",
+              path: `/connector/oauth/callback`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      runs: (input?: ConnectorRunsInput, requestOptions?: RequestOptions) =>
+        request<ConnectorRunsOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/runs`,
+            query: { cursor: input?.["cursor"], limit: input?.["limit"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      providers: (input?: ConnectorProvidersInput, requestOptions?: RequestOptions) =>
+        request<ConnectorProvidersOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/providers`,
+            query: { service: input?.["service"], authType: input?.["authType"], category: input?.["category"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      provider: (input: ConnectorProviderInput, requestOptions?: RequestOptions) =>
+        request<ConnectorProviderOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/providers/${encodeURIComponent(input.service)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      categories: (requestOptions?: RequestOptions) =>
+        request<ConnectorCategoriesOutput>(
+          {
+            method: "GET",
+            path: `/api/connector/categories`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      proxy: (input: ConnectorProxyInput, requestOptions?: RequestOptions) =>
+        request<ConnectorProxyOutput>(
+          {
+            method: "POST",
+            path: `/api/connector/proxy/${encodeURIComponent(input.service)}`,
+            body: {
+              sessionID: input["sessionID"],
+              endpoint: input["endpoint"],
+              method: input["method"],
+              query: input["query"],
+              headers: input["headers"],
+              body: input["body"],
+              connectionID: input["connectionID"],
+            },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      file: {
+        upload: (input: ConnectorFileUploadInput, requestOptions?: RequestOptions) =>
+          request<ConnectorFileUploadOutput>(
+            {
+              method: "POST",
+              path: `/api/connector/files`,
+              body: {
+                sessionID: input["sessionID"],
+                name: input["name"],
+                mimeType: input["mimeType"],
+                data: input["data"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        download: (input: ConnectorFileDownloadInput, requestOptions?: RequestOptions) =>
+          request<ConnectorFileDownloadOutput>(
+            {
+              method: "GET",
+              path: `/api/connector/files/${encodeURIComponent(input.fileID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+              binary: true,
+            },
+            requestOptions,
+          ),
+      },
+      trigger: {
+        create: (input: ConnectorTriggerCreateInput, requestOptions?: RequestOptions) =>
+          request<ConnectorTriggerCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/triggers`,
+              body: {
+                service: input["service"],
+                triggerId: input["triggerId"],
+                config: input["config"],
+                connectionID: input["connectionID"],
+              },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        list: (input: ConnectorTriggerListInput, requestOptions?: RequestOptions) =>
+          request<ConnectorTriggerListOutput>(
+            {
+              method: "GET",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/triggers`,
+              successStatus: 200,
+              declaredStatuses: [400, 401],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        cancel: (input: ConnectorTriggerCancelInput, requestOptions?: RequestOptions) =>
+          request<ConnectorTriggerCancelOutput>(
+            {
+              method: "DELETE",
+              path: `/api/session/${encodeURIComponent(input.sessionID)}/connector/triggers/${encodeURIComponent(input.triggerID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 409, 503],
+              empty: true,
+            },
+            requestOptions,
+          ),
+        webhook: (input: ConnectorTriggerWebhookInput, requestOptions?: RequestOptions) =>
+          request<ConnectorTriggerWebhookOutput>(
+            {
+              method: "POST",
+              path: `/connector/webhook/${encodeURIComponent(input.scheduleID)}`,
+              successStatus: 204,
+              declaredStatuses: [400, 401, 404, 500],
+              empty: true,
+            },
+            requestOptions,
+          ),
+      },
+      reconcile: (requestOptions?: RequestOptions) =>
+        request<ConnectorReconcileOutput>(
+          {
+            method: "POST",
+            path: `/api/connector/reconcile`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409, 503],
+            empty: false,
           },
           requestOptions,
         ),

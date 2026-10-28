@@ -44,6 +44,8 @@ import type {
   SessionUpdateOutput,
   SessionMoveInput,
   SessionMoveOutput,
+  SessionPermissionsPresetInput,
+  SessionPermissionsPresetOutput,
   SessionPromptInput,
   SessionPromptOutput,
   SessionCommandInput,
@@ -66,6 +68,20 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionContextInsightsOverviewInput,
+  SessionContextInsightsOverviewOutput,
+  SessionContextInsightsAnalysisInput,
+  SessionContextInsightsAnalysisOutput,
+  SessionContextInsightsFamilyInput,
+  SessionContextInsightsFamilyOutput,
+  SessionContextInsightsSummaryInput,
+  SessionContextInsightsSummaryOutput,
+  SessionContextInsightsRequestsInput,
+  SessionContextInsightsRequestsOutput,
+  SessionContextInsightsRequestInput,
+  SessionContextInsightsRequestOutput,
+  SessionContextInsightsContentInput,
+  SessionContextInsightsContentOutput,
   SessionCommandDefinitionsListInput,
   SessionCommandDefinitionsListOutput,
   SessionCommandDefinitionsCreateInput,
@@ -94,8 +110,16 @@ import type {
   SessionSandboxOutput,
   SessionKillSandboxInput,
   SessionKillSandboxOutput,
+  SessionSnapshotCreateInput,
+  SessionSnapshotCreateOutput,
+  SessionSnapshotGetInput,
+  SessionSnapshotGetOutput,
+  SessionSnapshotStatsInput,
+  SessionSnapshotStatsOutput,
   SessionDiffInput,
   SessionDiffOutput,
+  SessionAgentDefinitionsPermissionPresetInput,
+  SessionAgentDefinitionsPermissionPresetOutput,
   SessionInboxListInput,
   SessionInboxListOutput,
   SessionInboxCancelInput,
@@ -128,6 +152,14 @@ import type {
   SessionToolDefinitionsDeleteOutput,
   SessionToolDefinitionsClearInput,
   SessionToolDefinitionsClearOutput,
+  SessionPluginDefinitionsListInput,
+  SessionPluginDefinitionsListOutput,
+  SessionPluginDefinitionsCreateInput,
+  SessionPluginDefinitionsCreateOutput,
+  SessionPluginDefinitionsDeleteInput,
+  SessionPluginDefinitionsDeleteOutput,
+  SessionPluginDefinitionsClearInput,
+  SessionPluginDefinitionsClearOutput,
   SessionSkillDefinitionsCreateInput,
   SessionSkillDefinitionsCreateOutput,
   SessionSkillDefinitionsDeleteInput,
@@ -144,6 +176,8 @@ import type {
   SessionGenerateOutput,
   SessionLogInput,
   SessionLogOutput,
+  SessionLogsInput,
+  SessionLogsOutput,
   SessionInterruptInput,
   SessionInterruptOutput,
   SessionBackgroundInput,
@@ -248,6 +282,61 @@ import type {
   CredentialActivateOutput,
   CredentialRemoveInput,
   CredentialRemoveOutput,
+  ConnectorAppMcpListInput,
+  ConnectorAppMcpListOutput,
+  ConnectorAppMcpCreateInput,
+  ConnectorAppMcpCreateOutput,
+  ConnectorAppMcpUpdateInput,
+  ConnectorAppMcpUpdateOutput,
+  ConnectorAppMcpRotateInput,
+  ConnectorAppMcpRotateOutput,
+  ConnectorAppMcpRemoveInput,
+  ConnectorAppMcpRemoveOutput,
+  ConnectorAppMcpCallInput,
+  ConnectorAppMcpCallOutput,
+  ConnectorAppMcpListenInput,
+  ConnectorAppMcpListenOutput,
+  ConnectorConnectionCreateInput,
+  ConnectorConnectionCreateOutput,
+  ConnectorConnectionListInput,
+  ConnectorConnectionListOutput,
+  ConnectorConnectionRemoveInput,
+  ConnectorConnectionRemoveOutput,
+  ConnectorMcpAttachInput,
+  ConnectorMcpAttachOutput,
+  ConnectorMcpCallInput,
+  ConnectorMcpCallOutput,
+  ConnectorOauthStartInput,
+  ConnectorOauthStartOutput,
+  ConnectorOauthCompleteInput,
+  ConnectorOauthCompleteOutput,
+  ConnectorOauthClientInput,
+  ConnectorOauthClientOutput,
+  ConnectorOauthCallbackOutput,
+  ConnectorConnectionReconnectInput,
+  ConnectorConnectionReconnectOutput,
+  ConnectorRunsInput,
+  ConnectorRunsOutput,
+  ConnectorProvidersInput,
+  ConnectorProvidersOutput,
+  ConnectorProviderInput,
+  ConnectorProviderOutput,
+  ConnectorCategoriesOutput,
+  ConnectorProxyInput,
+  ConnectorProxyOutput,
+  ConnectorFileUploadInput,
+  ConnectorFileUploadOutput,
+  ConnectorFileDownloadInput,
+  ConnectorFileDownloadOutput,
+  ConnectorTriggerCreateInput,
+  ConnectorTriggerCreateOutput,
+  ConnectorTriggerListInput,
+  ConnectorTriggerListOutput,
+  ConnectorTriggerCancelInput,
+  ConnectorTriggerCancelOutput,
+  ConnectorTriggerWebhookInput,
+  ConnectorTriggerWebhookOutput,
+  ConnectorReconcileOutput,
   ProjectListOutput,
   ProjectUpdateInput,
   ProjectUpdateOutput,
@@ -482,6 +571,7 @@ const EndpointSessionCreate = (raw: RawClient["server.session"]) => (input?: Ses
         metadata: input?.["metadata"],
         permissions: input?.["permissions"],
         sandbox: input?.["sandbox"],
+        summaryFrom: input?.["summaryFrom"],
       },
     }).pipe(
       Effect.mapError(mapClientError),
@@ -571,6 +661,14 @@ const EndpointSessionMove = (raw: RawClient["server.session"]) => (input: Sessio
     }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointSessionPermissionsPreset = (raw: RawClient["server.session"]) => (input: SessionPermissionsPresetInput) =>
+  preserveEffect<SessionPermissionsPresetOutput>()(
+    raw["session.permissions.preset"]({
+      params: { sessionID: input["sessionID"] },
+      payload: { preset: input["preset"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
 const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: SessionPromptInput) =>
   preserveEffect<SessionPromptOutput>()(
     raw["session.prompt"]({
@@ -582,6 +680,8 @@ const EndpointSessionPrompt = (raw: RawClient["server.session"]) => (input: Sess
         agents: input["agents"],
         skills: input["skills"],
         format: input["format"],
+        preset: input["preset"],
+        permissions: input["permissions"],
         model: input["model"],
         userName: input["userName"],
         userId: input["userId"],
@@ -606,6 +706,8 @@ const EndpointSessionCommand = (raw: RawClient["server.session"]) => (input: Ses
         agents: input["agents"],
         skills: input["skills"],
         format: input["format"],
+        preset: input["preset"],
+        permissions: input["permissions"],
         delivery: input["delivery"],
       },
     }).pipe(Effect.mapError(mapClientError)),
@@ -689,6 +791,78 @@ const EndpointSessionContext = (raw: RawClient["server.session"]) => (input: Ses
       Effect.map((value) => value.data),
     ),
   )
+
+const EndpointSessionContextInsightsOverview =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsOverviewInput) =>
+    preserveEffect<SessionContextInsightsOverviewOutput>()(
+      raw["session.contextInsights.overview"]({
+        payload: { sessionIDs: input["sessionIDs"], from: input["from"], to: input["to"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionContextInsightsAnalysis =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsAnalysisInput) =>
+    preserveEffect<SessionContextInsightsAnalysisOutput>()(
+      raw["session.contextInsights.analysis"]({
+        params: { sessionID: input["sessionID"] },
+        query: { before: input["before"], limit: input["limit"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionContextInsightsFamily =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsFamilyInput) =>
+    preserveEffect<SessionContextInsightsFamilyOutput>()(
+      raw["session.contextInsights.family"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionContextInsightsSummary =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsSummaryInput) =>
+    preserveEffect<SessionContextInsightsSummaryOutput>()(
+      raw["session.contextInsights.summary"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionContextInsightsRequests =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsRequestsInput) =>
+    preserveEffect<SessionContextInsightsRequestsOutput>()(
+      raw["session.contextInsights.requests"]({
+        params: { sessionID: input["sessionID"] },
+        query: { before: input["before"], limit: input["limit"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointSessionContextInsightsRequest =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsRequestInput) =>
+    preserveEffect<SessionContextInsightsRequestOutput>()(
+      raw["session.contextInsights.request"]({
+        params: { sessionID: input["sessionID"], requestID: input["requestID"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionContextInsightsContent =
+  (raw: RawClient["server.session"]) => (input: SessionContextInsightsContentInput) =>
+    preserveEffect<SessionContextInsightsContentOutput>()(
+      raw["session.contextInsights.content"]({
+        params: { sessionID: input["sessionID"], requestID: input["requestID"], index: input["index"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
 
 const EndpointSessionCommandDefinitionsList =
   (raw: RawClient["server.session"]) => (input: SessionCommandDefinitionsListInput) =>
@@ -808,6 +982,30 @@ const EndpointSessionKillSandbox = (raw: RawClient["server.session"]) => (input:
     raw["session.killSandbox"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
   )
 
+const EndpointSessionSnapshotCreate = (raw: RawClient["server.session"]) => (input: SessionSnapshotCreateInput) =>
+  preserveEffect<SessionSnapshotCreateOutput>()(
+    raw["session.snapshot.create"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionSnapshotGet = (raw: RawClient["server.session"]) => (input: SessionSnapshotGetInput) =>
+  preserveEffect<SessionSnapshotGetOutput>()(
+    raw["session.snapshot.get"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
+const EndpointSessionSnapshotStats = (raw: RawClient["server.session"]) => (input: SessionSnapshotStatsInput) =>
+  preserveEffect<SessionSnapshotStatsOutput>()(
+    raw["session.snapshot.stats"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
+    ),
+  )
+
 const EndpointSessionDiff = (raw: RawClient["server.session"]) => (input: SessionDiffInput) =>
   preserveEffect<SessionDiffOutput>()(
     raw["session.diff"]({
@@ -818,6 +1016,15 @@ const EndpointSessionDiff = (raw: RawClient["server.session"]) => (input: Sessio
       Effect.map((value) => value.data),
     ),
   )
+
+const EndpointSessionAgentDefinitionsPermissionPreset =
+  (raw: RawClient["server.session"]) => (input: SessionAgentDefinitionsPermissionPresetInput) =>
+    preserveEffect<SessionAgentDefinitionsPermissionPresetOutput>()(
+      raw["session.agentDefinitions.permissionPreset"]({
+        params: { sessionID: input["sessionID"], agentID: input["agentID"] },
+        payload: { preset: input["preset"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
 
 const EndpointSessionInboxList = (raw: RawClient["server.session"]) => (input: SessionInboxListInput) =>
   preserveEffect<SessionInboxListOutput>()(
@@ -952,6 +1159,43 @@ const EndpointSessionToolDefinitionsClear =
       ),
     )
 
+const EndpointSessionPluginDefinitionsList =
+  (raw: RawClient["server.session"]) => (input: SessionPluginDefinitionsListInput) =>
+    preserveEffect<SessionPluginDefinitionsListOutput>()(
+      raw["session.pluginDefinitions.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionPluginDefinitionsCreate =
+  (raw: RawClient["server.session"]) => (input: SessionPluginDefinitionsCreateInput) =>
+    preserveEffect<SessionPluginDefinitionsCreateOutput>()(
+      raw["session.pluginDefinitions.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: { name: input["name"], description: input["description"], source: input["source"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointSessionPluginDefinitionsDelete =
+  (raw: RawClient["server.session"]) => (input: SessionPluginDefinitionsDeleteInput) =>
+    preserveEffect<SessionPluginDefinitionsDeleteOutput>()(
+      raw["session.pluginDefinitions.delete"]({ params: { sessionID: input["sessionID"], name: input["name"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
+const EndpointSessionPluginDefinitionsClear =
+  (raw: RawClient["server.session"]) => (input: SessionPluginDefinitionsClearInput) =>
+    preserveEffect<SessionPluginDefinitionsClearOutput>()(
+      raw["session.pluginDefinitions.clear"]({ params: { sessionID: input["sessionID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
 const EndpointSessionSkillDefinitionsCreate =
   (raw: RawClient["server.session"]) => (input: SessionSkillDefinitionsCreateInput) =>
     preserveEffect<SessionSkillDefinitionsCreateOutput>()(
@@ -1028,6 +1272,17 @@ const EndpointSessionLog = (raw: RawClient["server.session"]) => (input: Session
         Effect.mapError(mapClientError),
         Effect.map((stream) => stream.pipe(Stream.mapError(mapClientError))),
       ),
+    ),
+  )
+
+const EndpointSessionLogs = (raw: RawClient["server.session"]) => (input: SessionLogsInput) =>
+  preserveEffect<SessionLogsOutput>()(
+    raw["session.logs"]({
+      params: { sessionID: input["sessionID"] },
+      query: { limit: input["limit"], after: input["after"] },
+    }).pipe(
+      Effect.mapError(mapClientError),
+      Effect.map((value) => value.data),
     ),
   )
 
@@ -1130,6 +1385,8 @@ const EndpointSessionPromptStream = (raw: RawClient["server.session"]) => (input
           agents: input["agents"],
           skills: input["skills"],
           format: input["format"],
+          preset: input["preset"],
+          permissions: input["permissions"],
           model: input["model"],
           userName: input["userName"],
           userId: input["userId"],
@@ -1158,6 +1415,7 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
   switchModel: EndpointSessionSwitchModel(raw),
   update: EndpointSessionUpdate(raw),
   move: EndpointSessionMove(raw),
+  permissions: { preset: EndpointSessionPermissionsPreset(raw) },
   prompt: EndpointSessionPrompt(raw),
   command: EndpointSessionCommand(raw),
   skill: EndpointSessionSkill(raw),
@@ -1171,6 +1429,15 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     commit: EndpointSessionRevertCommit(raw),
   },
   context: EndpointSessionContext(raw),
+  contextInsights: {
+    overview: EndpointSessionContextInsightsOverview(raw),
+    analysis: EndpointSessionContextInsightsAnalysis(raw),
+    family: EndpointSessionContextInsightsFamily(raw),
+    summary: EndpointSessionContextInsightsSummary(raw),
+    requests: EndpointSessionContextInsightsRequests(raw),
+    request: EndpointSessionContextInsightsRequest(raw),
+    content: EndpointSessionContextInsightsContent(raw),
+  },
   commandDefinitions: {
     list: EndpointSessionCommandDefinitionsList(raw),
     create: EndpointSessionCommandDefinitionsCreate(raw),
@@ -1184,11 +1451,17 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     delete: EndpointSessionAgentDefinitionsDelete(raw),
     clear: EndpointSessionAgentDefinitionsClear(raw),
     refresh: EndpointSessionAgentDefinitionsRefresh(raw),
+    permissionPreset: EndpointSessionAgentDefinitionsPermissionPreset(raw),
   },
   keepAlive: EndpointSessionKeepAlive(raw),
   keepAliveStatus: EndpointSessionKeepAliveStatus(raw),
   sandbox: EndpointSessionSandbox(raw),
   killSandbox: EndpointSessionKillSandbox(raw),
+  snapshot: {
+    create: EndpointSessionSnapshotCreate(raw),
+    get: EndpointSessionSnapshotGet(raw),
+    stats: EndpointSessionSnapshotStats(raw),
+  },
   diff: EndpointSessionDiff(raw),
   inbox: {
     list: EndpointSessionInboxList(raw),
@@ -1226,8 +1499,15 @@ const adaptGroupSession = (raw: RawClient["server.session"]) => ({
     delete: EndpointSessionToolDefinitionsDelete(raw),
     clear: EndpointSessionToolDefinitionsClear(raw),
   },
+  pluginDefinitions: {
+    list: EndpointSessionPluginDefinitionsList(raw),
+    create: EndpointSessionPluginDefinitionsCreate(raw),
+    delete: EndpointSessionPluginDefinitionsDelete(raw),
+    clear: EndpointSessionPluginDefinitionsClear(raw),
+  },
   generate: EndpointSessionGenerate(raw),
   log: EndpointSessionLog(raw),
+  logs: EndpointSessionLogs(raw),
   interrupt: EndpointSessionInterrupt(raw),
   background: EndpointSessionBackground(raw),
   message: { get: EndpointSessionMessageGet(raw) },
@@ -1630,6 +1910,280 @@ const adaptGroupCredential = (raw: RawClient["server.credential"]) => ({
   update: EndpointCredentialUpdate(raw),
   activate: EndpointCredentialActivate(raw),
   remove: EndpointCredentialRemove(raw),
+})
+
+const EndpointConnectorAppMcpList = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpListInput) =>
+  preserveEffect<ConnectorAppMcpListOutput>()(
+    raw["connector.appMcp.list"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorAppMcpCreate = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpCreateInput) =>
+  preserveEffect<ConnectorAppMcpCreateOutput>()(
+    raw["connector.appMcp.create"]({
+      params: { sessionID: input["sessionID"] },
+      payload: {
+        name: input["name"],
+        service: input["service"],
+        connectionId: input["connectionId"],
+        actionIds: input["actionIds"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorAppMcpUpdate = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpUpdateInput) =>
+  preserveEffect<ConnectorAppMcpUpdateOutput>()(
+    raw["connector.appMcp.update"]({
+      params: { sessionID: input["sessionID"], deploymentID: input["deploymentID"] },
+      payload: {
+        revision: input["revision"],
+        name: input["name"],
+        status: input["status"],
+        actionIds: input["actionIds"],
+        confirmContracts: input["confirmContracts"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorAppMcpRotate = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpRotateInput) =>
+  preserveEffect<ConnectorAppMcpRotateOutput>()(
+    raw["connector.appMcp.rotate"]({
+      params: { sessionID: input["sessionID"], deploymentID: input["deploymentID"] },
+      payload: { revision: input["revision"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorAppMcpRemove = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpRemoveInput) =>
+  preserveEffect<ConnectorAppMcpRemoveOutput>()(
+    raw["connector.appMcp.remove"]({
+      params: { sessionID: input["sessionID"], deploymentID: input["deploymentID"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorAppMcpCall = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpCallInput) =>
+  preserveEffect<ConnectorAppMcpCallOutput>()(
+    raw["connector.appMcp.call"]({ params: { deploymentID: input["deploymentID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorAppMcpListen = (raw: RawClient["server.connector"]) => (input: ConnectorAppMcpListenInput) =>
+  preserveEffect<ConnectorAppMcpListenOutput>()(
+    raw["connector.appMcp.listen"]({ params: { deploymentID: input["deploymentID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorConnectionCreate =
+  (raw: RawClient["server.connector"]) => (input: ConnectorConnectionCreateInput) =>
+    preserveEffect<ConnectorConnectionCreateOutput>()(
+      raw["connector.connection.create"]({
+        params: { sessionID: input["sessionID"] },
+        payload: {
+          service: input["service"],
+          authType: input["authType"],
+          values: input["values"],
+          alias: input["alias"],
+        },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointConnectorConnectionList = (raw: RawClient["server.connector"]) => (input: ConnectorConnectionListInput) =>
+  preserveEffect<ConnectorConnectionListOutput>()(
+    raw["connector.connection.list"]({ params: { sessionID: input["sessionID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorConnectionRemove =
+  (raw: RawClient["server.connector"]) => (input: ConnectorConnectionRemoveInput) =>
+    preserveEffect<ConnectorConnectionRemoveOutput>()(
+      raw["connector.connection.remove"]({
+        params: { sessionID: input["sessionID"], connectionID: input["connectionID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointConnectorMcpAttach = (raw: RawClient["server.connector"]) => (input: ConnectorMcpAttachInput) =>
+  preserveEffect<ConnectorMcpAttachOutput>()(
+    raw["connector.mcp.attach"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+type ConnectorMcpCallRequest = Parameters<RawClient["server.connector"]["connector.mcp.call"]>[0]
+const EndpointConnectorMcpCall = (raw: RawClient["server.connector"]) => (input: ConnectorMcpCallInput) =>
+  preserveEffect<ConnectorMcpCallOutput>()(
+    raw["connector.mcp.call"]({
+      headers: { authorization: input["authorization"] },
+      payload: input["payload"],
+    } as ConnectorMcpCallRequest).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorOauthStart = (raw: RawClient["server.connector"]) => (input: ConnectorOauthStartInput) =>
+  preserveEffect<ConnectorOauthStartOutput>()(
+    raw["connector.oauth.start"]({
+      params: { sessionID: input["sessionID"] },
+      payload: {
+        service: input["service"],
+        alias: input["alias"],
+        authorizationOptionIds: input["authorizationOptionIds"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorOauthComplete = (raw: RawClient["server.connector"]) => (input: ConnectorOauthCompleteInput) =>
+  preserveEffect<ConnectorOauthCompleteOutput>()(
+    raw["connector.oauth.complete"]({
+      params: { sessionID: input["sessionID"], connectionRequestID: input["connectionRequestID"] },
+      payload: { alias: input["alias"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorOauthClient = (raw: RawClient["server.connector"]) => (input: ConnectorOauthClientInput) =>
+  preserveEffect<ConnectorOauthClientOutput>()(
+    raw["connector.oauth.client"]({
+      params: { service: input["service"] },
+      payload: {
+        clientId: input["clientId"],
+        clientSecret: input["clientSecret"],
+        extra: input["extra"],
+        requestedScopes: input["requestedScopes"],
+        redirectUri: input["redirectUri"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorOauthCallback = (raw: RawClient["server.connector"]) => () =>
+  preserveEffect<ConnectorOauthCallbackOutput>()(
+    raw["connector.oauth.callback"]({}).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorConnectionReconnect =
+  (raw: RawClient["server.connector"]) => (input: ConnectorConnectionReconnectInput) =>
+    preserveEffect<ConnectorConnectionReconnectOutput>()(
+      raw["connector.connection.reconnect"]({
+        params: { sessionID: input["sessionID"], connectionID: input["connectionID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointConnectorRuns = (raw: RawClient["server.connector"]) => (input?: ConnectorRunsInput) =>
+  preserveEffect<ConnectorRunsOutput>()(
+    raw["connector.runs"]({ query: { cursor: input?.["cursor"], limit: input?.["limit"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorProviders = (raw: RawClient["server.connector"]) => (input?: ConnectorProvidersInput) =>
+  preserveEffect<ConnectorProvidersOutput>()(
+    raw["connector.providers"]({
+      query: { service: input?.["service"], authType: input?.["authType"], category: input?.["category"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorProvider = (raw: RawClient["server.connector"]) => (input: ConnectorProviderInput) =>
+  preserveEffect<ConnectorProviderOutput>()(
+    raw["connector.provider"]({ params: { service: input["service"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorCategories = (raw: RawClient["server.connector"]) => () =>
+  preserveEffect<ConnectorCategoriesOutput>()(raw["connector.categories"]({}).pipe(Effect.mapError(mapClientError)))
+
+const EndpointConnectorProxy = (raw: RawClient["server.connector"]) => (input: ConnectorProxyInput) =>
+  preserveEffect<ConnectorProxyOutput>()(
+    raw["connector.proxy"]({
+      params: { service: input["service"] },
+      payload: {
+        sessionID: input["sessionID"],
+        endpoint: input["endpoint"],
+        method: input["method"],
+        query: input["query"],
+        headers: input["headers"],
+        body: input["body"],
+        connectionID: input["connectionID"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorFileUpload = (raw: RawClient["server.connector"]) => (input: ConnectorFileUploadInput) =>
+  preserveEffect<ConnectorFileUploadOutput>()(
+    raw["connector.file.upload"]({
+      payload: { sessionID: input["sessionID"], name: input["name"], mimeType: input["mimeType"], data: input["data"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorFileDownload = (raw: RawClient["server.connector"]) => (input: ConnectorFileDownloadInput) =>
+  preserveEffect<ConnectorFileDownloadOutput>()(
+    raw["connector.file.download"]({ params: { fileID: input["fileID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorTriggerCreate = (raw: RawClient["server.connector"]) => (input: ConnectorTriggerCreateInput) =>
+  preserveEffect<ConnectorTriggerCreateOutput>()(
+    raw["connector.trigger.create"]({
+      params: { sessionID: input["sessionID"] },
+      payload: {
+        service: input["service"],
+        triggerId: input["triggerId"],
+        config: input["config"],
+        connectionID: input["connectionID"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorTriggerList = (raw: RawClient["server.connector"]) => (input: ConnectorTriggerListInput) =>
+  preserveEffect<ConnectorTriggerListOutput>()(
+    raw["connector.trigger.list"]({ params: { sessionID: input["sessionID"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointConnectorTriggerCancel = (raw: RawClient["server.connector"]) => (input: ConnectorTriggerCancelInput) =>
+  preserveEffect<ConnectorTriggerCancelOutput>()(
+    raw["connector.trigger.cancel"]({ params: { sessionID: input["sessionID"], triggerID: input["triggerID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorTriggerWebhook = (raw: RawClient["server.connector"]) => (input: ConnectorTriggerWebhookInput) =>
+  preserveEffect<ConnectorTriggerWebhookOutput>()(
+    raw["connector.trigger.webhook"]({ params: { scheduleID: input["scheduleID"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointConnectorReconcile = (raw: RawClient["server.connector"]) => () =>
+  preserveEffect<ConnectorReconcileOutput>()(raw["connector.reconcile"]({}).pipe(Effect.mapError(mapClientError)))
+
+const adaptGroupConnector = (raw: RawClient["server.connector"]) => ({
+  appMcp: {
+    list: EndpointConnectorAppMcpList(raw),
+    create: EndpointConnectorAppMcpCreate(raw),
+    update: EndpointConnectorAppMcpUpdate(raw),
+    rotate: EndpointConnectorAppMcpRotate(raw),
+    remove: EndpointConnectorAppMcpRemove(raw),
+    call: EndpointConnectorAppMcpCall(raw),
+    listen: EndpointConnectorAppMcpListen(raw),
+  },
+  connection: {
+    create: EndpointConnectorConnectionCreate(raw),
+    list: EndpointConnectorConnectionList(raw),
+    remove: EndpointConnectorConnectionRemove(raw),
+    reconnect: EndpointConnectorConnectionReconnect(raw),
+  },
+  mcp: { attach: EndpointConnectorMcpAttach(raw), call: EndpointConnectorMcpCall(raw) },
+  oauth: {
+    start: EndpointConnectorOauthStart(raw),
+    complete: EndpointConnectorOauthComplete(raw),
+    client: EndpointConnectorOauthClient(raw),
+    callback: EndpointConnectorOauthCallback(raw),
+  },
+  runs: EndpointConnectorRuns(raw),
+  providers: EndpointConnectorProviders(raw),
+  provider: EndpointConnectorProvider(raw),
+  categories: EndpointConnectorCategories(raw),
+  proxy: EndpointConnectorProxy(raw),
+  file: { upload: EndpointConnectorFileUpload(raw), download: EndpointConnectorFileDownload(raw) },
+  trigger: {
+    create: EndpointConnectorTriggerCreate(raw),
+    list: EndpointConnectorTriggerList(raw),
+    cancel: EndpointConnectorTriggerCancel(raw),
+    webhook: EndpointConnectorTriggerWebhook(raw),
+  },
+  reconcile: EndpointConnectorReconcile(raw),
 })
 
 const EndpointProjectList = (raw: RawClient["server.project"]) => () =>
@@ -2160,6 +2714,7 @@ const adaptClient = (raw: RawClient) => ({
   integration: adaptGroupIntegration(raw["server.integration"]),
   mcp: adaptGroupMcp(raw["server.mcp"]),
   credential: adaptGroupCredential(raw["server.credential"]),
+  connector: adaptGroupConnector(raw["server.connector"]),
   project: adaptGroupProject(raw["server.project"]),
   form: adaptGroupForm(raw["server.form"]),
   permission: adaptGroupPermission(raw["server.permission"]),
