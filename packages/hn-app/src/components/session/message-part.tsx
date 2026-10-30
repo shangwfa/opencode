@@ -21,6 +21,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Markdown } from "./markdown"
+import { isPreviewableFileHref } from "./file-preview-url"
 import type { Part } from "@/types/opencode"
 
 type ToolMeta = {
@@ -251,6 +252,7 @@ function ToolBlock({
   const Icon = meta.icon
   const status = part.state.status
   const summary = meta.summary(part)
+  const previewPath = onFileLink && part.tool.toLowerCase() === "read" && typeof summary === "string" && isPreviewableFileHref(summary) ? summary : undefined
   const output =
     typeof part.state.output === "string"
       ? part.state.output
@@ -260,10 +262,13 @@ function ToolBlock({
 
   return (
     <div className="group/tool my-1">
+      <div className="flex items-center">
       <button
         type="button"
-        className="hover:bg-muted/70 flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors"
-        onClick={() => setOpen((v) => !v)}
+        className="hover:bg-muted/70 flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors"
+        title={previewPath ? `预览 ${previewPath}` : undefined}
+        aria-expanded={previewPath ? undefined : open}
+        onClick={() => previewPath ? onFileLink?.(previewPath) : setOpen((v) => !v)}
       >
         <span className="bg-muted flex size-6 shrink-0 items-center justify-center rounded-md">
           <Icon className="text-muted-foreground size-3.5" />
@@ -272,6 +277,8 @@ function ToolBlock({
         <span className="text-muted-foreground min-w-0 flex-1 truncate text-[13px]">{summary}</span>
         <ToolStatusIcon status={status} />
       </button>
+      {previewPath && <button type="button" className="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted" aria-label="查看 Read 工具详情" aria-expanded={open} onClick={() => setOpen((value) => !value)}><ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} /></button>}
+      </div>
       {open && (
         <div className="bg-muted/40 mt-1 ml-[34px] overflow-hidden rounded-lg border">
           <ToolOutput
@@ -286,7 +293,7 @@ function ToolBlock({
 
 /** 工具输出里的沙箱文件链接（file:///workspace/x.html）渲染为可点击按钮 */
 const FILE_HREF_RE =
-  /file:\/\/\/[^\s"'<>)\]，。；：、]+|(?<![\w:/.-])\/(?:workspace|root|tmp|home)\/[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf)\b/gi
+  /file:\/\/\/[^\s"'<>)\]，。；：、]+|(?<![\w:/.-])\/(?:workspace|root|tmp|home)\/[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf|docx?|xlsx?|pptx|od[tpfs]|rtf|mp[34]|webm|wav|ogg|m4a|mov)\b/gi
 
 function ToolOutput({ text, onFileLink }: { text: string; onFileLink?: (href: string) => void }) {
   const nodes: React.ReactNode[] = []
@@ -312,7 +319,7 @@ function ToolOutput({ text, onFileLink }: { text: string; onFileLink?: (href: st
         <span key={`${href}-${match.index}`}>{raw}</span>
       ),
     )
-    cursor = match.index + href.length
+    cursor = match.index + raw.length
   }
   if (cursor < text.length) nodes.push(text.slice(cursor))
 

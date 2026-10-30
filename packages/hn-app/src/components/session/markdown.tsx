@@ -28,7 +28,7 @@ const FILE_URL_RE = /file:\/\/\/[^\s"'<>)\]，。；：、]+/g
  * 限定沙箱常见根目录 + 可预览扩展名，避免把 `/usr/bin` 之类误链化；href 统一补 `file://`。
  */
 const BARE_SANDBOX_PATH_RE =
-  /(?<![\w:/.-])\/(?:workspace|root|tmp|home)\/[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf)\b/gi
+  /(?<![\w:/.-])\/(?:workspace|root|tmp|home)\/[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf|docx?|xlsx?|pptx|od[tpfs]|rtf|mp[34]|webm|wav|ogg|m4a|mov)\b/gi
 
 /** 把文本节点里的沙箱文件引用转成 <a>（跳过 a/code/pre，避免破坏已有链接与代码块） */
 export function linkifySandboxFileUrls(html: string): string {
@@ -104,6 +104,7 @@ export function Markdown({
 
   return (
     <div
+      data-slot="markdown"
       className={cnMarkdown(className)}
       onClick={
         onFileLink

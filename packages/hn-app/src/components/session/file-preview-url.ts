@@ -51,7 +51,10 @@ const TEXT_EXT = new Set([
   "java",
 ])
 
-export type PreviewKind = "html" | "image" | "markdown" | "text" | "unsupported"
+const DOCUMENT_EXT = new Set(["pdf", "doc", "docx", "rtf", "odt", "xls", "xlsx", "ods", "pptx", "odp", "ofd"])
+const MEDIA_EXT = new Set(["mp3", "wav", "ogg", "m4a", "mp4", "webm", "mov"])
+
+export type PreviewKind = "html" | "image" | "markdown" | "text" | "document" | "media" | "unsupported"
 
 /** 取文件名（含扩展名） */
 export function filenameOf(path: string): string {
@@ -109,6 +112,8 @@ export function previewKindOf(path: string): PreviewKind {
   if (IMAGE_EXT.has(ext)) return "image"
   if (MARKDOWN_EXT.has(ext)) return "markdown"
   if (TEXT_EXT.has(ext)) return "text"
+  if (DOCUMENT_EXT.has(ext)) return "document"
+  if (MEDIA_EXT.has(ext)) return "media"
   return "unsupported"
 }
 
@@ -136,6 +141,30 @@ export function guessMimeType(path: string): string {
     md: "text/markdown",
     json: "application/json",
     csv: "text/csv",
+    pdf: "application/pdf",
+    doc: "application/msword",
+    docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    xls: "application/vnd.ms-excel",
+    xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    odt: "application/vnd.oasis.opendocument.text",
+    ods: "application/vnd.oasis.opendocument.spreadsheet",
+    odp: "application/vnd.oasis.opendocument.presentation",
+    rtf: "application/rtf",
+    ofd: "application/ofd",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    m4a: "audio/mp4",
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
   }
   return map[ext] ?? "text/plain"
+}
+
+/** 二进制接口返回 base64，预览与下载必须还原原始字节，不能直接保存字符串。 */
+export function sandboxPreviewFile(content: string, binary: boolean, path: string): File {
+  const bytes = binary ? Uint8Array.from(atob(content), (character) => character.charCodeAt(0)) : content
+  return new File([bytes], filenameOf(path), { type: guessMimeType(path) })
 }

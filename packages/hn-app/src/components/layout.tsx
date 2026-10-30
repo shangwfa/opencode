@@ -50,6 +50,7 @@ const navGroups: NavItem[][] = [
  */
 export function AppLayout() {
   const { pathname } = useLocation()
+  const workspacePage = ["/free-chat", "/cdp"].some((path) => pathname === path || pathname.startsWith(`${path}/`))
   // 入口显隐是展示偏好：默认显示，隐藏后仍可通过地址直达。
   const preferences = readPreferences()
   const groups = navGroups.map((group) =>
@@ -61,9 +62,9 @@ export function AppLayout() {
     to === "/" ? pathname === "/" : pathname === to || pathname.startsWith(`${to}/`)
 
   return (
-    <div className="bg-muted/30 flex h-screen overflow-hidden">
+    <div className={cn("bg-muted/30 flex h-screen overflow-hidden", workspacePage && "chat-shell")}>
       <TooltipProvider delayDuration={200}>
-        <aside className="bg-muted/70 flex w-16 shrink-0 flex-col">
+        <aside className="app-rail bg-muted/70 flex w-16 shrink-0 flex-col">
           <div className="flex h-14 shrink-0 items-center justify-center border-b">
             <Link to="/" aria-label="OpenCode Chat" className="flex items-center">
               <span className="bg-foreground flex size-7 items-center justify-center rounded-lg">

@@ -2,12 +2,13 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import path from "node:path"
+import { fileViewerRenderers } from "@file-viewer/vite-plugin"
 
 // 与源项目对齐：dev 端口 3001；
 // OpenCode SaaS 地址运行时读 window.YD.API_URL，需求 API base 读 window.YD.BOSS_API_URL，
 // dev 下由 vite 注入 /local-requirement 代理（xybot-front-opencode-ui 同款约定）。
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), fileViewerRenderers({ inject: false, copyAssets: { baseDir: "file-viewer" } })],
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },
   },

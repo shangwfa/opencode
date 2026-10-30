@@ -4,7 +4,7 @@
  * 以 user 消息为界切 turn；user 渲染气泡，assistant 按 byMessageCreated 序渲染 parts。
  * 底部状态行来自 useTurnPhase（工具执行中/思考中/卡顿提示）。
  */
-import { useMemo, type ReactNode } from "react"
+import { useLayoutEffect, useMemo, type ReactNode } from "react"
 import type { Message, Part } from "@/types/opencode"
 import { byMessageCreated, isToolPartStalledByError } from "@/shared/util/session"
 import { extractAttachmentContext } from "@/features/requirement/attachments/build-attachment-context-text"
@@ -75,16 +75,22 @@ export function SessionTimeline({
 }) {
   const turns = useMemo(() => sliceTurnMessages(messages), [messages])
   const { anchorRef, pinned, overflowing, scrollToBottom } = useStickToBottom([messages.length, parts, working])
+  const latestUserID = turns.at(-1)?.find((message) => message.role === "user")?.id
+
+  // 新用户消息（含乐观消息）恢复跟随；AI 增量和同一消息的快照同步不抢滚动。
+  useLayoutEffect(() => {
+    if (latestUserID) scrollToBottom()
+  }, [latestUserID, scrollToBottom])
 
   const hasStreamingReasoning = useMemo(() => hasStreamingReasoningPart(parts), [parts])
 
   return (
-    <div className={cn("mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-6", className)}>
+    <div data-slot="session-timeline" className={cn("mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-6", className)}>
       {turns.map((turn, ti) => {
         const userMsg = turn.find((m) => m.role === "user")
         const assistantMsgs = turn.filter((m) => m.role === "assistant")
         return (
-          <div key={userMsg?.id ?? `assistant-turn-${ti}`} className="hb-fade-up flex flex-col gap-3">
+          <div key={userMsg?.id ?? `assistant-turn-${ti}`} data-slot="chat-turn" className="hb-fade-up flex flex-col gap-3">
             {userMsg && (
               <>
                 {/* 附件（对齐源：user 消息的 file part 也渲染为附件卡片/图片） */}
@@ -103,7 +109,7 @@ export function SessionTimeline({
                 )}
                 {displayText(parts[userMsg.id] ?? []) && (
                   <div className="flex justify-end">
-                    <div className="bg-muted text-foreground max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-xs">
+                    <div data-chat-role="user" className="bg-muted text-foreground max-w-[85%] rounded-2xl rounded-br-md px-4 py-2.5 text-sm leading-relaxed shadow-xs">
                       <Markdown content={displayText(parts[userMsg.id] ?? [])} onFileLink={onFileLink} />
                     </div>
                   </div>
@@ -114,7 +120,7 @@ export function SessionTimeline({
               const msgParts = parts[m.id] ?? []
               const stalled = isToolPartStalledByError(msgParts)
               return (
-                <div key={m.id} className="flex flex-col">
+                <div key={m.id} data-chat-role="assistant" className="flex min-w-0 flex-col">
                   {(msgParts.length ? msgParts : []).map((p) => (
                     <MessagePart key={p.id} part={p} onFileLink={onFileLink} onImagePreview={onImagePreview} />
                   ))}

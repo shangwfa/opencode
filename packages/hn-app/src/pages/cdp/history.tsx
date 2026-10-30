@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { browserApi } from "@/lib/browser"
-import { useBrowserWorkspace } from "./layout"
+import { BrowserNavigationToggle, useBrowserWorkspace } from "./layout"
 
 export function CdpHistory() {
   const { sessions, refresh } = useBrowserWorkspace()
@@ -26,10 +26,10 @@ export function CdpHistory() {
   }
   const filtered = sessions.filter((s) => s.title.toLowerCase().includes(query.toLowerCase()))
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
+    <div className="cdp-collection flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
       <header className="mb-7 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">历史任务</h1>
+          <div className="flex items-center gap-2"><BrowserNavigationToggle /><h1 className="text-xl font-semibold tracking-tight">历史任务</h1></div>
           <p className="mt-2 text-sm text-muted-foreground">回到之前的浏览器工作区，继续未完成的任务。</p>
         </div>
         <Button asChild size="sm" className="gap-2">
@@ -51,7 +51,7 @@ export function CdpHistory() {
           {error}
         </p>
       )}
-      <div className="divide-y rounded-xl border">
+      <div className="cdp-history-list divide-y rounded-xl border">
         {filtered.map((session) => (
           <div key={session.id} className="group flex items-center gap-4 px-4 py-4">
             <History className="hidden size-4 shrink-0 text-muted-foreground sm:block" />

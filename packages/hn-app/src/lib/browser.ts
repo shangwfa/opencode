@@ -72,10 +72,10 @@ export const browserApi = {
   deleteScript: (id: string) => request(`${root}/scripts/${encodeURIComponent(id)}`, "DELETE"),
 }
 
-export function browserPrompt(text: string, review: boolean, scriptPath?: string | null) {
+export function browserPrompt(text: string, scriptPath?: string | null) {
   return [
     scriptPath ? `读取并执行浏览器脚本 ${scriptPath}，按以下要求补充参数。` : "",
-    review ? `UI走查：${text.trim()}` : text.trim(),
+    text.trim(),
   ]
     .filter(Boolean)
     .join("\n")

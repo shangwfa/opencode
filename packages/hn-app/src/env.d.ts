@@ -1,3 +1,5 @@
+/// <reference types="@file-viewer/vite-plugin/client" />
+
 declare global {
   interface Window {
     YD?: {

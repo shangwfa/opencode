@@ -4,7 +4,7 @@
  * 数据来源：GET /file/content?path=&sessionID=（当前部署无端口代理，HTML 以 srcdoc 内联渲染，
  * 因此相对路径资源不解析；模型产出的单文件 HTML（内联 CSS/JS）可完整呈现）。
  */
-import { useEffect, useMemo, useState } from "react"
+import { lazy, Suspense, useEffect, useMemo, useState } from "react"
 import { Code2, Copy, Download, Eye, FileWarning } from "lucide-react"
 import {
   Dialog,
@@ -16,17 +16,18 @@ import {
 import { Button } from "@/components/ui/button"
 import { Loader2 } from "lucide-react"
 import { readSandboxFile } from "@/lib/rest"
-import { Markdown } from "./markdown"
 import {
   guessMimeType,
   parentDirectoryOf,
   parseSandboxFileHref,
   previewKindOf,
+  sandboxPreviewFile,
   type PreviewKind,
 } from "./file-preview-url"
 import { cn } from "@/lib/utils"
 
-type Loaded = { kind: PreviewKind; content: string; filename: string; path: string; binary: boolean }
+const FileViewerPreview = lazy(() => import("./file-viewer-preview"))
+type Loaded = { kind: PreviewKind; content: string; filename: string; path: string; file: File }
 
 export function FilePreviewDialog({
   href,
@@ -56,17 +57,19 @@ export function FilePreviewDialog({
     // 通道 B = /file/content（本地 14096 上游 v2）。绝对路径未带 directory 时用父目录兜底。
     const dir = directory?.trim() || parentDirectoryOf(ref.path)
     readSandboxFile(ref.path, { directory: dir, sessionId, mime: guessMimeType(ref.path) })
-      .then((res) => {
-        if (cancelled) return
+      .then(async (res) => {
         const kind = previewKindOf(ref.path)
+        const file = sandboxPreviewFile(res.content, res.binary, ref.path)
+        const content = ["html", "text", "markdown"].includes(kind) ? await file.text() : ""
+        if (cancelled) return
         setState({
           loading: false,
           data: {
             kind,
-            content: res.content,
+            content,
             filename: ref.filename,
             path: ref.path,
-            binary: res.binary,
+            file,
           },
         })
       })
@@ -81,8 +84,7 @@ export function FilePreviewDialog({
 
   const download = () => {
     if (!state.data) return
-    const blob = new Blob([state.data.content], { type: guessMimeType(state.data.path) })
-    const url = URL.createObjectURL(blob)
+    const url = URL.createObjectURL(state.data.file)
     const a = document.createElement("a")
     a.href = url
     a.download = state.data.filename
@@ -96,10 +98,11 @@ export function FilePreviewDialog({
 
   const open = !!ref && kind !== "unsupported"
   const canToggleSource = kind === "html"
+  const canCopy = !!state.data && ["html", "text", "markdown"].includes(state.data.kind)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[86vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,92vw)]">
+      <DialogContent className="flex h-[86dvh] max-h-[86dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,92vw)]">
         <DialogHeader className="border-border/70 gap-1 border-b px-5 py-3.5">
           <DialogTitle className="flex min-w-0 items-center gap-2 text-sm">
             <span className="truncate">{ref?.filename ?? "文件"}</span>
@@ -121,7 +124,7 @@ export function FilePreviewDialog({
             </Button>
           )}
           <div className="flex-1" />
-          <Button variant="ghost" size="sm" className="h-7 gap-1.5 rounded-md px-2 text-xs" onClick={copy} disabled={!state.data}>
+          <Button variant="ghost" size="sm" className="h-7 gap-1.5 rounded-md px-2 text-xs" onClick={copy} disabled={!canCopy}>
             <Copy className="size-3.5" />
             复制
           </Button>
@@ -163,11 +166,13 @@ function kindLabel(kind: PreviewKind) {
   if (kind === "image") return "图片"
   if (kind === "markdown") return "Markdown"
   if (kind === "text") return "文本"
+  if (kind === "document") return "文档"
+  if (kind === "media") return "音视频"
   return "文件"
 }
 
 function PreviewBody({ data, showSource }: { data: Loaded; showSource: boolean }) {
-  if (!data.content.trim()) {
+  if (data.file.size === 0) {
     return <EmptyState title="文件为空" detail="沙箱中该文件没有内容。" />
   }
 
@@ -183,27 +188,8 @@ function PreviewBody({ data, showSource }: { data: Loaded; showSource: boolean }
     )
   }
 
-  if (data.kind === "image") {
-    // 通道 A 返回 base64；通道 B 的 type=raw 同样是 base64
-    const src = `data:${guessMimeType(data.path)};base64,${data.content}`
-    return (
-      <div className="flex min-h-full items-center justify-center p-6">
-        <img src={src} alt={data.filename} className="max-h-[70vh] max-w-full object-contain" />
-      </div>
-    )
-  }
-
-  if (data.kind === "markdown" && !showSource) {
-    return (
-      <div className="mx-auto w-full max-w-3xl px-6 py-5">
-        <Markdown content={data.content} />
-      </div>
-    )
-  }
-
-  return (
-    <pre className="text-muted-foreground p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">{data.content}</pre>
-  )
+  if (showSource) return <pre className="p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap">{data.content}</pre>
+  return <Suspense fallback={<div role="status" className="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />正在加载预览器…</div>}><FileViewerPreview file={data.file} /></Suspense>
 }
 
 function EmptyState({ icon, title, detail }: { icon?: React.ReactNode; title: string; detail: string }) {

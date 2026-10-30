@@ -42,6 +42,7 @@ export type ComposerSubmitInput = {
 }
 
 const KNOWN_AGENTS = ["build", "plan", "general"] as const
+const AGENT_LABELS: Record<string, string> = { build: "执行", plan: "规划", general: "通用" }
 
 export function Composer(props: {
   sessionId?: string
@@ -108,7 +109,7 @@ export function Composer(props: {
   const modelGroups = selectAvailableModels(providers)
 
   return (
-    <div className="relative shrink-0 px-4 pt-4 pb-4">
+    <div data-slot="chat-composer" className="relative shrink-0 px-3 pt-2 pb-3 sm:px-5 sm:pb-5">
       {/* 内容渐隐，避免消息与输入框硬切 */}
       <div
         aria-hidden
@@ -116,9 +117,9 @@ export function Composer(props: {
       />
       <div className="mx-auto w-full max-w-3xl">
         <div
+          data-slot="chat-composer-surface"
           className={cn(
-            "bg-card rounded-2xl border shadow-sm transition-[border-color,box-shadow] focus-within:border-foreground/20 focus-within:ring-2 focus-within:ring-ring/15",
-            props.working && "hb-pulse-ring border-foreground/20",
+            "bg-muted/30 rounded-[20px] border border-foreground/10 transition-[border-color,background-color] focus-within:border-foreground/25 focus-within:bg-card motion-reduce:transition-none",
             dragging && "border-ring ring-2 ring-ring/30",
           )}
           onDragOver={(e) => {
@@ -136,7 +137,7 @@ export function Composer(props: {
           }}
         >
           {images.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 px-3 pt-2.5">
+            <div className="flex flex-wrap gap-2 px-4 pt-3">
               {images.map((image) => (
                 <div
                   key={image.id}
@@ -168,7 +169,7 @@ export function Composer(props: {
                   <button
                     type="button"
                     aria-label={`移除 ${image.filename}`}
-                    className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-background/85 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                    className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-background/90 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
                     onClick={() => attachments.removeAttachment(image.id)}
                   >
                     <X className="size-2.5" />
@@ -179,10 +180,11 @@ export function Composer(props: {
           )}
           <Textarea
             ref={editorRef}
+            aria-label="消息内容"
             value={value}
             onChange={(e) => setValue(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                 e.preventDefault()
                 void doSubmit()
               }
@@ -191,10 +193,10 @@ export function Composer(props: {
               // 粘贴图片走 attachments（dataUrl → prompt image part → 发送时转 file part）
               void attachments.handlePaste(e.nativeEvent)
             }}
-            placeholder="随便问点什么…"
-            className="max-h-52 min-h-[3.25rem] resize-none border-0 bg-transparent px-4 pt-3.5 pb-2 text-[15px] leading-relaxed shadow-none focus-visible:ring-0"
+            placeholder="输入消息，开始协作…"
+            className="max-h-52 min-h-[60px] resize-none rounded-t-[20px] rounded-b-none border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-6 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-[15px] dark:bg-transparent"
           />
-          <div className="flex items-center gap-0.5 px-2 pb-2">
+          <div className="flex min-w-0 items-center gap-1 px-2.5 pb-2.5">
             <input
               ref={fileInputRef}
               type="file"
@@ -208,53 +210,61 @@ export function Composer(props: {
               }}
             />
             <Button
+              type="button"
               variant="ghost"
               size="icon"
-              className="text-muted-foreground hover:text-foreground size-8"
+              className="text-muted-foreground hover:text-foreground size-9 shrink-0 rounded-full"
+              aria-label="添加图片"
               title="添加图片"
               onClick={() => fileInputRef.current?.click()}
             >
-              <Plus className="size-4" />
+              <Plus className="size-[18px]" />
             </Button>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground h-8 gap-1.5 rounded-lg px-2 text-[13px]"
+                aria-label="选择 Agent"
+                title={`当前模式：${props.agent || "build"}`}
+                className="text-muted-foreground hover:text-foreground h-9 shrink-0 gap-1 rounded-full px-2 text-[13px] font-normal"
               >
-                <span>{props.agent || "build"}</span>
-                <ChevronDown className="size-3.5 opacity-50" />
+                <span>{AGENT_LABELS[props.agent || "build"] ?? props.agent}</span>
+                <ChevronDown className="size-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-32">
-              <DropdownMenuLabel>Agent</DropdownMenuLabel>
+            <DropdownMenuContent align="start" className="chat-menu min-w-32">
+              <DropdownMenuLabel>工作模式</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {KNOWN_AGENTS.map((agent) => (
                 <DropdownMenuItem
                   key={agent}
-                  className={cn(agent === props.agent && "bg-accent font-medium")}
+                  className={cn(agent === props.agent && "chat-menu-selected")}
                   onClick={() => props.onAgentChange(agent)}
                 >
-                  <span className="capitalize">{agent}</span>
+                  <span>{AGENT_LABELS[agent]}</span>
+                  <span className="text-muted-foreground ml-auto text-xs">{agent}</span>
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
 
+          <div className="min-w-0 flex-1" />
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-muted-foreground hover:text-foreground h-8 max-w-52 gap-1.5 rounded-lg px-2 text-[13px]"
+                aria-label="选择模型"
+                title={modelLabel}
+                className="text-muted-foreground hover:text-foreground h-9 min-w-0 max-w-52 gap-1 rounded-full px-2 text-[13px] font-normal"
               >
                 <span className="truncate">{modelLabel}</span>
-                <ChevronDown className="size-3.5 shrink-0 opacity-50" />
+                <ChevronDown className="size-3 shrink-0 opacity-60" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-80 min-w-64 overflow-y-auto">
+            <DropdownMenuContent align="start" className="chat-menu max-h-80 min-w-64 overflow-y-auto">
               {!providers ? (
                 <div className="text-muted-foreground px-2 py-3 text-xs">加载中…</div>
               ) : modelGroups.length === 0 ? (
@@ -270,7 +280,7 @@ export function Composer(props: {
                     return (
                       <DropdownMenuItem
                         key={`${group.provider.id}/${modelID}`}
-                        className={cn("gap-2", selected && "bg-accent font-medium")}
+                        className={cn("gap-2", selected && "chat-menu-selected")}
                         onClick={() => props.onModelChange({ providerID: group.provider.id, modelID })}
                       >
                         <span className="min-w-0 flex-1 truncate">{model.displayName || modelID}</span>
@@ -294,15 +304,14 @@ export function Composer(props: {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="flex-1" />
-
             {props.contextPercent !== undefined && <ContextUsageRing percent={percent} />}
 
             {props.working ? (
               <Button
                 size="icon"
                 variant="secondary"
-                className="text-foreground size-8 rounded-lg"
+                className="text-foreground ml-1 size-9 shrink-0 rounded-full"
+                aria-label="停止生成"
                 title="停止"
                 onClick={() => props.onAbort()}
               >
@@ -311,12 +320,13 @@ export function Composer(props: {
             ) : (
               <Button
                 size="icon"
-                className="size-8 rounded-lg"
+                className="ml-1 size-9 shrink-0 rounded-full shadow-none disabled:bg-foreground/10 disabled:text-muted-foreground disabled:opacity-100"
+                aria-label="发送消息"
                 disabled={!value.trim() && !hasAttachments}
                 onClick={() => void doSubmit()}
                 title="发送"
               >
-                <ArrowUp className="size-4" />
+                <ArrowUp className="size-[18px]" />
               </Button>
             )}
           </div>
@@ -329,7 +339,7 @@ export function Composer(props: {
 function ContextUsageRing({ percent }: { percent: number }) {
   const C = 2 * Math.PI * 11
   return (
-    <div className="relative size-7" title={`上下文用量 ${percent}%`} aria-label={`上下文用量 ${percent}%`}>
+    <div className="relative size-7 shrink-0" title={`上下文用量 ${percent}%`} aria-label={`上下文用量 ${percent}%`}>
       <svg viewBox="0 0 28 28" className="size-7 -rotate-90">
         <circle cx="14" cy="14" r="11" fill="none" strokeWidth="2.5" className="stroke-muted" />
         <circle

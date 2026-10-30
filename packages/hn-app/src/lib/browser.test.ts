@@ -5,11 +5,10 @@ import { visibleFormFields } from "@/features/browser-cdp/session-forms"
 import type { Form } from "@opencode/schema/form"
 
 describe("浏览器任务迁移", () => {
-  it("普通任务、走查和流程参数不会互相覆盖", () => {
-    expect(browserPrompt("  打开官网  ", false)).toBe("打开官网")
-    expect(browserPrompt("检查登录", true)).toBe("UI走查：检查登录")
-    expect(browserPrompt("城市=杭州", false, "/workspace/output/published-script.js")).toContain("城市=杭州")
-    expect(browserPrompt("检查登录", true, "/workspace/output/published-script.js")).toContain("UI走查：检查登录")
+  it("普通任务与脚本参数不会互相覆盖", () => {
+    expect(browserPrompt("  打开官网  ")).toBe("打开官网")
+    expect(browserPrompt("城市=杭州", "/workspace/output/published-script.js")).toContain("城市=杭州")
+    expect(browserPrompt("城市=杭州", "/workspace/output/published-script.js")).toContain("published-script.js")
   })
   it("地址补全并保持端口、查询和片段", () => {
     expect(normalizeBrowserUrl("example.com/path?q=1#top")).toBe("https://example.com/path?q=1#top")

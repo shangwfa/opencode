@@ -7,7 +7,7 @@
  */
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router"
-import { MessageSquareText, PanelLeft, Plus } from "lucide-react"
+import { PanelLeft, Plus, Layers3, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -32,40 +32,9 @@ import { useSessionBridge } from "@/hooks/use-session-bridge"
 import { ContextDialog, LazySessionInsights } from "@/components/context-insights/entry"
 import { readPreferences } from "@/components/context-insights/model"
 import { SessionForms } from "@/features/session/forms"
+import { groupSessions, type SessionRow } from "@/features/session/session-groups"
 
-type SessionRow = {
-  id: string
-  title?: string
-  time?: { created?: number; updated?: number }
-  [key: string]: unknown
-}
-
-/** 会话时间：今天/昨天显示相对日，其余 MM-DD（同日会话不再全部显示同一日期） */
-function formatDate(ts?: number) {
-  if (!ts) return ""
-  const d = new Date(ts)
-  const now = new Date()
-  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
-  const diffDays = Math.round((startOf(now) - startOf(d)) / 86400000)
-  if (diffDays === 0) return "今天"
-  if (diffDays === 1) return "昨天"
-  return `${d.getMonth() + 1}/${d.getDate()}`
-}
-
-/**
- * L2 会话列表项（上下文级）：选中用白卡——与 L1 的左指示条语言区分，
- * 靠底色深度（L1 muted/70 > L2 muted/30）而非相同卡片样式来体现层级。
- */
-function cnSessionItem(active: boolean) {
-  return cn(
-    "group flex h-9 w-full items-center rounded-lg px-2.5 text-left transition-colors",
-    active
-      ? "bg-background text-foreground shadow-xs ring-1 ring-border"
-      : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
-  )
-}
-
-function SessionListPanel({ activeId, collapsed }: { activeId?: string; collapsed?: boolean }) {
+function SessionListPanel({ activeId, collapsed, onSelect }: { activeId?: string; collapsed?: boolean; onSelect?: () => void }) {
   const { directory } = useSDK()
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<SessionRow[]>([])
@@ -75,11 +44,7 @@ function SessionListPanel({ activeId, collapsed }: { activeId?: string; collapse
   useEffect(() => {
     void sessionSource()
       .list()
-      .then((list) => {
-        setSessions(
-          (list as SessionRow[]).sort((a, b) => (b.time?.created ?? 0) - (a.time?.created ?? 0)),
-        )
-      })
+      .then((list) => setSessions(list as SessionRow[]))
       .catch(() => {})
   }, [directory, activeId])
 
@@ -100,53 +65,60 @@ function SessionListPanel({ activeId, collapsed }: { activeId?: string; collapse
   }
 
   return (
-    <div
+    <aside
       className={cn(
-        "bg-muted/30 flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out",
+        "chat-sessions bg-muted/30 flex shrink-0 flex-col overflow-hidden transition-[width] duration-200 ease-out",
         collapsed ? "w-0 border-r-0" : "w-60",
       )}
       aria-hidden={collapsed}
+      inert={collapsed}
+      aria-label="会话列表"
     >
-      {/* 顶部与 L1 的 h-14 对齐，避免两条顶线错位 */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <span className="text-[13px] font-medium">会话</span>
+      <div className="chat-sessions-header">
+        <button type="button" className="chat-sessions-close" aria-label="关闭会话列表" onClick={onSelect}><X className="size-4" /></button>
+        <div className="chat-workspace-label"><span className="chat-ai-mark" aria-hidden />OpenCode<span>工作空间</span></div>
+        <h2>会话</h2>
         <Button
-          variant="ghost"
+          variant="secondary"
           size="sm"
-          className="text-muted-foreground hover:text-foreground ml-auto h-7 gap-1 rounded-lg px-2 text-[12px]"
+          className="chat-new-session"
           onClick={() => void create()}
           disabled={creating}
         >
           <Plus className="size-3.5" />
-          新建
+          {creating ? "正在创建…" : "新建对话"}
         </Button>
       </div>
       {/* 原生滚动容器：Radix ScrollArea 的 viewport 是 display:table，宽度会被内容撑开，
           导致 truncate 失效（实测 296px > 列宽 240px） */}
-      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto p-2">
-        <div className="flex min-w-0 flex-col gap-0.5 px-0.5">
-          {sessions.length === 0 && (
-            <div className="text-muted-foreground/70 px-2.5 py-6 text-center text-xs">暂无会话</div>
-          )}
-          {sessions.map((s) => (
-            <button
-              key={s.id}
-              type="button"
-              title={s.title ?? "未命名会话"}
-              className={cnSessionItem(s.id === activeId)}
-              onClick={() => navigate(`/free-chat/session/${s.id}`)}
-            >
-              <span className="min-w-0 flex-1 truncate text-[13px] leading-tight">
-                {s.title ?? "未命名会话"}
-              </span>
-              <span className="text-muted-foreground/70 shrink-0 text-[11px] leading-tight tabular-nums">
-                {formatDate(s.time?.created)}
-              </span>
-            </button>
-          ))}
-        </div>
+      <div className="chat-session-list min-h-0 min-w-0 flex-1 overflow-y-auto px-2.5">
+        {sessions.length === 0 && (
+          <div className="text-muted-foreground/70 px-2.5 py-6 text-center text-xs">暂无会话</div>
+        )}
+        {groupSessions(sessions).map((group) => (
+          <section key={group.label} aria-label={group.label} className="chat-session-group">
+            <h3 className="chat-list-label">{group.label}</h3>
+            <div className="flex min-w-0 flex-col gap-0.5">
+              {group.sessions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  title={s.title ?? "未命名会话"}
+                  aria-current={s.id === activeId ? "page" : undefined}
+                  className="chat-session-item flex min-w-0 w-full items-center text-left transition-colors"
+                  onClick={() => {
+                    navigate(`/free-chat/session/${s.id}`)
+                    if (window.matchMedia("(max-width: 767px)").matches) onSelect?.()
+                  }}
+                >
+                  <span className="min-w-0 flex-1 truncate text-[13px] leading-tight">{s.title ?? "未命名会话"}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ))}
       </div>
-    </div>
+    </aside>
   )
 }
 
@@ -269,8 +241,8 @@ export function FreeChatCore({
   }
 
   return (
-    <Card className="flex min-h-0 flex-1 flex-col border-0 py-0">
-      <CardHeader className="h-14 flex-row items-center gap-2 border-b px-4">
+    <Card className="chat-conversation flex min-h-0 flex-1 flex-col gap-0 border-0 py-0">
+      <CardHeader className="chat-conversation-header h-14 flex-row items-center gap-2 border-b px-4">
         {onTogglePanel && (
           <Button
             variant="ghost"
@@ -284,22 +256,23 @@ export function FreeChatCore({
           </Button>
         )}
         {/* 顶部只保留「toggle + 标题 + 运行态」：图标与 token 数属于噪音 */}
-        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm">
-          <span className="truncate" title={title}>{title}</span>
+        <CardTitle className="chat-conversation-title flex min-w-0 flex-1 items-center gap-2 text-sm">
+          <span className="chat-header-mark chat-ai-mark" aria-hidden />
+          <span className="min-w-0 truncate" title={title}>{title}</span>
           {working && <Badge variant="outline">{turnPhase.phaseLabel}</Badge>}
         </CardTitle>
         {headerActions}
-        {sid && <Button size="sm" variant="ghost" className="ml-auto shrink-0 text-xs" onClick={() => {
+        {sid && <Button size="sm" variant="ghost" className="chat-context-button ml-auto shrink-0 gap-1.5 text-xs" onClick={() => {
           // Wide screens dock the panel; narrow ones must use the dialog. The placement preference
           // only narrows that choice, it never forces a dock that cannot fit.
           const wide = window.matchMedia("(min-width: 1024px)").matches
           if (wide && readPreferences().placement === "dock") setContextDock((old) => !old)
           else setContextOpen(true)
-        }}>上下文</Button>}
+        }}><Layers3 className="size-3.5" />上下文</Button>}
       </CardHeader>
       <CardContent className="flex min-h-0 min-w-0 flex-1 flex-row p-0">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <ScrollArea className="min-h-0 flex-1">
+        <ScrollArea className="chat-timeline-scroll min-h-0 flex-1">
           <SessionTimeline
             messages={messages}
             parts={parts}
@@ -310,6 +283,12 @@ export function FreeChatCore({
             onImagePreview={setImageTarget}
             className="min-h-full"
           >
+            {messages.length === 0 && !working && (
+              <div className="chat-empty-state">
+                <span className="chat-empty-mark chat-ai-mark" aria-hidden />
+                <h1>今天，想完成什么？</h1>
+              </div>
+            )}
             {sid && (
               <SessionForms
                 key={sid}
@@ -329,15 +308,6 @@ export function FreeChatCore({
             }}
           />
           <ImageLightbox target={imageTarget} onOpenChange={(open) => !open && setImageTarget(undefined)} />
-          {!sid && messages.length === 0 && (
-            <div className="flex flex-col items-center gap-2.5 py-20 text-center">
-              <div className="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-xl">
-                <MessageSquareText className="size-5" />
-              </div>
-              <p className="text-sm font-medium">开始一段新对话</p>
-              <p className="text-muted-foreground text-xs">发送第一条消息时会自动创建会话</p>
-            </div>
-          )}
         </ScrollArea>
         <Composer
           sessionId={sid || undefined}
@@ -374,9 +344,10 @@ export function FreeChatPage() {
   return (
     <ServerProvider directory={dir}>
       <DataProvider bridge={bridge}>
-        <div className="flex h-full">
+        <div className="chat-workspace relative flex h-full">
           {/* 无 p-4：让主区与 L2 贴边、顶部与 L1 对齐，横线才能连成一条 */}
-          <SessionListPanel activeId={sessionId} collapsed={panelCollapsed} />
+          {!panelCollapsed && <button type="button" className="chat-sidebar-backdrop" aria-label="关闭会话列表遮罩" onClick={togglePanel} />}
+          <SessionListPanel activeId={sessionId} collapsed={panelCollapsed} onSelect={togglePanel} />
           <div className="flex min-w-0 flex-1 flex-col">
             <FreeChatCore onTogglePanel={togglePanel} panelCollapsed={panelCollapsed} />
           </div>

@@ -3,9 +3,9 @@ import { createRoot } from "react-dom/client"
 import { expect, it, vi } from "vitest"
 import { SessionTimeline } from "./session-timeline"
 
-const scroll = vi.hoisted(() => ({ pinned: true, overflowing: true }))
+const scroll = vi.hoisted(() => ({ pinned: true, overflowing: true, scrollToBottom: vi.fn() }))
 vi.mock("@/hooks/use-stick-to-bottom", () => ({
-  useStickToBottom: () => ({ ...scroll, anchorRef: { current: null }, scrollToBottom: vi.fn() }),
+  useStickToBottom: () => ({ ...scroll, anchorRef: { current: null } }),
 }))
 
 it("回到底部按钮显隐不增加或移除 flex 子项，避免 gap 改变导致滚动反馈循环", async () => {

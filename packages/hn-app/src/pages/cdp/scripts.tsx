@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { browserApi, type BrowserScript, type BrowserVersion } from "@/lib/browser"
 import { useAuth } from "@/lib/auth"
 import { PublishScriptDialog } from "@/features/browser-cdp/publish-script-dialog"
+import { BrowserNavigationToggle } from "./layout"
 
 export function CdpScripts() {
   const [scripts, setScripts] = useState<BrowserScript[]>([])
@@ -32,10 +33,10 @@ export function CdpScripts() {
     `${script.name} ${script.description}`.toLowerCase().includes(query.toLowerCase()),
   )
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
+    <div className="cdp-collection flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
       <header className="mb-7 flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">脚本库</h1>
+          <div className="flex items-center gap-2"><BrowserNavigationToggle /><h1 className="text-xl font-semibold tracking-tight">脚本库</h1></div>
           <p className="mt-2 text-sm text-muted-foreground">把成功执行的流程，变成下一次工作的起点。</p>
         </div>
         <Button size="sm" className="gap-2" onClick={() => setPublish(true)}>
@@ -68,7 +69,7 @@ export function CdpScripts() {
             <Link
               key={script.id}
               to={`/cdp/scripts/${script.id}`}
-              className="group rounded-xl border p-5 transition-colors hover:bg-muted/30"
+              className="cdp-script-card group rounded-xl border p-5 transition-colors hover:bg-muted/30"
             >
               <div className="flex items-center gap-3">
                 <Code2 className="size-4 text-muted-foreground" />
@@ -145,11 +146,11 @@ export function CdpScriptDetail() {
     }
   }
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
-      <Link to="/cdp/scripts" className="mb-6 flex w-fit items-center gap-2 text-xs text-muted-foreground">
+    <div className="cdp-collection flex min-h-0 flex-1 flex-col overflow-y-auto p-5 md:p-8">
+      <div className="mb-6 flex items-center gap-2"><BrowserNavigationToggle /><Link to="/cdp/scripts" className="flex w-fit items-center gap-2 text-xs text-muted-foreground">
         <ArrowLeft className="size-3" />
         返回脚本库
-      </Link>
+      </Link></div>
       {error && (
         <div role="alert" className="mb-4 text-sm text-destructive">
           {error}

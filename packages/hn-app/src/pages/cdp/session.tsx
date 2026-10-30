@@ -9,11 +9,12 @@ import { withDraftText } from "@/components/prompt-input/draft-text"
 import { FilePreviewDialog } from "@/components/session/file-preview-dialog"
 import { FreeChatCore } from "@/pages/free-chat"
 import { BrowserPanel } from "@/features/browser-cdp/browser-panel"
+import { BrowserWorkspaceSplit } from "@/features/browser-cdp/workspace-split"
 import { PublishScriptDialog } from "@/features/browser-cdp/publish-script-dialog"
 import { sessionSource } from "@/lib/session-source"
 import { browserApi } from "@/lib/browser"
 import { baseFetch } from "@/lib/base-api"
-import { useBrowserWorkspace } from "./layout"
+import { BrowserNavigationToggle, useBrowserWorkspace } from "./layout"
 
 type FirstTask = {
   prompt: string
@@ -185,15 +186,18 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
   const [publish, setPublish] = useState(false)
   const [mobilePanel, setMobilePanel] = useState(false)
   const data = useData()
-  const { sessions } = useBrowserWorkspace()
+  const { sessions, navigationCollapsed, toggleNavigation } = useBrowserWorkspace()
   const title = sessions.find((session) => session.id === sessionId)?.title ?? "浏览器任务"
   return (
     <>
       <FirstPrompt sessionId={sessionId} connected={connected} />
-      <div className="flex min-h-0 flex-1 flex-col xl:flex-row">
-        <div className={`min-h-0 min-w-0 flex-1 flex-col ${mobilePanel ? "hidden xl:flex" : "flex"}`}>
+      <BrowserWorkspaceSplit
+        showPanel={mobilePanel}
+        chat={
           <FreeChatCore
             title={title}
+            onTogglePanel={toggleNavigation}
+            panelCollapsed={navigationCollapsed}
             headerActions={
               <Button
                 variant="ghost"
@@ -206,16 +210,15 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
               </Button>
             }
           />
-        </div>
-        <aside
-          className={`min-h-0 min-w-0 flex-1 flex-col border-l xl:min-w-80 xl:w-[48%] xl:flex-none ${mobilePanel ? "flex" : "hidden xl:flex"}`}
-          aria-label="浏览器工具面板"
-        >
-          <div className="flex h-14 shrink-0 items-center gap-1 border-b px-3">
+        }
+        panel={<>
+          <div className="cdp-tool-tabs flex shrink-0 items-center gap-1 border-b px-3">
+            <div className="xl:hidden"><BrowserNavigationToggle /></div>
             <Button
               size="sm"
               variant={tab === "browser" ? "secondary" : "ghost"}
               className="gap-2 text-xs"
+              aria-pressed={tab === "browser"}
               onClick={() => setTab("browser")}
             >
               <Monitor className="size-3.5" />
@@ -225,6 +228,7 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
               size="sm"
               variant={tab === "files" ? "secondary" : "ghost"}
               className="gap-2 text-xs"
+              aria-pressed={tab === "files"}
               onClick={() => setTab("files")}
             >
               <Folder className="size-3.5" />
@@ -247,8 +251,8 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
             />
           </div>
           {tab === "files" && <WorkFiles sessionId={sessionId} />}
-        </aside>
-      </div>
+        </>}
+      />
       <PublishScriptDialog open={publish} onOpenChange={setPublish} sessionId={sessionId} />
     </>
   )
