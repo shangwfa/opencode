@@ -8,6 +8,9 @@ import { authEnabled } from "./auth"
 import { baseFetch } from "./base-api"
 import { subscribeSessionEvents } from "./base-sse"
 import { timelineMessages, type SessionMessage } from "./session-messages"
+import type { Form } from "@opencode/schema/form"
+
+export type FormInfo = Form.Info
 
 export type ChatSession = {
   id: string
@@ -29,6 +32,10 @@ export type SessionSource = {
   abort(sessionId: string): Promise<unknown>
   /** 消息列表（[{info|message, parts}]） */
   messages(sessionId: string): Promise<unknown[]>
+  /** 待回答问题（通用表单） */
+  forms(sessionId: string): Promise<{ data: FormInfo[] }>
+  /** 回答待确认问题 */
+  reply(sessionId: string, form: string, answer: Record<string, unknown>): Promise<unknown>
   /** 单会话事件流（SSE）；onEnd 在断开时触发（供重连）；返回取消函数 */
   subscribe(
     sessionId: string,
@@ -60,6 +67,17 @@ const saasSource: SessionSource = {
     const { sessionMessages } = await import("./rest")
     const res = await sessionMessages(sessionId)
     return ((res.data ?? res) as unknown[]) ?? []
+  },
+  async forms(sessionId) {
+    const { rest } = await import("./rest")
+    return rest<{ data: FormInfo[] }>(`/api/session/${encodeURIComponent(sessionId)}/form`)
+  },
+  async reply(sessionId, form, answer) {
+    const { rest } = await import("./rest")
+    return rest(`/api/session/${encodeURIComponent(sessionId)}/form/${encodeURIComponent(form)}/reply`, {
+      method: "POST",
+      body: { answer },
+    })
   },
   subscribe() {
     // 直连模式的事件流由 DataProvider 的全局订阅负责，这里不需要
@@ -94,6 +112,15 @@ const baseSource: SessionSource = {
       `/api/sessions/${encodeURIComponent(sessionId)}/messages`,
     )
     return timelineMessages(sessionId, res.data ?? [])
+  },
+  async forms(sessionId) {
+    return baseFetch<{ data: FormInfo[] }>(`/api/sessions/${encodeURIComponent(sessionId)}/forms`)
+  },
+  async reply(sessionId, form, answer) {
+    return baseFetch<unknown>(`/api/sessions/${encodeURIComponent(sessionId)}/forms/${encodeURIComponent(form)}/reply`, {
+      method: "POST",
+      body: JSON.stringify({ answer }),
+    })
   },
   subscribe(sessionId, onEvent, onEnd) {
     return subscribeSessionEvents(sessionId, onEvent, onEnd)

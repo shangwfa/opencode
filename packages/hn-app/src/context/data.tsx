@@ -202,6 +202,8 @@ export function DataProvider({ bridge, children }: { bridge?: DataBridge; childr
   const stateRef = useRef(state)
   stateRef.current = state
   const messageRequests = useRef<Record<string, number>>({})
+  /** 已乐观插入、服务端尚未回显的用户消息；loadMessages 合并时必须保留它们。 */
+  const optimisticPending = useRef<Record<string, Set<string>>>({})
 
   // 事件流（GET /event SSE；断连 3s 重连）
   useEffect(() => {
@@ -291,6 +293,17 @@ export function DataProvider({ bridge, children }: { bridge?: DataBridge; childr
         // 由隐藏消息触发的 assistant 回复同样隐藏
         // 新 step 可能尚未进入请求发起时的快照，保留仍有流式内容的消息。
         for (const entry of existing) if (streamed[entry.id]?.length && !list.some((item) => item.id === entry.id)) list.push(entry)
+        // 浏览器会话准备阶段会先写入 shell 消息，使服务端列表非空；
+        // 若此时刚刚发出的用户消息还没落库，上面的合并会把它冲掉（表现为「发出去的消息先消失、稍后再出现」）。
+        const pending = optimisticPending.current[sessionID]
+        for (const entry of existing) {
+          if (!pending?.has(entry.id)) continue
+          if (list.some((item) => item.id === entry.id)) {
+            pending.delete(entry.id)
+            continue
+          }
+          list.push(entry)
+        }
         message[sessionID] = list
           .filter((m) => !hidden[m.id] && !(m.role === "assistant" && hidden[m.parentID]))
           .sort(byMessageCreated)
@@ -302,6 +315,8 @@ export function DataProvider({ bridge, children }: { bridge?: DataBridge; childr
   }
 
   const optimisticAdd: DataContextValue["optimisticAdd"] = (input) => {
+    const pending = (optimisticPending.current[input.sessionID] ??= new Set())
+    pending.add(input.message.id)
     setState((prev) => {
       const messages = prev.message[input.sessionID] ?? []
       const next = [...messages, input.message].sort(byMessageCreated)
@@ -310,11 +325,13 @@ export function DataProvider({ bridge, children }: { bridge?: DataBridge; childr
         message: { ...prev.message, [input.sessionID]: next },
         part: { ...prev.part, [input.message.id]: input.parts },
         session_status: { ...prev.session_status, [input.sessionID]: { type: "busy" } },
+        session_error: { ...prev.session_error, [input.sessionID]: undefined },
       }
     })
   }
 
   const optimisticRemove: DataContextValue["optimisticRemove"] = (input) => {
+    optimisticPending.current[input.sessionID]?.delete(input.messageID)
     setState((prev) => {
       const messages = (prev.message[input.sessionID] ?? []).filter((m) => m.id !== input.messageID)
       const part = { ...prev.part }

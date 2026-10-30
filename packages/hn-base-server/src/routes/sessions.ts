@@ -290,6 +290,38 @@ sessionRoutes.get("/:id/fs/content", async (c) => {
   return c.json({ type: "text", content: await res.text() })
 })
 
+/** 待回答问题（通用会话表单：websearch provider 选择、确认类问答等） */
+sessionRoutes.get("/:id/forms", async (c) => {
+  const id = c.req.param("id")
+  await assertSession(c.get("userId"), id, "read", c)
+  const res = await saasFetch(`/api/session/${encodeURIComponent(id)}/form`)
+  if (!res.ok) throw errors.notFound("session")
+  return c.json(await res.json().catch(() => ({ data: [] })))
+})
+
+const formReplyBody = z
+  .object({ answer: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.array(z.string())])) })
+  .strict()
+
+sessionRoutes.post("/:id/forms/:form/reply", async (c) => {
+  const id = c.req.param("id")
+  await assertSession(c.get("userId"), id, "run", c)
+  const parsed = formReplyBody.safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    throw errors.invalid(issue?.message ?? "参数错误", issue?.path?.join("."))
+  }
+  const res = await saasFetch(
+    `/api/session/${encodeURIComponent(id)}/form/${encodeURIComponent(c.req.param("form"))}/reply`,
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data) },
+  )
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    throw errors.upstream(502, `表单提交失败（${res.status}）：${text.slice(0, 160)}`)
+  }
+  return c.json(await res.json().catch(() => ({ replied: true })))
+})
+
 /** 子会话 */
 sessionRoutes.get("/:id/children", async (c) => {
   const id = c.req.param("id")

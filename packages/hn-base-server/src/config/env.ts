@@ -89,6 +89,14 @@ export const env = {
   get saasPassword(): string {
     return readEnv("OPENCODE_PASSWORD") || ""
   },
+  /** 覆盖沙箱内浏览器启动命令；供非仓库镜像/模板（阿里云、Vercel 等）自备运行时。 */
+  get browserStartCommand(): string | undefined {
+    return readEnv("OPENCODE_BROWSER_START_COMMAND")
+  },
+  /** 允许在沙箱内安装 Chromium（云端官方模板未预装时使用，首次启动较慢）。 */
+  get browserAutoInstall(): boolean {
+    return readEnv("OPENCODE_BROWSER_AUTO_INSTALL") === "1" || readEnv("OPENCODE_BROWSER_AUTO_INSTALL") === "true"
+  },
 }
 
 export type Env = typeof env

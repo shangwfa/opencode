@@ -5,7 +5,7 @@
  * - 左侧会话列表（GET /session），右侧 timeline + composer；发送/停止复用 REST 管线
  * 高级功能（AgentConfigPanel / 子代理页 / rrweb 回放）见 MIGRATION.md。
  */
-import { Suspense, useEffect, useMemo, useState } from "react"
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react"
 import { useNavigate, useParams } from "react-router"
 import { MessageSquareText, PanelLeft, Plus } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -31,6 +31,7 @@ import { sessionSource, usingBaseServer, type ChatSession } from "@/lib/session-
 import { useSessionBridge } from "@/hooks/use-session-bridge"
 import { ContextDialog, LazySessionInsights } from "@/components/context-insights/entry"
 import { readPreferences } from "@/components/context-insights/model"
+import { SessionForms } from "@/features/session/forms"
 
 type SessionRow = {
   id: string
@@ -149,12 +150,16 @@ function SessionListPanel({ activeId, collapsed }: { activeId?: string; collapse
   )
 }
 
-function FreeChatCore({
+export function FreeChatCore({
   onTogglePanel,
   panelCollapsed = false,
+  title = "自由对话",
+  headerActions,
 }: {
   onTogglePanel?: () => void
   panelCollapsed?: boolean
+  title?: string
+  headerActions?: ReactNode
 }) {
   const { sessionId } = useParams()
   const { directory } = useSDK()
@@ -279,10 +284,11 @@ function FreeChatCore({
           </Button>
         )}
         {/* 顶部只保留「toggle + 标题 + 运行态」：图标与 token 数属于噪音 */}
-        <CardTitle className="flex items-center gap-2 text-sm">
-          自由对话
+        <CardTitle className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+          <span className="truncate" title={title}>{title}</span>
           {working && <Badge variant="outline">{turnPhase.phaseLabel}</Badge>}
         </CardTitle>
+        {headerActions}
         {sid && <Button size="sm" variant="ghost" className="ml-auto shrink-0 text-xs" onClick={() => {
           // Wide screens dock the panel; narrow ones must use the dialog. The placement preference
           // only narrows that choice, it never forces a dock that cannot fit.
@@ -299,10 +305,21 @@ function FreeChatCore({
             parts={parts}
             working={working}
             phaseLabel={turnPhase.phaseLabel}
+            executionError={data.state.session_error[sid]}
             onFileLink={setPreviewHref}
             onImagePreview={setImageTarget}
             className="min-h-full"
-          />
+          >
+            {sid && (
+              <SessionForms
+                key={sid}
+                sessionId={sid}
+                active={working}
+                load={sessionSource().forms}
+                reply={sessionSource().reply}
+              />
+            )}
+          </SessionTimeline>
           <FilePreviewDialog
             href={previewHref}
             directory={directory || undefined}

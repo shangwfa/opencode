@@ -63,11 +63,7 @@ function isJson(res: Response): boolean {
 export { isJson }
 
 /** 创建会话：V2 优先，legacy 回退 */
-export async function saasCreateSession(input: {
-  directory: string
-  title?: string
-  agent?: string
-}): Promise<string> {
+export async function saasCreateSession(input: { directory: string; title?: string; agent?: string }): Promise<string> {
   // directory 只认 body.location：query 会被忽略，回落到镜像默认目录
   // /app/packages/opencode，导致 shell/文件工具与预期工作区不一致
   const body = JSON.stringify({
@@ -123,13 +119,14 @@ async function waitForShellEndV2(
   const started = Date.now()
   while (Date.now() - started < timeoutMs) {
     try {
-      const res = await saasFetch(
-        `/api/experimental/session/${encodeURIComponent(sessionId)}/log?follow=false&after=0`,
-      )
+      const res = await saasFetch(`/api/experimental/session/${encodeURIComponent(sessionId)}/log?follow=false&after=0`)
       if (res.ok && !(res.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) {
         // replay 可能以 SSE 返回，也可能是 JSON 数组
         const text = await res.text()
-        const events: Array<{ type?: string; data?: { shell?: ShellEnded & { command?: string }; output?: { output?: string } } }> = []
+        const events: Array<{
+          type?: string
+          data?: { shell?: ShellEnded & { command?: string }; output?: { output?: string } }
+        }> = []
         const trimmed = text.trim()
         if (trimmed.startsWith("[")) {
           try {
@@ -161,6 +158,23 @@ async function waitForShellEndV2(
 }
 
 /**
+ * 会话沙箱保活开关。
+ * SaaS 在每轮对话结束时会销毁未保活的沙箱（`destroyUnkeptSandbox`）。
+ * 浏览器运行在沙箱内，会话一过轮次就会被回收，所以浏览器会话必须保活。
+ */
+export async function saasKeepAlive(sessionId: string, enabled = true): Promise<void> {
+  const res = await saasFetch(`/api/experimental/session/${encodeURIComponent(sessionId)}/keep-alive`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => "")
+    throw errors.upstream(503, `沙箱保活失败（${res.status}）：${text.slice(0, 160)}`)
+  }
+}
+
+/**
  * 在会话工作目录执行一条 shell 命令。
  * 沙箱命令在会话沙箱内执行；绝不落到 SaaS 宿主文件系统。
  */
@@ -168,6 +182,7 @@ export async function saasRunShell(
   sessionId: string,
   command: string,
   options: { agent?: string; successMarker?: string; messageID?: string } = {},
+  waitMs = 90_000,
 ): Promise<{ exit: number; output: string }> {
   // V2
   const v2 = await saasFetch(`/api/session/${encodeURIComponent(sessionId)}/shell`, {
@@ -179,7 +194,7 @@ export async function saasRunShell(
     }),
   })
   if (v2.ok && !(v2.headers.get("content-type") ?? "").toLowerCase().includes("text/html")) {
-    const ended = await waitForShellEndV2(sessionId, command)
+    const ended = await waitForShellEndV2(sessionId, command, waitMs)
     if (ended) {
       return { exit: typeof ended.exit === "number" ? ended.exit : 1, output: ended.output?.output ?? "" }
     }
@@ -188,5 +203,4 @@ export async function saasRunShell(
 
   // legacy shell 在旧镜像中使用 SaaS 本地进程，不能用于会话沙箱初始化。
   throw errors.internal("执行服务沙箱命令接口不可用，命令未执行")
-
 }

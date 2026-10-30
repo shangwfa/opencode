@@ -270,6 +270,38 @@ const DDL = (s: string) => String.raw`
   );
   CREATE INDEX IF NOT EXISTS audit_actor_idx ON "${s}"."audit_log" (actor_id);
   CREATE INDEX IF NOT EXISTS audit_time_idx ON "${s}"."audit_log" (time_created);
+
+  CREATE TABLE IF NOT EXISTS "${s}"."browser_session" (
+    id text PRIMARY KEY,
+    title text NOT NULL,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    time_created bigint NOT NULL,
+    deleted_at bigint
+  );
+  CREATE INDEX IF NOT EXISTS browser_session_owner_idx ON "${s}"."browser_session" (owner_id, time_created);
+  -- 云端模板自举安装可能数分钟：创建接口先落 preparing，后台准备完成再转 ready。
+  ALTER TABLE "${s}"."browser_session" ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'ready';
+  ALTER TABLE "${s}"."browser_session" ADD COLUMN IF NOT EXISTS error text;
+  CREATE TABLE IF NOT EXISTS "${s}"."browser_script" (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    description text NOT NULL DEFAULT '',
+    visibility text NOT NULL DEFAULT 'private',
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    version integer NOT NULL,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL,
+    deleted_at bigint
+  );
+  CREATE INDEX IF NOT EXISTS browser_script_owner_idx ON "${s}"."browser_script" (owner_id);
+  CREATE TABLE IF NOT EXISTS "${s}"."browser_script_version" (
+    script_id text NOT NULL REFERENCES "${s}"."browser_script"(id),
+    version integer NOT NULL,
+    content text NOT NULL,
+    changelog text NOT NULL DEFAULT '',
+    time_created bigint NOT NULL,
+    PRIMARY KEY (script_id, version)
+  );
 `
 
 export async function ensureSchema(pool: Pool, schemaName = env.databaseSchema): Promise<void> {

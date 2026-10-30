@@ -4,10 +4,11 @@
  * 以 user 消息为界切 turn；user 渲染气泡，assistant 按 byMessageCreated 序渲染 parts。
  * 底部状态行来自 useTurnPhase（工具执行中/思考中/卡顿提示）。
  */
-import { useEffect, useMemo, useRef } from "react"
+import { useMemo, type ReactNode } from "react"
 import type { Message, Part } from "@/types/opencode"
 import { byMessageCreated, isToolPartStalledByError } from "@/shared/util/session"
 import { extractAttachmentContext } from "@/features/requirement/attachments/build-attachment-context-text"
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom"
 import { MessagePart } from "./message-part"
 import { Markdown } from "./markdown"
 import { cn } from "@/lib/utils"
@@ -52,6 +53,8 @@ export function SessionTimeline({
   parts,
   working,
   phaseLabel,
+  executionError,
+  children,
   onFileLink,
   onImagePreview,
   className,
@@ -60,6 +63,10 @@ export function SessionTimeline({
   parts: Record<string, Part[]>
   working: boolean
   phaseLabel?: string
+  /** 本轮执行失败但没有任何 assistant 消息可承载错误（例如模型调用直接失败）。 */
+  executionError?: unknown
+  /** 与消息同宽、共享滚动的待回答问题。 */
+  children?: ReactNode
   /** 沙箱文件链接点击（预览弹窗由页面层持有） */
   onFileLink?: (href: string) => void
   /** 图片 part 点击放大（灯箱由页面层持有） */
@@ -67,14 +74,9 @@ export function SessionTimeline({
   className?: string
 }) {
   const turns = useMemo(() => sliceTurnMessages(messages), [messages])
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const { anchorRef, pinned, overflowing, scrollToBottom } = useStickToBottom([messages.length, parts, working])
 
   const hasStreamingReasoning = useMemo(() => hasStreamingReasoningPart(parts), [parts])
-
-  // 自动滚动（源 createAutoScroll 语义：新内容出现时贴底）
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-  }, [messages.length, parts, working])
 
   return (
     <div className={cn("mx-auto flex w-full max-w-3xl flex-col gap-6 px-5 py-6", className)}>
@@ -135,6 +137,7 @@ export function SessionTimeline({
         )
       })}
 
+      {children}
       {/* 有流式思考块时，思考态已由块内「思考中」表达，底部不再重复一行 */}
       {working && phaseLabel && !hasStreamingReasoning && (
         <div className="text-muted-foreground flex items-center gap-2 text-[13px]">
@@ -146,7 +149,31 @@ export function SessionTimeline({
           <span>{phaseLabel}</span>
         </div>
       )}
-      <div ref={bottomRef} />
+      {/* 失败轮次可能一条 assistant 消息都没有；不显示就会「发出去后什么也没有」 */}
+      {!working && executionError != null && (
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+        >
+          <p className="font-medium">执行失败</p>
+          <p className="mt-1 break-words">{sessionErrorText(executionError)}</p>
+        </div>
+      )}
+      <div ref={anchorRef} />
+      {/* 用户上滚后不再强制跟随，提供一个回到最新的入口 */}
+      {/* 外层始终保留，避免显隐改变 flex gap 后触发底部滚动反馈循环。 */}
+      <div className="pointer-events-none sticky bottom-2 z-10 h-0 shrink-0 self-center">
+        {overflowing && !pinned && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            aria-label="回到底部"
+            className="pointer-events-auto absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-background px-3 py-1.5 text-xs shadow-sm hover:bg-muted"
+          >
+            回到底部 ↓
+          </button>
+        )}
+      </div>
     </div>
   )
 }

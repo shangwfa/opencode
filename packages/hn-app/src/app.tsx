@@ -21,11 +21,16 @@ import { KnowledgeTasksPage } from "@/pages/knowledge/tasks"
 import { RequirementsPage } from "@/pages/requirements"
 import { AppDetailPage } from "@/pages/app-detail"
 import { AgentRegistryPage } from "@/pages/agent-registry"
-import { CdpPage } from "@/pages/cdp"
 import { SessionPage } from "@/pages/session"
 import { NotFoundPage } from "@/pages/not-found"
 
 const ContextInsightsPage = lazy(() => import("@/pages/context-insights").then((module) => ({ default: module.ContextInsightsPage })))
+const CdpLayout = lazy(() => import("@/pages/cdp/layout").then((module) => ({ default: module.CdpLayout })))
+const CdpHome = lazy(() => import("@/pages/cdp/home").then((module) => ({ default: module.CdpHome })))
+const CdpHistory = lazy(() => import("@/pages/cdp/history").then((module) => ({ default: module.CdpHistory })))
+const CdpScripts = lazy(() => import("@/pages/cdp/scripts").then((module) => ({ default: module.CdpScripts })))
+const CdpScriptDetail = lazy(() => import("@/pages/cdp/scripts").then((module) => ({ default: module.CdpScriptDetail })))
+const CdpSession = lazy(() => import("@/pages/cdp/session").then((module) => ({ default: module.CdpSession })))
 
 export function App() {
   return (
@@ -62,7 +67,13 @@ export function App() {
         <Route path="/knowledge/tasks" element={<KnowledgeTasksPage />} />
         <Route path="/requirements" element={<RequirementsPage />} />
         <Route path="/agent-registry" element={<AgentRegistryPage />} />
-        <Route path="/cdp" element={<CdpPage />} />
+        <Route path="/cdp" element={<Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">正在加载浏览器工作区…</p>}><CdpLayout /></Suspense>}>
+          <Route index element={<CdpHome />} />
+          <Route path="sessions" element={<CdpHistory />} />
+          <Route path="scripts" element={<CdpScripts />} />
+          <Route path="scripts/:scriptId" element={<CdpScriptDetail />} />
+          <Route path="session/:sessionId" element={<CdpSession />} />
+        </Route>
         <Route path="/session/:sessionId" element={<SessionPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

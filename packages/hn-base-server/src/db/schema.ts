@@ -12,7 +12,9 @@ import {
   bigint,
   boolean,
   index,
+  integer,
   jsonb,
+  primaryKey,
   pgSchema,
   text,
   timestamp,
@@ -123,10 +125,7 @@ export const member = hnBase.table(
     role: text("role").notNull(),
     createdAt: createdAt(),
   },
-  (t) => [
-    index("member_user_idx").on(t.userId),
-    uniqueIndex("member_org_user_uq").on(t.organizationId, t.userId),
-  ],
+  (t) => [index("member_user_idx").on(t.userId), uniqueIndex("member_org_user_uq").on(t.organizationId, t.userId)],
 )
 
 /** 组织自定义角色：permissions = { requirement: ["read","write"], session: ["read"], ... } */
@@ -388,13 +387,62 @@ export const auditLog = hnBase.table(
     metadata: jsonb("metadata"),
     timeCreated: bigint("time_created", { mode: "number" }).notNull(),
   },
-  (t) => [
-    index("audit_actor_idx").on(t.actorId),
-    index("audit_time_idx").on(t.timeCreated),
-  ],
+  (t) => [index("audit_actor_idx").on(t.actorId), index("audit_time_idx").on(t.timeCreated)],
+)
+
+export const browserSession = hnBase.table(
+  "browser_session",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id),
+    /** ready | preparing | failed：云端模板自举安装可能数分钟，创建接口不阻塞等待。 */
+    status: text("status").notNull().default("ready"),
+    error: text("error"),
+    timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+    deletedAt: bigint("deleted_at", { mode: "number" }),
+  },
+  (t) => [index("browser_session_owner_idx").on(t.ownerId, t.timeCreated)],
+)
+
+export const browserScript = hnBase.table(
+  "browser_script",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    visibility: text("visibility").$type<"private" | "public">().notNull().default("private"),
+    ownerId: text("owner_id")
+      .notNull()
+      .references(() => user.id),
+    version: integer("version").notNull(),
+    timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+    timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+    deletedAt: bigint("deleted_at", { mode: "number" }),
+  },
+  (t) => [index("browser_script_owner_idx").on(t.ownerId)],
+)
+
+export const browserScriptVersion = hnBase.table(
+  "browser_script_version",
+  {
+    scriptId: text("script_id")
+      .notNull()
+      .references(() => browserScript.id),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    changelog: text("changelog").notNull().default(""),
+    timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.scriptId, t.version] })],
 )
 
 export const schema = {
+  browserSession,
+  browserScript,
+  browserScriptVersion,
   user,
   session,
   account,

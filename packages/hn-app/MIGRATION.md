@@ -45,7 +45,7 @@
 | `src/pages/dashboard` | 同名 | 🔴 骨架 |
 | `src/pages/agent-registry` | 同名 | 🟡 API 层已迁，UI 骨架 |
 | `src/features/workspace/*` | entry-path 已迁；其余（upload/download/mkdir/preview-panel/agents-md） | 🔴 待迁 |
-| `src/features/browser-cdp/*` | line-diff 已迁；BrowserPanel/use-cdp-viewer/PublishScriptDialog | 🔴 待迁 |
+| `src/pages/cdp/*`、`src/features/browser-cdp/*` | `pages/cdp/`、`features/browser-cdp/`、`lib/browser.ts` | ✅ React 工作区：任务首页、会话实时画面/接管、文件预览、历史、脚本发布/版本/diff；接口迁至 hn-base-server + PG，详见 `docs/test-cases/browser-use-migration.md` |
 | `src/features/openui/*` | 未迁 | 🔴 React 侧反而更自然（openui-react-runtime 是 React 渲染器） |
 | `src/ui/**`（1797 个 Solid 组件） | `src/components/ui/*`（shadcn） | 🟡 已建 11 个核心组件（button/badge/card/input/textarea/separator/scroll-area/tabs/dialog/tooltip/skeleton），按需用 shadcn CLI 补 |
 
