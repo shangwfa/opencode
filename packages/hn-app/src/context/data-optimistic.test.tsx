@@ -49,3 +49,21 @@ it("服务端已有 shell 消息时，未落库的乐观用户消息不会被合
     await act(async () => root.unmount())
   }
 })
+
+it("执行途中进入会话：正在运行的工具快照恢复 busy，终止事件不被旧快照覆盖", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const message = { id: "msg_live", sessionID: "ses_live", role: "assistant", parentID: "msg_user", time: { created: 2 } } as never
+  const parts = [{ id: "prt_tool", messageID: "msg_live", sessionID: "ses_live", type: "tool", tool: "shell", state: { status: "running", input: {} } }] as never
+  const bridge = { subscribe: () => () => {}, loadMessages: vi.fn(async () => [{ message, parts }]) }
+  let data: DataContextValue | undefined
+  const Probe = () => { data = useData(); return null }
+  const container = document.createElement("div"), root = createRoot(container)
+  try {
+    await act(async () => root.render(<ServerProvider directory="/workspace"><DataProvider bridge={bridge}><Probe /></DataProvider></ServerProvider>))
+    await act(async () => data!.loadMessages("ses_live"))
+    expect(data!.state.session_status.ses_live?.type).toBe("busy")
+    await act(async () => data!.setSessionStatus("ses_live", { type: "idle" }))
+    await act(async () => data!.loadMessages("ses_live", { force: true }))
+    expect(data!.state.session_status.ses_live?.type).toBe("idle")
+  } finally { await act(async () => root.unmount()) }
+})

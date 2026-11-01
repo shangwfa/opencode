@@ -5,12 +5,26 @@
  * 沙箱文件链接（file:///workspace/x.html）点击后由 onFileLink 拦截，交给预览弹窗，
  * 避免浏览器直接打开 file:// 失败。
  */
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { marked } from "marked"
 import DOMPurify from "dompurify"
-import { parseSandboxFileHref } from "./file-preview-url"
+import { guessMimeType, isPreviewableFileHref, parseSandboxFileHref, previewKindOf, sandboxPreviewFile } from "./file-preview-url"
+import { readSandboxFile } from "@/lib/rest"
 
 marked.setOptions({ gfm: true, breaks: true })
+marked.use({
+  tokenizer: {
+    url(source) {
+      const match = /^(?:https?:\/\/|www\.)[^\s<>]+/i.exec(source)
+      if (!match) return false
+      const boundary = match[0].search(/[，。；：！？、（）【】「」『』《》]/)
+      if (boundary < 0) return false
+      const raw = match[0].slice(0, boundary).replace(/[.,;:!?]+$/, "")
+      if (!raw) return false
+      return { type: "link", raw, text: raw, href: /^www\./i.test(raw) ? `http://${raw}` : raw, tokens: [{ type: "text", raw, text: raw }] }
+    },
+  },
+})
 
 /**
  * DOMPurify 默认 `ALLOWED_URI_REGEXP` 不含 `file:`，会剥掉模型写的 `[x](file://…)` 的 href，
@@ -28,15 +42,30 @@ const FILE_URL_RE = /file:\/\/\/[^\s"'<>)\]，。；：、]+/g
  * 限定沙箱常见根目录 + 可预览扩展名，避免把 `/usr/bin` 之类误链化；href 统一补 `file://`。
  */
 const BARE_SANDBOX_PATH_RE =
-  /(?<![\w:/.-])\/(?:workspace|root|tmp|home)\/[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf|docx?|xlsx?|pptx|od[tpfs]|rtf|mp[34]|webm|wav|ogg|m4a|mov)\b/gi
+  /(?<![\w:/.-])(?:\/(?:workspace|root|tmp|home)\/|(?:\.\/)?output\/)[^\s"'<>)\]，。；：、`]+?\.(?:html?|md|png|jpe?g|gif|webp|svg|avif|ico|json|csv|txt|pdf|docx?|xlsx?|pptx|od[tpfs]|rtf|mp[34]|webm|wav|ogg|m4a|mov)\b/gi
+
+function sandboxHref(raw: string) {
+  return raw.startsWith("file://") ? raw : raw.startsWith("/") ? `file://${raw}` : `file:///workspace/${raw.replace(/^\.\//, "")}`
+}
 
 /** 把文本节点里的沙箱文件引用转成 <a>（跳过 a/code/pre，避免破坏已有链接与代码块） */
 export function linkifySandboxFileUrls(html: string): string {
   if (typeof DOMParser === "undefined") return html
-  if (!html.includes("<a") && !html.includes("file://") && !html.includes("/workspace/")) return html
+  if (!html.includes("<a") && !html.includes("file://") && !html.includes("/workspace/") && !html.includes("output/")) return html
   const doc = new DOMParser().parseFromString(`<div id="hb-root">${html}</div>`, "text/html")
   const root = doc.getElementById("hb-root")
   if (!root) return html
+
+  // 行内代码只有在完整内容就是文件路径时才可点；命令、示例代码和 fenced code 保持原样。
+  for (const code of root.querySelectorAll("code")) {
+    if (code.closest("pre, a") || code.children.length) continue
+    const raw = code.textContent?.trim() ?? ""
+    if (!/^(?:file:\/\/\/|\/(?:workspace|root|tmp|home)\/|(?:\.\/)?output\/)/i.test(raw) || /(?:^|\/)\.\.(?:\/|$)/.test(raw) || !isPreviewableFileHref(sandboxHref(raw))) continue
+    const anchor = doc.createElement("a")
+    anchor.setAttribute("data-sandbox-href", sandboxHref(raw))
+    code.replaceWith(anchor)
+    anchor.appendChild(code)
+  }
 
   const targets: Text[] = []
   const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT)
@@ -45,7 +74,7 @@ export function linkifySandboxFileUrls(html: string): string {
     const value = node.nodeValue
     if (!value) continue
     if (node.parentElement?.closest("a, code, pre")) continue
-    if (!value.includes("file://") && !value.includes("/workspace/")) continue
+    if (!value.includes("file://") && !value.includes("/workspace/") && !value.includes("output/")) continue
     targets.push(node)
   }
 
@@ -56,10 +85,11 @@ export function linkifySandboxFileUrls(html: string): string {
     let cursor = 0
     for (const match of text.matchAll(pattern)) {
       const raw = match[0]
+      if (/(?:^|\/)\.\.(?:\/|$)/.test(raw)) continue
       const index = match.index ?? 0
       if (index > cursor) fragment.appendChild(doc.createTextNode(text.slice(cursor, index)))
       const anchor = doc.createElement("a")
-      anchor.setAttribute("data-sandbox-href", raw.startsWith("file://") ? raw : `file://${raw}`)
+      anchor.setAttribute("data-sandbox-href", sandboxHref(raw))
       anchor.textContent = raw
       fragment.appendChild(anchor)
       cursor = index + raw.length
@@ -73,6 +103,12 @@ export function linkifySandboxFileUrls(html: string): string {
     const href = anchor.getAttribute("href") ?? ""
     anchor.setAttribute("data-sandbox-href", href)
     anchor.removeAttribute("href")
+  }
+  for (const anchor of root.querySelectorAll("a[data-sandbox-href]")) {
+    anchor.setAttribute("role", "button")
+    anchor.setAttribute("tabindex", "0")
+    anchor.setAttribute("title", "预览文件")
+    anchor.classList.add("cursor-pointer")
   }
   for (const anchor of root.querySelectorAll("a[href]")) {
     if (!/^https?:\/\//i.test(anchor.getAttribute("href") ?? "")) continue
@@ -94,15 +130,25 @@ export function Markdown({
   content,
   className,
   onFileLink,
+  sessionId,
+  directory,
 }: {
   content: string
   className?: string
   /** 点击沙箱文件链接（file:// 或绝对路径）时回调 */
   onFileLink?: (href: string) => void
+  sessionId?: string
+  directory?: string
 }) {
   const html = useMemo(() => renderMarkdownHtml(content), [content])
+  const images = useMemo(() => {
+    if (!sessionId || typeof DOMParser === "undefined") return []
+    const doc = new DOMParser().parseFromString(html, "text/html")
+    return [...new Set([...doc.querySelectorAll("a[data-sandbox-href]")].map((node) => node.getAttribute("data-sandbox-href") ?? "").filter((href) => previewKindOf(href) === "image"))]
+  }, [html, sessionId])
 
   return (
+    <>
     <div
       data-slot="markdown"
       className={cnMarkdown(className)}
@@ -112,15 +158,49 @@ export function Markdown({
               const anchor = (event.target as HTMLElement | null)?.closest?.("a")
               const href = anchor?.getAttribute("data-sandbox-href") ?? anchor?.getAttribute("href")
               if (!href) return
-              if (!parseSandboxFileHref(href)) return
+               if (!parseSandboxFileHref(href)) return
+               if (window.getSelection()?.toString()) return
               event.preventDefault()
               onFileLink(href)
             }
           : undefined
       }
+      onKeyDown={onFileLink ? (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return
+        const anchor = (event.target as HTMLElement | null)?.closest?.("a[data-sandbox-href]")
+        const href = anchor?.getAttribute("data-sandbox-href")
+        if (!href || !parseSandboxFileHref(href)) return
+        event.preventDefault()
+        onFileLink(href)
+      } : undefined}
       dangerouslySetInnerHTML={{ __html: html }}
     />
+    {images.length > 0 && <div aria-label="截图预览" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">{images.map((href) => <SandboxImage key={href} href={href} sessionId={sessionId!} directory={directory} onFileLink={onFileLink} />)}</div>}
+    </>
   )
+}
+
+function SandboxImage({ href, sessionId, directory, onFileLink }: { href: string; sessionId: string; directory?: string; onFileLink?: (href: string) => void }) {
+  const ref = parseSandboxFileHref(href)
+  const [state, setState] = useState<{ url?: string; error?: string }>({})
+  const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    if (!ref) return
+    let disposed = false, url = ""
+    setState({})
+    void readSandboxFile(ref.path, { sessionId, directory, mime: guessMimeType(ref.path) }).then((payload) => {
+      if (disposed) return
+      url = URL.createObjectURL(sandboxPreviewFile(payload.content, payload.binary, ref.path))
+      setState({ url })
+    }).catch((error: unknown) => { if (!disposed) setState({ error: error instanceof Error ? error.message : String(error) }) })
+    return () => { disposed = true; if (url) URL.revokeObjectURL(url) }
+  }, [href, sessionId, directory, revision])
+  if (!ref) return null
+  return <figure className="min-w-0 overflow-hidden rounded-xl border bg-slate-50">
+    {state.url ? <button type="button" className="block w-full cursor-zoom-in" aria-label={`预览 ${ref.filename}`} onClick={() => onFileLink?.(href)}><img src={state.url} alt={ref.filename} loading="lazy" className="max-h-56 w-full object-contain" onError={() => setState({ error: "图片无法显示" })} /></button>
+      : <div className="flex min-h-24 items-center justify-center p-3 text-xs text-muted-foreground">{state.error ? <button type="button" className="underline" onClick={() => setRevision((n) => n + 1)}>图片加载失败，点击重试</button> : "正在加载截图…"}</div>}
+    <figcaption className="truncate border-t bg-white px-3 py-2 text-xs text-muted-foreground" title={ref.path}>{ref.filename}</figcaption>
+  </figure>
 }
 
 function cnMarkdown(extra?: string) {

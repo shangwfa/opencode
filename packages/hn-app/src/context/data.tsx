@@ -50,6 +50,13 @@ export function applyDataEvent(
 ): DataState {
   // 事件载荷缺失（例如新版本服务端换了信封）时保持状态不变，绝不在渲染期抛错。
   if (!event.properties || typeof event.properties !== "object") return state
+  // SSE 不重放：进入会话或重连时可能错过 execution.started，但后续活动仍证明正在执行。
+  const activeSession = event.properties.sessionID
+  if (typeof activeSession === "string" &&
+      /^(session\.step\.started|session\.(reasoning|text)\.(started|delta)|session\.tool\.(input\.(started|delta)|called|progress))$/.test(event.type) &&
+      state.session_status[activeSession]?.type !== "busy") {
+    state = { ...state, session_status: { ...state.session_status, [activeSession]: { type: "busy" } }, session_error: { ...state.session_error, [activeSession]: undefined } }
+  }
   switch (event.type) {
     case "session.step.failed": {
       const props = event.properties as { sessionID: string; assistantMessageID: string; error: unknown }
@@ -307,7 +314,13 @@ export function DataProvider({ bridge, children }: { bridge?: DataBridge; childr
         message[sessionID] = list
           .filter((m) => !hidden[m.id] && !(m.role === "assistant" && hidden[m.parentID]))
           .sort(byMessageCreated)
-        return { ...prev, message, part, hidden, streamed, loaded: { ...prev.loaded, [sessionID]: true } }
+        const latest = message[sessionID].at(-1)
+        const active = latest?.role === "assistant" && latest.time.completed === undefined && !latest.error
+        // 只填补缺失状态，不能让滞后的工具快照覆盖已经收到的终止事件。
+        const session_status = prev.session_status[sessionID] === undefined && active
+          ? { ...prev.session_status, [sessionID]: { type: "busy" as const } }
+          : prev.session_status
+        return { ...prev, message, part, hidden, streamed, session_status, loaded: { ...prev.loaded, [sessionID]: true } }
       })
     } catch {
       // 加载失败保持 loaded=false，下次重试

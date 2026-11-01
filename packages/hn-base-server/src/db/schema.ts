@@ -8,6 +8,8 @@
  *
  * 约定：列名显式 snake_case；时间用 timestamp（better-auth 需要 Date）。
  */
+import type { AutomationApp } from "@opencode/schema/automation-app"
+import { sql } from "drizzle-orm"
 import {
   bigint,
   boolean,
@@ -439,7 +441,42 @@ export const browserScriptVersion = hnBase.table(
   (t) => [primaryKey({ columns: [t.scriptId, t.version] })],
 )
 
+export const automationApp = hnBase.table("automation_app", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  definition: jsonb("definition").$type<AutomationApp.Definition>().notNull(),
+  version: integer("version").notNull(),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [index("automation_app_owner_idx").on(t.ownerId, t.timeUpdated)])
+
+export const automationRun = hnBase.table("automation_run", {
+  id: text("id").primaryKey(),
+  appId: text("app_id").notNull().references(() => automationApp.id),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  sessionId: text("session_id").notNull(),
+  targetId: text("target_id"),
+  requestKey: text("request_key").notNull(),
+  appVersion: integer("app_version").notNull(),
+  definition: jsonb("definition").$type<AutomationApp.Definition>().notNull(),
+  parameters: jsonb("parameters").$type<Record<string, string>>().notNull(),
+  status: text("status").$type<AutomationApp.Run["status"]>().notNull(),
+  /** 仅为活动状态建立唯一索引：repairing 也算活动，避免同时开第二个运行。 */
+  cursor: integer("cursor").notNull().default(0),
+  results: jsonb("results").$type<AutomationApp.StepResult[]>().notNull().default([]),
+  error: text("error"),
+  repairApplied: boolean("repair_applied").notNull().default(false),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [
+  index("automation_run_app_idx").on(t.appId, t.timeCreated),
+  uniqueIndex("automation_run_request_idx").on(t.ownerId, t.requestKey),
+  uniqueIndex("automation_run_active_idx").on(t.sessionId).where(sql`${t.status} IN ('queued','running','paused','repairing')`),
+])
+
 export const schema = {
+  automationApp,
+  automationRun,
   browserSession,
   browserScript,
   browserScriptVersion,

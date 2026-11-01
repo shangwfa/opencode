@@ -40,6 +40,12 @@ const updated = (info: Message) => ({ type: "message.updated", properties: { inf
 const partUpdated = (part: Part) => ({ type: "message.part.updated", properties: { part } })
 
 describe("applyDataEvent 系统编排消息过滤", () => {
+  test.each(["session.step.started", "session.reasoning.started", "session.text.delta", "session.tool.called", "session.tool.progress"])("未收到执行开始事件时，活动事件仍恢复 busy：%s", (type) => {
+    const next = applyDataEvent(state(), { type, properties: { sessionID: "ses_1", assistantMessageID: "msg_a", agent: "build", model: { id: "m", providerID: "p" }, ordinal: 0, delta: "a" } })
+    expect(next.session_status.ses_1?.type).toBe("busy")
+    const ended = applyDataEvent(next, { type: "session.execution.succeeded", properties: { sessionID: "ses_1" } })
+    expect(ended.session_status.ses_1?.type).toBe("idle")
+  })
   test("执行失败恢复 idle 并保存错误，而不是永久思考中", () => {
     let next = applyDataEvent(state(), { type: "session.execution.started", properties: { sessionID: "ses_1" } })
     expect(next.session_status.ses_1.type).toBe("busy")

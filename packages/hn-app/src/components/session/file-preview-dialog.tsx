@@ -103,7 +103,7 @@ export function FilePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[86dvh] max-h-[86dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[min(1100px,92vw)]">
-        <DialogHeader className="border-border/70 gap-1 border-b px-5 py-3.5">
+        <DialogHeader className="border-border/70 gap-1 border-b px-5 py-3.5 pe-14 text-start">
           <DialogTitle className="flex min-w-0 items-center gap-2 text-sm">
             <span className="truncate">{ref?.filename ?? "文件"}</span>
             <span className="text-muted-foreground shrink-0 text-[11px] font-normal">{kindLabel(kind)}</span>

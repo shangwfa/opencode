@@ -19,6 +19,7 @@ import { auditRoutes } from "./routes/audit.js"
 import { requirementRoutes } from "./routes/requirements.js"
 import { sessionRoutes } from "./routes/sessions.js"
 import { browserRoutes } from "./routes/browser.js"
+import { automationAppRoutes } from "./routes/automation-apps.js"
 import { connectorRoutes } from "./routes/connectors.js"
 import { knowledgeRoutes } from "./routes/knowledge.js"
 import { knowledgeLegacyRoutes } from "./routes/knowledge-legacy.js"
@@ -121,6 +122,7 @@ export function createApp() {
     return new Response(response.body, { status: response.status, headers: outgoing })
   })
   app.route("/api/sessions", sessionRoutes)
+  app.route("/api/automation-apps", automationAppRoutes)
   app.route("/api/browser", browserRoutes)
   app.route("/api/connectors", connectorRoutes)
   app.route("/api/knowledge", knowledgeRoutes)

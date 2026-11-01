@@ -4,8 +4,8 @@ import {
   LayoutDashboard,
   FolderInput,
   Boxes,
+  Workflow,
   Bot,
-  Monitor,
   MessagesSquare,
   Home,
   Terminal,
@@ -35,7 +35,7 @@ const navGroups: NavItem[][] = [
 
     { to: "/git-providers", label: "Git 服务连接", icon: GitBranch },
     { to: "/agent-registry", label: "Agent 注册表", icon: Bot },
-    { to: "/cdp", label: "Browser Use", icon: Monitor },
+    { to: "/cdp", label: "自动化", icon: Workflow },
   ],
 ]
 

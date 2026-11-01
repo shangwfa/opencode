@@ -58,6 +58,8 @@ export function SessionTimeline({
   onFileLink,
   onImagePreview,
   className,
+  sessionId,
+  directory,
 }: {
   messages: Message[]
   parts: Record<string, Part[]>
@@ -72,6 +74,8 @@ export function SessionTimeline({
   /** 图片 part 点击放大（灯箱由页面层持有） */
   onImagePreview?: (target: { url: string; name?: string }) => void
   className?: string
+  sessionId?: string
+  directory?: string
 }) {
   const turns = useMemo(() => sliceTurnMessages(messages), [messages])
   const { anchorRef, pinned, overflowing, scrollToBottom } = useStickToBottom([messages.length, parts, working])
@@ -122,7 +126,7 @@ export function SessionTimeline({
               return (
                 <div key={m.id} data-chat-role="assistant" className="flex min-w-0 flex-col">
                   {(msgParts.length ? msgParts : []).map((p) => (
-                    <MessagePart key={p.id} part={p} onFileLink={onFileLink} onImagePreview={onImagePreview} />
+                    <MessagePart key={p.id} part={p} onFileLink={onFileLink} onImagePreview={onImagePreview} sessionId={sessionId} directory={directory} />
                   ))}
                   {m.role === "assistant" && m.error != null && (
                     <div role="alert" className="my-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">

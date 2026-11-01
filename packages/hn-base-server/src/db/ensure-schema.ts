@@ -294,6 +294,42 @@ const DDL = (s: string) => String.raw`
     deleted_at bigint
   );
   CREATE INDEX IF NOT EXISTS browser_script_owner_idx ON "${s}"."browser_script" (owner_id);
+  CREATE TABLE IF NOT EXISTS "${s}"."automation_app" (
+    id text PRIMARY KEY,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    definition jsonb NOT NULL,
+    version integer NOT NULL,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS automation_app_owner_idx ON "${s}"."automation_app" (owner_id, time_updated);
+  CREATE TABLE IF NOT EXISTS "${s}"."automation_run" (
+    id text PRIMARY KEY,
+    app_id text NOT NULL REFERENCES "${s}"."automation_app"(id),
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    session_id text NOT NULL,
+    target_id text,
+    request_key text NOT NULL,
+    app_version integer NOT NULL,
+    definition jsonb NOT NULL,
+    parameters jsonb NOT NULL,
+    status text NOT NULL CHECK (status IN ('queued','running','paused','repairing','succeeded','failed')),
+    cursor integer NOT NULL DEFAULT 0,
+    results jsonb NOT NULL DEFAULT '[]',
+    error text,
+    repair_applied boolean NOT NULL DEFAULT false,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL,
+    UNIQUE (owner_id, request_key)
+  );
+  ALTER TABLE "${s}"."automation_run" ADD COLUMN IF NOT EXISTS target_id text;
+  ALTER TABLE "${s}"."automation_run" DROP CONSTRAINT IF EXISTS automation_run_status_check;
+  ALTER TABLE "${s}"."automation_run" ADD CONSTRAINT automation_run_status_check
+    CHECK (status IN ('queued','running','paused','repairing','succeeded','failed'));
+  CREATE INDEX IF NOT EXISTS automation_run_app_idx ON "${s}"."automation_run" (app_id, time_created);
+  DROP INDEX IF EXISTS "${s}"."automation_run_active_idx";
+  CREATE UNIQUE INDEX IF NOT EXISTS automation_run_active_idx ON "${s}"."automation_run" (session_id)
+    WHERE status IN ('queued','running','paused','repairing');
   CREATE TABLE IF NOT EXISTS "${s}"."browser_script_version" (
     script_id text NOT NULL REFERENCES "${s}"."browser_script"(id),
     version integer NOT NULL,
@@ -307,8 +343,15 @@ const DDL = (s: string) => String.raw`
 export async function ensureSchema(pool: Pool, schemaName = env.databaseSchema): Promise<void> {
   const client = await pool.connect()
   try {
-    await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`)
-    await client.query(DDL(schemaName))
+    // 多 Pod 同时启动时，并发 DDL（含 CREATE SCHEMA IF NOT EXISTS）会唯一键冲突或死锁；
+    // 用库级咨询锁串行化，并在锁内完成全部建表。
+    await client.query("SELECT pg_advisory_lock(hashtextextended($1, 0))", [`ensure-schema:${schemaName}`])
+    try {
+      await client.query(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`)
+      await client.query(DDL(schemaName))
+    } finally {
+      await client.query("SELECT pg_advisory_unlock(hashtextextended($1, 0))", [`ensure-schema:${schemaName}`])
+    }
   } finally {
     client.release()
   }

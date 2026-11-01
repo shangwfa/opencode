@@ -36,9 +36,13 @@ function DialogContent({
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="ring-offset-background focus:ring-ring absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
-          <XIcon className="size-4" />
-          <span className="sr-only">Close</span>
+        <DialogPrimitive.Close
+          data-slot="dialog-close"
+          aria-label="关闭弹窗"
+          title="关闭"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:ring-ring/40 absolute end-3 top-3 inline-flex size-8 items-center justify-center rounded-full border-0 bg-transparent transition-colors outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none"
+        >
+          <XIcon className="size-4" strokeWidth={1.8} />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPrimitive.Portal>

@@ -274,6 +274,8 @@ export function FreeChatCore({
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <ScrollArea className="chat-timeline-scroll min-h-0 flex-1">
           <SessionTimeline
+            sessionId={sid || undefined}
+            directory={directory || undefined}
             messages={messages}
             parts={parts}
             working={working}

@@ -97,16 +97,20 @@ export function MessagePart({
   part,
   onFileLink,
   onImagePreview,
+  sessionId,
+  directory,
 }: {
   part: Part
   onFileLink?: (href: string) => void
   onImagePreview?: (target: { url: string; name?: string }) => void
+  sessionId?: string
+  directory?: string
 }) {
   if (part.type === "step-start" || part.type === "step-finish") return null
   if (part.type === "reasoning") return <ReasoningBlock part={part} />
   if (part.type === "tool") return <ToolBlock part={part} onFileLink={onFileLink} />
   // synthetic 是发给模型的隐藏上下文，不渲染
-  if (part.type === "text") return part.synthetic ? null : <TextBlock part={part} onFileLink={onFileLink} />
+  if (part.type === "text") return part.synthetic ? null : <TextBlock part={part} onFileLink={onFileLink} sessionId={sessionId} directory={directory} />
   if (part.type === "file")
     return <FilePartBlock part={part} onFileLink={onFileLink} onImagePreview={onImagePreview} />
   // snapshot / agent / patch / subtask / retry / compaction：不渲染或后续按需视图
@@ -333,15 +337,19 @@ function ToolOutput({ text, onFileLink }: { text: string; onFileLink?: (href: st
 function TextBlock({
   part,
   onFileLink,
+  sessionId,
+  directory,
 }: {
   part: Extract<Part, { type: "text" }>
   onFileLink?: (href: string) => void
+  sessionId?: string
+  directory?: string
 }) {
   if (!part.text?.trim()) return null
   return (
     <div className="my-1.5 first:mt-0">
       {part.synthetic && <Badge className="mr-1.5 align-middle text-[10px]">合成</Badge>}
-      <Markdown content={part.text} onFileLink={onFileLink} />
+      <Markdown content={part.text} onFileLink={onFileLink} sessionId={sessionId} directory={directory} />
     </div>
   )
 }

@@ -186,6 +186,8 @@ export function Composer(props: {
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && e.keyCode !== 229) {
                 e.preventDefault()
+                // 草稿可在运行中编辑，但 Enter 不能误触停止按钮。
+                if (props.working) return
                 void doSubmit()
               }
             }}
@@ -193,7 +195,7 @@ export function Composer(props: {
               // 粘贴图片走 attachments（dataUrl → prompt image part → 发送时转 file part）
               void attachments.handlePaste(e.nativeEvent)
             }}
-            placeholder="输入消息，开始协作…"
+            placeholder={props.working ? "AI 正在执行，可先输入下一条消息…" : "输入消息，开始协作…"}
             className="max-h-52 min-h-[60px] resize-none rounded-t-[20px] rounded-b-none border-0 bg-transparent px-4 pt-4 pb-2 text-base leading-6 shadow-none placeholder:text-muted-foreground focus-visible:ring-0 md:text-[15px] dark:bg-transparent"
           />
           <div className="flex min-w-0 items-center gap-1 px-2.5 pb-2.5">

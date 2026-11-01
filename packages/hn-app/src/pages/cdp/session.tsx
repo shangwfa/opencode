@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { useLocation, useNavigate, useParams } from "react-router"
-import { File, Folder, FolderUp, Monitor, RefreshCw, Upload } from "lucide-react"
+import { File, Folder, FolderUp, Monitor, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ServerProvider } from "@/context/sdk"
 import { DataProvider, useData, type DataBridge } from "@/context/data"
@@ -10,7 +10,7 @@ import { FilePreviewDialog } from "@/components/session/file-preview-dialog"
 import { FreeChatCore } from "@/pages/free-chat"
 import { BrowserPanel } from "@/features/browser-cdp/browser-panel"
 import { BrowserWorkspaceSplit } from "@/features/browser-cdp/workspace-split"
-import { PublishScriptDialog } from "@/features/browser-cdp/publish-script-dialog"
+import { SaveAppDialog } from "@/features/automation/save-app-dialog"
 import { sessionSource } from "@/lib/session-source"
 import { browserApi } from "@/lib/browser"
 import { baseFetch } from "@/lib/base-api"
@@ -199,6 +199,10 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
             onTogglePanel={toggleNavigation}
             panelCollapsed={navigationCollapsed}
             headerActions={
+              <>
+              <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={() => setPublish(true)}>
+                任务确认无误？创建应用
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -208,6 +212,7 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
               >
                 <Monitor className="size-4" />
               </Button>
+              </>
             }
           />
         }
@@ -234,10 +239,6 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
               <Folder className="size-3.5" />
               文件
             </Button>
-            <Button size="sm" variant="ghost" className="ml-auto gap-1 text-xs" onClick={() => setPublish(true)}>
-              <Upload className="size-3.5" />
-              发布脚本
-            </Button>
             <Button size="sm" variant="ghost" className="text-xs xl:hidden" onClick={() => setMobilePanel(false)}>
               聊天
             </Button>
@@ -253,7 +254,7 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
           {tab === "files" && <WorkFiles sessionId={sessionId} />}
         </>}
       />
-      <PublishScriptDialog open={publish} onOpenChange={setPublish} sessionId={sessionId} />
+      <SaveAppDialog open={publish} onOpenChange={setPublish} sessionId={sessionId} />
     </>
   )
 }

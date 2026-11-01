@@ -6,8 +6,10 @@ import { createApp } from "./app.js"
 import { env } from "./config/env.js"
 import { ensureSchema } from "./db/ensure-schema.js"
 import { pool } from "./db/index.js"
+import { startAutomationWorker } from "./lib/automation-worker.js"
 
 await ensureSchema(pool)
+startAutomationWorker()
 
 const app = createApp()
 

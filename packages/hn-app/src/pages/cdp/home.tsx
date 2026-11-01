@@ -71,7 +71,7 @@ export function CdpHome() {
   return (
     <div className="cdp-home flex min-h-0 flex-1 flex-col overflow-y-auto">
       <header className="cdp-page-header flex shrink-0 items-center justify-between border-b px-6">
-        <span className="flex items-center gap-3 text-sm font-semibold"><BrowserNavigationToggle /><span className="chat-ai-mark" aria-hidden />浏览器工作区</span>
+        <span className="flex items-center gap-3 text-sm font-semibold"><BrowserNavigationToggle /><span className="chat-ai-mark" aria-hidden />自动化工作区</span>
         <span className="cdp-header-note flex items-center gap-1.5 text-xs text-muted-foreground">
           <Monitor className="size-3.5" />
           独立会话沙箱
@@ -79,10 +79,10 @@ export function CdpHome() {
       </header>
       <div className="cdp-home-content mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center px-5 pb-20 pt-12 md:px-10">
         <h1 className="cdp-home-title text-3xl tracking-tight md:text-[36px] md:leading-[1.3]">
-          让浏览器替你完成工作。
+          把重复的工作，交给自动化。
         </h1>
         <p className="mt-4 max-w-lg text-sm leading-6 text-muted-foreground">
-          描述目标，AI 在真实浏览器中操作。你可以实时观察，在登录或确认操作时随时接管。
+          描述目标，AI 帮你完成网页操作、文件与数据处理。浏览器画面实时可见，需要登录或确认时随时接管。
         </p>
         {selected && (
           <div className="mb-3 mt-7 flex">
@@ -192,12 +192,12 @@ export function CdpHome() {
             </span>
           </button>
           <Link
-            to="/cdp/scripts"
+            to="/cdp/apps"
             className="group flex items-start gap-3 rounded-xl border border-transparent p-4 transition-colors hover:border-border hover:bg-muted/30"
           >
             <Code2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
             <span>
-              <span className="text-[13px] font-medium">把流程变成脚本</span>
+              <span className="text-[13px] font-medium">复用已完成的流程</span>
               <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                 复用已验证的操作，不必每次重新描述。
               </span>

@@ -31,6 +31,8 @@ const CdpHistory = lazy(() => import("@/pages/cdp/history").then((module) => ({ 
 const CdpScripts = lazy(() => import("@/pages/cdp/scripts").then((module) => ({ default: module.CdpScripts })))
 const CdpScriptDetail = lazy(() => import("@/pages/cdp/scripts").then((module) => ({ default: module.CdpScriptDetail })))
 const CdpSession = lazy(() => import("@/pages/cdp/session").then((module) => ({ default: module.CdpSession })))
+const AutomationsPage = lazy(() => import("@/pages/automations").then((module) => ({ default: module.AutomationsPage })))
+const AutomationDetailPage = lazy(() => import("@/pages/automations").then((module) => ({ default: module.AutomationDetailPage })))
 
 export function App() {
   return (
@@ -69,6 +71,8 @@ export function App() {
         <Route path="/agent-registry" element={<AgentRegistryPage />} />
         <Route path="/cdp" element={<Suspense fallback={<p role="status" className="p-6 text-sm text-muted-foreground">正在加载浏览器工作区…</p>}><CdpLayout /></Suspense>}>
           <Route index element={<CdpHome />} />
+          <Route path="apps" element={<AutomationsPage />} />
+          <Route path="apps/:automationId" element={<AutomationDetailPage />} />
           <Route path="sessions" element={<CdpHistory />} />
           <Route path="scripts" element={<CdpScripts />} />
           <Route path="scripts/:scriptId" element={<CdpScriptDetail />} />

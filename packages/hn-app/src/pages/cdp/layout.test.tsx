@@ -71,3 +71,40 @@ it("仅列表加载失败时显示重试，成功后自动移除", async () => {
   expect(container.querySelector('[role="alert"]')).toBeNull()
   expect([...container.querySelectorAll("button")].some((button) => button.textContent === "重试")).toBe(false)
 })
+
+it("切换页面只给内容容器添加过渡，不重挂布局；减少动态效果时不播放", async () => {
+  const animate = vi.fn((_frames: unknown, _options: unknown) => ({ cancel: vi.fn() }))
+  const original = HTMLElement.prototype.animate
+  HTMLElement.prototype.animate = animate as never
+  const matchMedia = window.matchMedia
+  window.matchMedia = vi.fn((query: string) => ({ matches: false, media: query })) as never
+  try {
+    await mount()
+    const sidebar = container.querySelector('[aria-label="浏览器导航栏"]')
+    const content = container.querySelector(".cdp-route-content")
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="scripts-link"]')!.click())
+    expect(container.querySelector('[aria-label="浏览器导航栏"]')).toBe(sidebar)
+    expect(container.querySelector(".cdp-route-content")).toBe(content)
+    expect(animate).toHaveBeenCalledTimes(1)
+    expect(animate.mock.calls[0]?.[1]).toMatchObject({ duration: 190 })
+  } finally {
+    HTMLElement.prototype.animate = original
+    window.matchMedia = matchMedia
+  }
+})
+
+it("减少动态效果时切换页面不播放动画", async () => {
+  const animate = vi.fn()
+  const original = HTMLElement.prototype.animate
+  const matchMedia = window.matchMedia
+  HTMLElement.prototype.animate = animate as never
+  window.matchMedia = vi.fn((query: string) => ({ matches: query.includes("prefers-reduced-motion"), media: query })) as never
+  try {
+    await mount()
+    await act(async () => container.querySelector<HTMLAnchorElement>('[data-testid="scripts-link"]')!.click())
+    expect(animate).not.toHaveBeenCalled()
+  } finally {
+    HTMLElement.prototype.animate = original
+    window.matchMedia = matchMedia
+  }
+})

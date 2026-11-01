@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react"
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { Link, NavLink, Outlet, useLocation } from "react-router"
 import {
   Code2,
@@ -47,6 +47,19 @@ export function CdpLayout() {
   const [error, setError] = useState("")
   const { collapsed, toggle: toggleNavigation } = useSessionPanelCollapsed()
   const { pathname } = useLocation()
+  const mainRef = useRef<HTMLDivElement>(null)
+  const previousPath = useRef(pathname)
+  useLayoutEffect(() => {
+    if (previousPath.current === pathname) return
+    previousPath.current = pathname
+    const content = mainRef.current?.querySelector<HTMLElement>(".cdp-route-content")
+    if (!content || window.matchMedia("(prefers-reduced-motion: reduce)").matches || typeof content.animate !== "function") return
+    const animation = content.animate(
+      [{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "translateY(0)" }],
+      { duration: 190, easing: "cubic-bezier(0.22, 1, 0.36, 1)" },
+    )
+    return () => animation.cancel()
+  }, [pathname])
   const refresh = useCallback(async () => {
     try {
       const res = await browserApi.sessions()
@@ -65,7 +78,7 @@ export function CdpLayout() {
   if (!authEnabled)
     return (
       <div className="mx-auto max-w-xl p-10">
-        <h1 className="text-xl font-semibold">Browser Use</h1>
+        <h1 className="text-xl font-semibold">自动化</h1>
         <p role="alert" className="mt-4 text-sm text-muted-foreground">
           请配置 VITE_HN_BASE_URL 并登录基础服务。浏览器任务和脚本库需要服务端鉴权及
           PostgreSQL，不能使用无鉴权的直连模式。
@@ -88,7 +101,7 @@ export function CdpLayout() {
           <div className="cdp-sidebar-header flex h-14 shrink-0 items-center gap-2 px-3">
               <Link to="/cdp" className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold" onClick={closeMobileNavigation}>
                 <span className="chat-ai-mark" aria-hidden />
-                Browser Use
+                自动化
               </Link>
             <button type="button" className="chat-sessions-close" aria-label="关闭浏览器导航" onClick={toggleNavigation}><X className="size-4" /></button>
           </div>
@@ -98,7 +111,7 @@ export function CdpLayout() {
                 {[
                   { path: "/cdp", name: "开始任务", icon: Home },
                   { path: "/cdp/sessions", name: "历史任务", icon: History },
-                  { path: "/cdp/scripts", name: "脚本库", icon: Code2 },
+                  { path: "/cdp/apps", name: "自动化应用", icon: Code2 },
                 ].map(({ path, name, icon: Icon }) => (
                   <NavLink
                     key={path}
@@ -123,7 +136,7 @@ export function CdpLayout() {
                   </div>
                 )}
                 {!error && sessions.length === 0 && (
-                  <p className="px-3 py-5 text-xs text-muted-foreground">你的浏览器任务将显示在这里</p>
+                  <p className="px-3 py-5 text-xs text-muted-foreground">你的自动化任务将显示在这里</p>
                 )}
                 {groupSessions(sessions.slice(0, 20).map((session) => ({
                   id: session.id, title: session.title, time: { created: session.timeCreated },
@@ -149,16 +162,16 @@ export function CdpLayout() {
             </>
           )}
         </aside>
-        <div className="cdp-main flex min-w-0 flex-1 flex-col overflow-hidden">
+        <div ref={mainRef} className="cdp-main flex min-w-0 flex-1 flex-col overflow-hidden">
           <nav
             className="cdp-mobile-nav flex h-11 shrink-0 items-center gap-4 border-b px-4 text-xs md:hidden"
             aria-label="浏览器导航"
           >
             <NavLink to="/cdp" end>开始任务</NavLink>
             <NavLink to="/cdp/sessions">历史任务</NavLink>
-            <NavLink to="/cdp/scripts">脚本库</NavLink>
+            <NavLink to="/cdp/apps">自动化应用</NavLink>
           </nav>
-          <Outlet />
+          <div className="cdp-route-content flex min-h-0 min-w-0 flex-1 flex-col"><Outlet /></div>
         </div>
       </div>
     </WorkspaceContext.Provider>

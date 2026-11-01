@@ -111,16 +111,21 @@ export function LoginPage() {
     void fetchAuthConfig().then((config) => setProviders(config.providers))
   }, [])
 
-  const submit = async (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
     setBusy(true)
     setError("")
+    // 浏览器自动填充不会触发 React onChange：以表单实际值为准，避免显示已填、提交旧值。
+    const form = new FormData(event.currentTarget)
+    const submittedEmail = String(form.get("email") ?? email).trim()
+    const submittedPassword = String(form.get("password") ?? password)
+    const submittedName = String(form.get("name") ?? name).trim()
     try {
       const result =
         mode === "signin"
-          ? await signIn(email, password)
-          : await signUp(email, password, name || email.split("@")[0] || "用户")
+          ? await signIn(submittedEmail, submittedPassword)
+          : await signUp(submittedEmail, submittedPassword, submittedName || submittedEmail.split("@")[0] || "用户")
       if (result.error) {
         setError(localizeError(result.error))
         return
@@ -213,6 +218,7 @@ export function LoginPage() {
                 <Field label="昵称" htmlFor="name" hint="可选">
                   <Input
                     id="name"
+                    name="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="你的名字"
@@ -225,6 +231,7 @@ export function LoginPage() {
               <Field label="邮箱" htmlFor="email">
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   required
                   value={email}
@@ -239,6 +246,7 @@ export function LoginPage() {
                 <div className="relative">
                   <Input
                     id="password"
+                    name="password"
                     type={showPassword ? "text" : "password"}
                     required
                     minLength={8}

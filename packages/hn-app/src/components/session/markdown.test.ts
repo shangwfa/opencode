@@ -19,11 +19,12 @@ describe("linkifySandboxFileUrls", () => {
     expect(html).not.toContain("<a href=\"file:///workspace/a.html\"")
   })
 
-  it("代码块内不链接化", () => {
+  it("代码块内不链接化，独立行内文件路径可预览", () => {
     const html = linkifySandboxFileUrls("<pre><code>file:///workspace/a.html</code></pre>")
     expect(html).not.toContain("<a ")
     const inline = linkifySandboxFileUrls("<p><code>file:///workspace/a.html</code></p>")
-    expect(inline).not.toContain("<a ")
+    expect(inline).toContain('data-sandbox-href="file:///workspace/a.html"')
+    expect(linkifySandboxFileUrls("<p><code>cat /workspace/a.html</code></p>")).not.toContain("<a ")
   })
 
   it("无 file:// 时原样返回", () => {
@@ -53,6 +54,10 @@ describe("linkifySandboxFileUrls 裸路径", () => {
     expect(linkifySandboxFileUrls("<p>/workspace/a.md</p>")).toContain('data-sandbox-href="file:///workspace/a.md"')
     expect(linkifySandboxFileUrls("<p>/workspace/a.png</p>")).toContain('data-sandbox-href="file:///workspace/a.png"')
   })
+  it("会话 output 相对路径可预览，但不链接路径穿越", () => {
+    expect(renderMarkdownHtml("截图：`output/buy-pricing-desktop.png`")) .toContain('data-sandbox-href="file:///workspace/output/buy-pricing-desktop.png"')
+    expect(renderMarkdownHtml("`output/../secret.png`")).not.toContain("data-sandbox-href")
+  })
 
   it("代码块里的裸路径不链化", () => {
     expect(linkifySandboxFileUrls("<pre><code>/workspace/a.html</code></pre>")).not.toContain("<a ")
@@ -75,11 +80,38 @@ describe("renderMarkdownHtml（模型写 markdown 链接的真实场景）", () 
   it("裸 /workspace 路径同样可点", () => {
     expect(renderMarkdownHtml("已生成 /workspace/a.html")).toContain('data-sandbox-href="file:///workspace/a.html"')
   })
+  it("行内代码中的中文 Markdown 文件路径保留样式且可键盘预览", () => {
+    const doc = new DOMParser().parseFromString(renderMarkdownHtml("完整版已保存到：`/workspace/output/影刀官网-产品与定价整理.md`"), "text/html")
+    const anchor = doc.querySelector("a[data-sandbox-href]")
+    expect(anchor?.getAttribute("data-sandbox-href")).toBe("file:///workspace/output/影刀官网-产品与定价整理.md")
+    expect(anchor?.querySelector("code")?.textContent).toBe("/workspace/output/影刀官网-产品与定价整理.md")
+    expect(anchor?.getAttribute("tabindex")).toBe("0")
+    expect(anchor?.getAttribute("role")).toBe("button")
+  })
 
   it("http(s) 链接不受影响，保留正常 href", () => {
     const html = renderMarkdownHtml("[官网](https://example.com)")
     expect(html).toContain('href="https://example.com"')
     expect(html).not.toContain("data-sandbox-href")
+  })
+  it("裸网址遇到中文括号或标点结束，不吞入后面的正文", () => {
+    const text = "已打开影刀官网（https://www.yingdao.com/）并整理了产品功能与版本定价，完整版已保存到："
+    const doc = new DOMParser().parseFromString(renderMarkdownHtml(text), "text/html")
+    const link = doc.querySelector("a")
+    expect(link?.getAttribute("href")).toBe("https://www.yingdao.com/")
+    expect(link?.textContent).toBe("https://www.yingdao.com/")
+    expect(doc.body.textContent).toContain("）并整理了产品功能与版本定价，完整版已保存到：")
+    expect(link?.nextSibling?.textContent).toContain("）并整理")
+  })
+  it.each(["，", "。", "；", "：", "！", "？", "、", "）", "】", "」", "》"])("裸网址在中文 %s 前结束", (punctuation) => {
+    const doc = new DOMParser().parseFromString(renderMarkdownHtml(`https://example.com/产品${punctuation}后续正文`), "text/html")
+    expect(decodeURI(doc.querySelector("a")?.getAttribute("href") ?? "")).toBe("https://example.com/产品")
+    expect(doc.querySelector("a")?.nextSibling?.textContent?.trim()).toBe(`${punctuation}后续正文`)
+  })
+  it("显式 Markdown 中文链接和代码中的网址保持原样", () => {
+    const doc = new DOMParser().parseFromString(renderMarkdownHtml("[产品](https://example.com/产品，价格)\n\n`https://example.com/）示例`"), "text/html")
+    expect(decodeURI(doc.querySelector("a")?.getAttribute("href") ?? "")).toBe("https://example.com/产品，价格")
+    expect(doc.querySelector("code")?.textContent).toBe("https://example.com/）示例")
   })
   it.each(["http://ui.shadcn.com", "https://ui.shadcn.com"])("外部链接 %s 可安全打开新标签页", (url) => {
     const doc = new DOMParser().parseFromString(renderMarkdownHtml(`[ui.shadcn.com](${url})`), "text/html")
