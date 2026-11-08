@@ -1,0 +1,51 @@
+{
+  "definition": {
+    "name": "每日订单汇总",
+    "description": "将已验证的「每日订单汇总」任务固化为可重复执行的本地数据处理应用：先写入订单 CSV 数据（默认使用记录中验证过的 5 行示例，可替换为自己的数据），再用 Python 逐行解析并以 Decimal 精确累加金额，生成 {\"total\": 金额总和, \"count\": 订单数} 格式的汇总报告 JSON，最后读回报告文件核对内容。全程仅处理当前会话沙箱内的文件，不访问网络、不涉及登录或验证码。",
+    "parameters": [
+      {
+        "key": "orders_csv",
+        "label": "订单数据（CSV，表头 order_id,amount）",
+        "required": false,
+        "defaultValue": "order_id,amount\n1001,120.50\n1002,89.90\n1003,240.00\n1004,56.75\n1005,310.25\n"
+      }
+    ],
+    "steps": [
+      {
+        "id": "prepare_orders_csv",
+        "title": "写入 orders.csv 订单数据文件",
+        "businessStage": "准备订单数据",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import json\nimport os\nfrom pathlib import Path\n\nparams = json.loads(os.environ.get(\"AUTOMATION_INPUT\") or \"{}\")\ncsv_text = params[\"orders_csv\"]\nout_dir = Path(os.environ[\"AUTOMATION_OUTPUT_DIR\"])\nout_dir.mkdir(parents=True, exist_ok=True)\ncsv_path = out_dir / \"orders.csv\"\ncsv_path.write_text(csv_text, encoding=\"utf-8\")\nlines = [line for line in csv_text.strip().splitlines() if line.strip()]\nprint(\"订单数据文件已写入: \" + str(csv_path))\nprint(\"数据行数: \" + str(max(len(lines) - 1, 0)))\n"
+        }
+      },
+      {
+        "id": "summarize_orders",
+        "title": "用 Decimal 累加金额并生成 report.json",
+        "businessStage": "汇总订单金额",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv\nimport json\nimport os\nfrom decimal import Decimal\nfrom pathlib import Path\n\nout_dir = Path(os.environ[\"AUTOMATION_OUTPUT_DIR\"])\ncsv_path = out_dir / \"orders.csv\"\n\ntotal = Decimal(\"0\")\ncount = 0\n\nwith csv_path.open(newline=\"\", encoding=\"utf-8\") as f:\n    reader = csv.DictReader(f)\n    for row in reader:\n        total += Decimal(row[\"amount\"].strip())\n        count += 1\n\nreport = {\"total\": float(total), \"count\": count}\nreport_path = out_dir / \"report.json\"\nreport_path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + \"\\n\", encoding=\"utf-8\")\n\nprint(\"订单数: \" + str(count))\nprint(\"金额总和: \" + str(total))\nprint(\"汇总报告: \" + json.dumps(report, ensure_ascii=False))\n"
+        }
+      },
+      {
+        "id": "verify_report",
+        "title": "读回 report.json 核对汇总结果",
+        "businessStage": "核对汇总结果",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import json\nimport os\nfrom pathlib import Path\n\nout_dir = Path(os.environ[\"AUTOMATION_OUTPUT_DIR\"])\nreport_path = out_dir / \"report.json\"\ncontent = report_path.read_text(encoding=\"utf-8\")\nreport = json.loads(content)\nprint(content.strip())\nprint(\"核对通过: total=\" + str(report[\"total\"]) + \", count=\" + str(report[\"count\"]))\n"
+        }
+      }
+    ],
+    "model": {
+      "id": "glm-5.3-flash",
+      "providerID": "Yd-GLM",
+      "variant": "default"
+    }
+  }
+}

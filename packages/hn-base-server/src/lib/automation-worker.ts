@@ -1,16 +1,16 @@
-import { and, asc, eq, inArray } from "drizzle-orm"
+import { asc, eq, inArray } from "drizzle-orm"
 import type { AutomationApp as A } from "@opencode/schema/automation-app"
 import { db, pool } from "../db/index.js"
-import { automationApp as apps, automationRun as runs } from "../db/schema.js"
+import { automationRun as runs } from "../db/schema.js"
 import { browserUpstream, startBrowser } from "./browser-cdp.js"
 import { automationTarget, ElementUnavailable, executeStep, pageSnapshot } from "./browser-automation-cdp.js"
 import { repairSelector } from "./automation-ai.js"
-import { definition, requiresConfirmation, resolveOperation } from "./automation-app.js"
-import { writeAudit } from "./audit.js"
-import { executeScript, ScriptFailed } from "./automation-runtime.js"
+import { requiresConfirmation, resolveOperation } from "./automation-app.js"
+import { executeScript, ScriptFailed, VerificationFailed, verifyAutomationOutput } from "./automation-runtime.js"
 import { check } from "../authz/index.js"
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres"
 import { repairScript } from "./automation-ai.js"
+import { applyVerifiedRepair } from "./automation-repair.js"
 
 /**
  * 异步修复：worker 生成方案后回到「待审核」，不自动执行、不修改应用。
@@ -155,7 +155,9 @@ export async function processAutomationRun(id: string) {
                 operation,
                 run.parameters,
                 `${run.id}_${run.cursor}_${crypto.randomUUID()}`,
-                results,
+                 results,
+                 run.definition.resources,
+                 run.id,
               )
             : await executeStep(run.sessionId, target!, operation)
       } catch (error) {
@@ -192,39 +194,25 @@ export async function processAutomationRun(id: string) {
         if (disconnected) throw new Error("运行锁连接中断")
         output = await executeStep(run.sessionId, target, repaired)
       }
-      results[run.cursor] = { ...current, status: "succeeded", output }
-      const repairs = results.filter((result) => result.status === "succeeded" && result.repairedOperation && !result.skipped)
-      if (run.cursor + 1 === run.definition.steps.length && repairs.length && !results.some((result) => result.skipped)) {
-        const updatedDefinition = definition({
-          ...run.definition,
-          steps: run.definition.steps.map((step) => {
-            const repair = repairs.find((result) => result.stepId === step.id)
-            return repair ? { ...step, operation: repair.repairedOperation } : step
-          }),
-        })
-        if (disconnected) throw new Error("运行锁连接中断")
-        const applied = await lockedDb.transaction(async (tx) => {
-          const updated = await tx.update(apps)
-            .set({ definition: updatedDefinition, version: run.appVersion + 1, timeUpdated: Date.now() })
-            .where(and(eq(apps.id, run.appId), eq(apps.ownerId, run.ownerId), eq(apps.version, run.appVersion)))
-            .returning({ id: apps.id })
-          await tx.update(runs).set({
-            results, cursor: run.cursor + 1, status: "succeeded", error: null,
-            repairApplied: updated.length > 0, timeUpdated: Date.now(),
-          }).where(eq(runs.id, id))
-          return updated.length > 0
-        })
-        if (applied) await writeAudit({ actorType: "system", actorId: run.ownerId, action: "automation.apply_repair", resourceType: "automation", resourceId: run.appId, metadata: { runId: id, automatic: true } })
-        return
-      }
+      current = { ...current, status: "succeeded", output }
+      results[run.cursor] = current
+      const finished = run.cursor + 1 === run.definition.steps.length
+      if (finished && run.definition.verification)
+        await verifyAutomationOutput(run.sessionId, run.id, run.definition.verification)
       await save({
         results,
         cursor: run.cursor + 1,
-        status: run.cursor + 1 === run.definition.steps.length ? "succeeded" : "queued",
+        status: finished ? "succeeded" : "queued",
       })
+      // 已发布应用的修复经重跑验证成功后自动固化为新版本；跳过或未完成步骤不会保存。
+      if (finished && run.appId) {
+        await applyVerifiedRepair({ ...run, results, status: "succeeded" }).catch((error) =>
+          console.error("[automation] 自动保存修复失败", run.id, error instanceof Error ? error.message : error),
+        )
+      }
     } catch (error) {
       await pause(
-        error instanceof ElementUnavailable ? "failed" : "uncertain",
+        error instanceof ElementUnavailable || error instanceof VerificationFailed ? "failed" : "uncertain",
         error instanceof Error ? error.message : String(error),
       )
     }

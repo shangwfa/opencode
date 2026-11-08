@@ -127,11 +127,13 @@ export function FreeChatCore({
   panelCollapsed = false,
   title = "自由对话",
   headerActions,
+  timelineFooter,
 }: {
   onTogglePanel?: () => void
   panelCollapsed?: boolean
   title?: string
   headerActions?: ReactNode
+  timelineFooter?: ReactNode
 }) {
   const { sessionId } = useParams()
   const { directory } = useSDK()
@@ -283,6 +285,9 @@ export function FreeChatCore({
             executionError={data.state.session_error[sid]}
             onFileLink={setPreviewHref}
             onImagePreview={setImageTarget}
+            footer={
+              timelineFooter && !working && messages.length > 0 ? <>{timelineFooter}</> : null
+            }
             className="min-h-full"
           >
             {messages.length === 0 && !working && (

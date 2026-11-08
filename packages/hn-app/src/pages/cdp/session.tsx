@@ -6,11 +6,12 @@ import { ServerProvider } from "@/context/sdk"
 import { DataProvider, useData, type DataBridge } from "@/context/data"
 import { usePromptController } from "@/context/prompt-store"
 import { withDraftText } from "@/components/prompt-input/draft-text"
+import { sendFollowupDraft } from "@/components/prompt-input/submit"
 import { FilePreviewDialog } from "@/components/session/file-preview-dialog"
 import { FreeChatCore } from "@/pages/free-chat"
 import { BrowserPanel } from "@/features/browser-cdp/browser-panel"
 import { BrowserWorkspaceSplit } from "@/features/browser-cdp/workspace-split"
-import { SaveAppDialog } from "@/features/automation/save-app-dialog"
+import { AppDistill } from "@/features/automation/app-distill"
 import { sessionSource } from "@/lib/session-source"
 import { browserApi } from "@/lib/browser"
 import { baseFetch } from "@/lib/base-api"
@@ -49,9 +50,28 @@ function FirstPrompt({ sessionId, connected }: { sessionId: string; connected: b
       // 清掉路由临时数据，刷新/返回不重复发起真实浏览器操作。
       navigate(`/cdp/session/${sessionId}`, { replace: true, state: null })
       firstTasks.delete(sessionId)
-      data.setSessionStatus(sessionId, { type: "busy" })
-      void sessionSource()
-        .sendMessage(sessionId, { parts: [{ type: "text", text: task.prompt }], model: task.model })
+      // 用乐观插入把用户消息立刻显示出来；浏览器准备期间也不会出现「空对话」，
+      // 发送成功后由服务端消息替换，失败则回滚到输入框。
+      void sendFollowupDraft({
+        client: {
+          promptAsync: (sid, body) => sessionSource().sendMessage(sid, body),
+          command: () => { throw new Error("网关模式暂不支持会话命令，请直连或去掉命令前缀") },
+        },
+        data: {
+          optimisticAdd: data.optimisticAdd,
+          optimisticRemove: data.optimisticRemove,
+          setSessionStatus: data.setSessionStatus,
+        },
+        draft: {
+          sessionID: sessionId,
+          sessionDirectory: "",
+          prompt: withDraftText([], task.prompt),
+          context: [],
+          agent: "build",
+          model: task.model,
+        },
+        optimisticBusy: true,
+      })
         .catch((cause) => {
           if (stopped) return
           sentFirstTasks.delete(sessionId)
@@ -108,12 +128,18 @@ function FirstPrompt({ sessionId, connected }: { sessionId: string; connected: b
   return null
 }
 
-function WorkFiles({ sessionId }: { sessionId: string }) {
+function WorkFiles({ sessionId, target }: { sessionId: string; target?: { path: string } }) {
   const [path, setPath] = useState("")
   const [items, setItems] = useState<Array<{ path: string; name: string; type: string }>>([])
   const [error, setError] = useState("")
   const [href, setHref] = useState<string>()
   const [revision, setRevision] = useState(0)
+  useEffect(() => {
+    if (!target) return
+    const relative = target.path.replace(/^\/workspace\/?/, "")
+    setPath(relative.split("/").slice(0, -1).join("/"))
+    setHref(target.path)
+  }, [target])
   useEffect(() => {
     let disposed = false
     void baseFetch<{ items: typeof items }>(
@@ -183,8 +209,8 @@ function WorkFiles({ sessionId }: { sessionId: string }) {
 
 function SessionContent({ sessionId, connected }: { sessionId: string; connected: boolean }) {
   const [tab, setTab] = useState<"browser" | "files">("browser")
-  const [publish, setPublish] = useState(false)
   const [mobilePanel, setMobilePanel] = useState(false)
+  const [fileTarget, setFileTarget] = useState<{ path: string }>()
   const data = useData()
   const { sessions, navigationCollapsed, toggleNavigation } = useBrowserWorkspace()
   const title = sessions.find((session) => session.id === sessionId)?.title ?? "浏览器任务"
@@ -198,11 +224,9 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
             title={title}
             onTogglePanel={toggleNavigation}
             panelCollapsed={navigationCollapsed}
+            timelineFooter={<AppDistill sessionId={sessionId} onOpenFile={(path) => { setFileTarget({ path }); setTab("files"); setMobilePanel(true) }} />}
             headerActions={
               <>
-              <Button variant="outline" size="sm" className="ml-auto text-xs" onClick={() => setPublish(true)}>
-                任务确认无误？创建应用
-              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -251,10 +275,9 @@ function SessionContent({ sessionId, connected }: { sessionId: string; connected
               onTakeover={() => sessionSource().abort(sessionId)}
             />
           </div>
-          {tab === "files" && <WorkFiles sessionId={sessionId} />}
+          {tab === "files" && <WorkFiles sessionId={sessionId} target={fileTarget} />}
         </>}
       />
-      <SaveAppDialog open={publish} onOpenChange={setPublish} sessionId={sessionId} />
     </>
   )
 }

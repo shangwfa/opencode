@@ -1,22 +1,28 @@
 import { useEffect, useRef, useState } from "react"
 import { Link, useParams, useSearchParams } from "react-router"
-import { ArrowLeft, ArrowUpRight, Boxes, Play, Plus } from "lucide-react"
+import { ArrowLeft, ArrowUpRight, Boxes, Check, ChevronRight, Circle, LoaderCircle, Play, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
   automationApi,
   businessStages,
   operationLabel,
+  repairSaveNotice,
   runStatusLabel,
+  stepDisplayStatus,
   type AutomationApp,
   type AutomationRun,
 } from "@/lib/automation-apps"
 import { browserApi } from "@/lib/browser"
 import { baseFetch } from "@/lib/base-api"
+import { BrowserNavigationToggle } from "./cdp/layout"
 import { BrowserPanel } from "@/features/browser-cdp/browser-panel"
+import { instructionApi, type InstructionApp } from "@/lib/instruction-apps"
 
 export function AutomationsPage() {
   const [items, setItems] = useState<AutomationApp[]>([])
+  const [legacyItems, setLegacyItems] = useState<InstructionApp[]>([])
   const [query, setQuery] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(true)
@@ -24,16 +30,13 @@ export function AutomationsPage() {
   useEffect(() => {
     let stopped = false
     setLoading(true)
-    void automationApi
-      .list()
-      .then((result) => {
+    void Promise.allSettled([automationApi.list(), instructionApi.apps()])
+      .then(([result, legacy]) => {
         if (!stopped) {
-          setItems(result.items)
-          setError("")
+          if (result.status === "fulfilled") setItems(result.value.items)
+          if (legacy.status === "fulfilled") setLegacyItems(legacy.value.items)
+          setError(result.status === "rejected" ? `固定流程加载失败：${String(result.reason)}` : legacy.status === "rejected" ? `旧版应用加载失败：${String(legacy.reason)}` : "")
         }
-      })
-      .catch((cause) => {
-        if (!stopped) setError(String(cause))
       })
       .finally(() => {
         if (!stopped) setLoading(false)
@@ -45,19 +48,22 @@ export function AutomationsPage() {
   const filtered = items.filter((item) =>
     `${item.definition.name} ${item.definition.description}`.toLowerCase().includes(query.toLowerCase()),
   )
+  const migrated = new Set(items.flatMap((item) => item.legacyAppId ? [item.legacyAppId] : []))
+  const filteredLegacy = legacyItems.filter((item) => !migrated.has(item.id) &&
+    `${item.definition.name} ${item.definition.description}`.toLowerCase().includes(query.toLowerCase()))
   return (
     <div className="chat-workspace h-full overflow-y-auto bg-slate-50 p-5 md:p-9">
       <div className="mx-auto max-w-5xl">
         <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="mb-2 text-xs tracking-widest text-muted-foreground">把做成的事，留给下一次</p>
-            <h1 className="text-2xl font-semibold tracking-tight">自动化应用</h1>
-            <p className="mt-3 text-sm text-muted-foreground">网页操作、文件与数据处理。一次探索，按需重复运行。</p>
+            <div className="flex items-center gap-2"><BrowserNavigationToggle /><h1 className="text-2xl font-semibold tracking-tight">自动化应用</h1></div>
+             <p className="mt-3 text-sm text-muted-foreground">和 AI 讨论、验证并发布流程；运行时直接执行固定步骤，异常时再请 AI 协助修复。旧版 AI 执行应用也在这里。</p>
           </div>
           <Button asChild size="sm">
             <Link to="/cdp">
               <Plus className="me-2 size-4" />
-              描述新需求
+               和 AI 设计应用
             </Link>
           </Button>
         </header>
@@ -69,9 +75,6 @@ export function AutomationsPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <Link to="/cdp/scripts" className="text-xs text-muted-foreground underline underline-offset-4">
-            查看旧脚本库
-          </Link>
         </div>
         {error && (
           <div role="alert" className="mb-4 text-sm text-destructive">
@@ -87,16 +90,17 @@ export function AutomationsPage() {
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            {filtered.map((item) => (
+             {filtered.map((item) => (
               <Link
                 key={item.id}
                 to={`/cdp/apps/${item.id}`}
                 className="group rounded-2xl border border-slate-200 bg-white p-6 transition-colors hover:border-indigo-300"
               >
                 <div className="flex items-center gap-3">
-                  <Boxes className="size-4 text-indigo-500" />
-                  <h2 className="flex-1 text-sm font-semibold">{item.definition.name}</h2>
-                  <ArrowUpRight className="size-4 text-muted-foreground" />
+                   <Boxes className="size-4 text-indigo-500" />
+                   <h2 className="flex-1 text-sm font-semibold">{item.definition.name}</h2>
+                   <span className="rounded bg-emerald-50 px-2 py-0.5 text-[11px] text-emerald-800">固定流程</span>
+                   <ArrowUpRight className="size-4 text-muted-foreground" />
                 </div>
                 <p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">
                   {item.definition.description || "暂无说明"}
@@ -107,16 +111,35 @@ export function AutomationsPage() {
                   </span>
                   <span>v{item.version}</span>
                 </div>
-              </Link>
-            ))}
-            {!filtered.length && (
+               </Link>
+             ))}
+             {filteredLegacy.map((item) => (
+               <Link
+                 key={item.id}
+                 to={`/cdp/instruction-apps/${item.id}`}
+                 className="group rounded-2xl border border-slate-200 bg-white p-6 transition-colors hover:border-amber-300"
+               >
+                 <div className="flex items-center gap-3">
+                   <Boxes className="size-4 text-amber-600" />
+                   <h2 className="flex-1 text-sm font-semibold">{item.definition.name}</h2>
+                   <span className="rounded bg-amber-50 px-2 py-0.5 text-[11px] text-amber-800">待升级 · AI 执行</span>
+                   <ArrowUpRight className="size-4 text-muted-foreground" />
+                 </div>
+                 <p className="mt-3 line-clamp-2 min-h-10 text-xs leading-5 text-muted-foreground">{item.definition.description || "暂无说明"}</p>
+                 <div className="mt-5 flex justify-between border-t pt-3 text-[11px] text-muted-foreground">
+                   <span>{item.definition.instructions.length} 个业务步骤 · {item.definition.parameters.length} 个参数</span>
+                   <span>v{item.version}</span>
+                 </div>
+               </Link>
+             ))}
+             {!filtered.length && !filteredLegacy.length && (
               <div className="col-span-full rounded-2xl border border-dashed bg-white px-6 py-16 text-center">
-                <h2 className="text-sm font-medium">{query ? "没有匹配的应用" : "让 AI 先帮你做成，再保存为应用"}</h2>
+                 <h2 className="text-sm font-medium">{query ? "没有匹配的应用" : "和 AI 一起设计你的第一条自动化流程"}</h2>
                 <p className="mt-3 text-xs leading-6 text-muted-foreground">
-                  在自动化工作区完成任务后，点击「保存为应用」。已有脚本仍保留在旧脚本库。
+                   先讨论和验证流程，再发布为可重复运行的应用。
                 </p>
                 <Button asChild className="mt-5" variant="outline">
-                  <Link to="/cdp">开始任务</Link>
+                   <Link to="/cdp">和 AI 设计应用</Link>
                 </Button>
               </div>
             )}
@@ -143,10 +166,14 @@ function AutomationDetail({ id }: { id: string }) {
   const [sessionId, setSessionId] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+  const [confirmedScripts, setConfirmedScripts] = useState(false)
+  // 执行详情在右侧面板查看；选中哪个业务阶段就展示哪个。
+  // 执行详情默认跟随步骤状态：执行中/暂停时自动展开，完成后自动收起；用户点击可覆盖。
+  const [detailOverrides, setDetailOverrides] = useState<Record<string, boolean>>({})
   const [revision, setRevision] = useState(0)
   // 恢复/修复后需要重启轮询；不用 URL 时间戳，避免时间戳相同时不重跑。
   const [pollKey, setPollKey] = useState(0)
-  const pending = useRef<{ sessionId: string; requestKey: string; parameters: Record<string, string> } | null>(null)
+  const pending = useRef<{ sessionId: string; requestKey: string; parameters: Record<string, string>; confirmed?: boolean } | null>(null)
   const submitted = useRef(false)
   useEffect(() => {
     let stopped = false
@@ -198,6 +225,7 @@ function AutomationDetail({ id }: { id: string }) {
   }, [id, runId, pollKey])
   const selectRun = (current: AutomationRun) => {
     setRun(current)
+    setDetailOverrides({})
     setSearch({ run: current.id })
   }
   const action = async (fn: () => Promise<void>) => {
@@ -229,7 +257,7 @@ function AutomationDetail({ id }: { id: string }) {
                   body: JSON.stringify({ title: app.definition.name }),
                 })
               ).session.id)
-        pending.current = { sessionId: session, requestKey: crypto.randomUUID(), parameters: { ...values } }
+        pending.current = { sessionId: session, requestKey: crypto.randomUUID(), parameters: { ...values }, confirmed: confirmedScripts }
       }
       const current = await automationApi.run(id, pending.current)
       pending.current = null
@@ -248,12 +276,15 @@ function AutomationDetail({ id }: { id: string }) {
   const currentResult = run?.results[run.cursor]
   const currentOperation = currentResult?.repairedOperation ?? run?.definition.steps[run.cursor]?.operation
   return (
-    <div className="chat-workspace h-full overflow-y-auto bg-slate-50 p-5 md:p-9">
-      <div className="mx-auto max-w-6xl">
-        <Link to="/cdp/apps" className="mb-7 flex w-fit items-center gap-2 text-xs text-muted-foreground">
+     <div className="chat-workspace h-full overflow-y-auto bg-[#f5f7f7] px-4 py-6 md:px-10 md:py-10">
+       <div className="mx-auto max-w-6xl">
+         <div className="mb-7 flex w-fit items-center gap-2">
+          <BrowserNavigationToggle />
+          <Link to="/cdp/apps" className="flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900">
           <ArrowLeft className="size-3" />
           自动化应用
         </Link>
+         </div>
         {error && (
           <p role="alert" className="mb-5 text-sm text-destructive">
             {error}
@@ -262,86 +293,150 @@ function AutomationDetail({ id }: { id: string }) {
             </Button>
           </p>
         )}
-        {!app && !error && <p role="status">正在加载应用…</p>}
+        {!app && !error && (
+          <div role="status" aria-live="polite" aria-busy="true" className="animate-pulse">
+            <span className="sr-only">正在加载应用…</span>
+            <div className="mb-8 border-b border-slate-200 pb-7">
+              <div className="flex flex-wrap items-center gap-3">
+                <Skeleton className="h-8 w-64 max-w-full rounded-lg bg-slate-200/80 md:h-9" />
+                <Skeleton className="h-6 w-24 rounded-full bg-slate-200/70" />
+              </div>
+              <Skeleton className="mt-4 h-4 w-full max-w-2xl rounded bg-slate-200/60" />
+              <Skeleton className="mt-2 h-4 w-2/3 max-w-xl rounded bg-slate-200/60" />
+            </div>
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_32px_-28px_#0f172a55] md:p-7">
+                <Skeleton className="h-3 w-20 rounded bg-slate-200/70" />
+                <Skeleton className="mt-3 h-6 w-28 rounded bg-slate-200/80" />
+                <Skeleton className="mt-3 h-3.5 w-52 rounded bg-slate-200/60" />
+                <div className="mt-6 space-y-5 border-t border-slate-100 pt-5">
+                  {[0, 1, 2].map((index) => (
+                    <div key={index} className="flex gap-4">
+                      <Skeleton className="size-9 shrink-0 rounded-xl bg-slate-200/70" />
+                      <div className="min-w-0 flex-1 space-y-2 pt-1">
+                        <Skeleton className="h-4 w-40 rounded bg-slate-200/70" />
+                        <Skeleton className="h-3 w-24 rounded bg-slate-200/50" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_32px_-28px_#0f172a55] md:p-6">
+                <Skeleton className="h-3 w-16 rounded bg-slate-200/70" />
+                <Skeleton className="mt-3 h-6 w-24 rounded bg-slate-200/80" />
+                <Skeleton className="mt-2 h-3.5 w-44 rounded bg-slate-200/60" />
+                <div className="mt-5 space-y-4 border-t border-slate-100 pt-4">
+                  <Skeleton className="h-9 w-full rounded-md bg-slate-200/60" />
+                  <Skeleton className="h-9 w-full rounded-md bg-slate-200/60" />
+                  <Skeleton className="h-10 w-full rounded-md bg-slate-300/70" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {app && (
           <>
-            <header className="mb-8">
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-semibold tracking-tight">{app.definition.name}</h1>
-                <span className="rounded bg-white px-2 py-1 text-xs text-muted-foreground">v{app.version}</span>
-              </div>
-              <p className="mt-3 max-w-3xl text-sm leading-6 text-muted-foreground">{app.definition.description}</p>
-            </header>
-            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <header className="mb-8 border-b border-slate-200 pb-7">
+               <div className="flex flex-wrap items-center gap-3">
+                 <h1 className="text-2xl font-semibold tracking-tight text-slate-950 md:text-3xl">{app.definition.name}</h1>
+                 <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">v{app.version} · 已发布</span>
+               </div>
+               <p className="mt-3 line-clamp-2 max-w-3xl text-sm leading-6 text-slate-600">{app.definition.description.split(/[：:；。]/)[0]}</p>
+               {app.definition.description && <details className="group mt-2 max-w-3xl text-xs text-slate-500">
+                 <summary className="flex w-fit cursor-pointer list-none items-center gap-1 font-medium text-teal-700 hover:text-teal-900 [&::-webkit-details-marker]:hidden">查看完整业务说明 <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" /></summary>
+                 <p className="mt-3 whitespace-pre-wrap break-words rounded-xl border border-slate-200 bg-white p-4 leading-6">{app.definition.description}</p>
+               </details>}
+             </header>
+             <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
               <div className="min-w-0 space-y-6">
-                <section className="rounded-2xl border bg-white p-6">
-                  <h2 className="mb-5 text-sm font-semibold">执行步骤</h2>
-                  <ol className="space-y-5">
-                    {businessStages(app.definition.steps).map((stage, index) => (
-                      <li key={stage.entries[0]!.step.id} className="flex gap-3">
-                        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs text-muted-foreground">
-                          {index + 1}
-                        </span>
-                        <div>
-                          <p className="text-sm">{stage.title}</p>
-                          <details className="mt-1 text-xs text-muted-foreground">
-                            <summary className="cursor-pointer">查看执行细节</summary>
-                            {stage.entries.map(({ step }) => <p className="mt-1" key={step.id}>{step.title} · {operationLabel(step)}</p>)}
-                          </details>
-                        </div>
-                      </li>
-                    ))}
-                  </ol>
-                </section>
-                {run && (
-                  <section aria-label="运行详情" className="rounded-2xl border bg-white p-6">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <h2 className="text-sm font-semibold">{runStatusLabel[run.status]}</h2>
-                      <Link
-                        className="text-xs text-indigo-600"
-                        to={hasBrowser ? `/cdp/session/${run.sessionId}` : `/free-chat/session/${run.sessionId}`}
-                      >
-                        打开会话与文件 ↗
-                      </Link>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      运行版本 v{run.appVersion} · 已完成 {businessStages(run.definition.steps).filter((stage) => stage.entries.every(({ index }) => run.results[index]?.status === "succeeded")).length}/{businessStages(run.definition.steps).length} 个业务阶段
-                    </p>
-                    <ol aria-live="polite" className="mt-5 divide-y">
-                      {businessStages(run.definition.steps).map((stage, stageIndex) => {
-                        const results = stage.entries.map(({ index }) => run.results[index])
-                        const state = results.every((result) => result?.status === "succeeded") ? "已完成"
-                          : results.some((result) => result?.status === "paused") ? "已暂停"
-                          : results.some((result) => result?.status === "running") || stage.entries.some(({ index }) => index === run.cursor && ["queued", "running", "repairing"].includes(run.status)) ? "执行中" : "待执行"
+                  <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_32px_-28px_#0f172a55] md:p-7">
+                   <div aria-label="运行详情">
+                     <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div><p className="text-[11px] font-semibold tracking-[0.16em] text-teal-700">RUN FLOW</p><h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-900">执行进度</h2></div>
+                        {run && <span role="status" className={`rounded-full px-3 py-1 text-xs font-semibold ${run.status === "succeeded" ? "bg-emerald-50 text-emerald-700" : run.status === "paused" || run.status === "failed" ? "bg-amber-50 text-amber-800" : "bg-teal-50 text-teal-700"}`}>{runStatusLabel[run.status]}</span>}
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs text-slate-500">{run ? `运行版本 v${run.appVersion} · 已完成 ${businessStages(run.definition.steps).filter((stage) => stage.entries.every(({ index }) => run.results[index]?.status === "succeeded")).length}/${businessStages(run.definition.steps).length} 个业务阶段` : `${businessStages(app.definition.steps).length} 个业务阶段`}</p>
+                        {run && <Link
+                          className="text-xs font-medium text-teal-700 hover:text-teal-900"
+                         to={hasBrowser ? `/cdp/session/${run.sessionId}` : `/free-chat/session/${run.sessionId}`}
+                       >
+                         打开会话与文件 ↗
+                       </Link>}
+                     </div>
+                     <ol aria-live="polite" className="relative mt-6">
+                       {businessStages(run?.definition.steps ?? app.definition.steps).map((stage, stageIndex, all) => {
+                          const states = stage.entries.map(({ index }) => stepDisplayStatus(run, index))
+                          const state = states.every((item) => item === "已完成") ? "已完成"
+                            : states.includes("修复中") ? "修复中"
+                            : states.includes("已暂停") ? "已暂停"
+                            : states.includes("执行中") ? "执行中" : "待执行"
+                          // 默认随状态：执行中/暂停自动展开，完成后自动收起；用户手动点过则以点击为准。
+                          const live = state === "执行中" || state === "修复中" || state === "已暂停"
+                          const detailOpen = detailOverrides[stage.title] ?? live
                         return (
-                          <li key={stage.entries[0]!.step.id} className="py-3 text-sm">
-                            <div className="flex justify-between gap-3">
-                              <span>
-                                {stageIndex + 1}. {stage.title}
-                              </span>
-                              <span className="shrink-0 text-xs text-muted-foreground">{state}</span>
-                            </div>
-                            <details className="mt-2 text-xs text-muted-foreground">
-                              <summary className="cursor-pointer">查看执行细节</summary>
-                              {stage.entries.map(({ step, index }) => {
-                                const result = run.results[index]
-                                return <div key={step.id} className="mt-2"><p>{step.title} · {result?.status === "succeeded" ? "已完成" : result?.status === "running" ? "执行中" : result?.status === "paused" ? "已暂停" : "待执行"}</p>
-                            {!!result?.repairAttempts && (
-                              <p className="mt-1 text-xs text-indigo-600">已尝试局部修复 {result.repairAttempts} 次</p>
-                            )}
-                            {result?.output && (
-                              <pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-slate-50 p-3 text-xs leading-5">
-                                {result.output}
-                              </pre>
-                            )}
+                           <li key={stage.entries[0]!.step.id} className="relative flex gap-4 pb-6 last:pb-0">
+                              {stageIndex < all.length - 1 && (
+                                <span aria-hidden className="absolute start-[17px] top-9 bottom-0 w-px bg-slate-200" />
+                              )}
+                              <div className={`relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full ring-4 ring-white ${state === "已完成" ? "bg-emerald-50 text-emerald-700" : state === "执行中" || state === "修复中" ? "bg-teal-700 text-white" : state === "已暂停" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-400"}`}>
+                                {state === "已完成" ? <Check className="size-4" /> : state === "执行中" || state === "修复中" ? <LoaderCircle className="size-4 animate-spin" /> : state === "已暂停" ? <Circle className="size-4" /> : <span className="text-xs font-semibold">{stageIndex + 1}</span>}
+                             </div>
+                             <div className="min-w-0 flex-1">
+                                {/* 状态与标题同一行、按钮与描述同一行，右列上下堆叠且逐行对齐。 */}
+                                <div className="flex items-start justify-between gap-3">
+                                  <span className="min-w-0 truncate text-sm font-semibold text-slate-900" title={stage.title}>{stage.title}</span>
+                                  {run && <span className={`shrink-0 text-xs font-medium ${state === "已完成" ? "text-emerald-700" : state === "执行中" || state === "修复中" ? "text-teal-700" : state === "已暂停" ? "text-amber-700" : "text-slate-400"}`}>{state}</span>}
                                 </div>
-                              })}
-                            </details>
+                             {/* 一个业务阶段的全部指令合并为一行；过长省略，hover 显示全文。未运行时只列动作，不显示状态。 */}
+                             <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+                               <p
+                                 className="min-w-0 truncate"
+                                 title={stage.entries.map(({ step, index }) => `${step.title} · ${run ? stepDisplayStatus(run, index) : operationLabel(step)}`).join(" · ")}
+                               >
+                                 {stage.entries.map(({ step, index }) => `${step.title} · ${run ? stepDisplayStatus(run, index) : operationLabel(step)}`).join(" · ")}
+                               </p>
+                               {run && stage.entries.some(({ index }) => {
+                                 const result = run.results[index]
+                                 return !!result?.repairAttempts || !!result?.output || result?.status === "running"
+                               }) && (
+                                 <Button
+                                   size="sm"
+                                   variant="ghost"
+                                   className="h-6 shrink-0 px-1.5 text-xs font-normal text-teal-700 hover:text-teal-900"
+                                   aria-expanded={detailOpen}
+                                   onClick={() => setDetailOverrides((current) => ({ ...current, [stage.title]: !detailOpen }))}
+                                 >
+                                   {detailOpen ? "收起执行详情" : "查看执行详情"}
+                                 </Button>
+                               )}
+                             </div>
+                             {/* 执行详情就地展开在当前卡片内，逐个指令列出输出。 */}
+                             {run && detailOpen && (
+                               <div className="mt-3 space-y-3 rounded-lg border border-slate-100 bg-slate-50/60 p-3">
+                                 {stage.entries.map(({ step, index }) => {
+                                   const result = run.results[index]
+                                   return (
+                                     <div key={step.id}>
+                                       <div className="flex items-center justify-between gap-2">
+                                         <p className="min-w-0 truncate text-xs font-medium text-slate-700" title={step.title}>{step.title}</p>
+                                         <span className="shrink-0 text-[11px] text-slate-500">{stepDisplayStatus(run, index)}</span>
+                                       </div>
+                                       {!!result?.repairAttempts && <p className="mt-1 text-xs text-indigo-600">已尝试局部修复 {result.repairAttempts} 次</p>}
+                                       {result?.output
+                                         ? <pre className="mt-1.5 max-h-44 overflow-auto whitespace-pre-wrap break-words rounded-md bg-white p-2.5 text-[11px] leading-5">{result.output}</pre>
+                                         : <p className="mt-1 text-[11px] text-slate-400">暂无输出</p>}
+                                     </div>
+                                   )
+                                 })}
+                               </div>
+                             )}
+                             </div>
                           </li>
                         )
                       })}
                     </ol>
-                    {run.status === "paused" && (
+                     {run?.status === "paused" && (
                       <div className="mt-4 space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-4">
                         <p role="status" className="text-sm leading-6">
                           {run.error}
@@ -389,49 +484,29 @@ function AutomationDetail({ id }: { id: string }) {
                         </div>
                       </div>
                     )}
-                    {run.status === "succeeded" &&
-                      run.repairApplied && <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm">修复后的运行已完成，应用已更新。请核对产物是否符合业务预期。</p>}
-                    {run.status === "succeeded" &&
-                      !run.repairApplied &&
-                      run.results.some((result) => result.repairedOperation && !result.skipped) && (
-                        <div className="mt-5 rounded-xl bg-indigo-50 p-4">
-                          <p className="text-sm">本次修复未自动保存，可能因为应用版本已变化或运行中跳过了步骤。</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            请先核实执行结果；已有新版本时不会覆盖。
-                          </p>
-                          <Button
-                            disabled={busy}
-                            className="mt-3"
-                            size="sm"
-                            onClick={() =>
-                              void action(async () => {
-                                await automationApi.applyRepair(run.id)
-                                setRun({ ...run, repairApplied: true })
-                                setRevision((r) => r + 1)
-                              })
-                            }
-                          >
-                            确认更新应用
-                          </Button>
-                        </div>
+                     {repairSaveNotice(run) === "saved" && <p className="mt-5 rounded-xl bg-emerald-50 p-4 text-sm">修复已自动保存为新版本，请核对产物是否符合业务预期。</p>}
+                     {repairSaveNotice(run) === "skipped" && (
+                        <p className="mt-5 rounded-xl bg-amber-50 p-4 text-sm">
+                          本次有步骤为跳过完成，修复未经完整重跑验证，未保存到应用。
+                        </p>
                       )}
-                  </section>
-                )}
+                   </div>
+                 </section>
                 {run && hasBrowser && (
                   <div className="flex h-[480px] min-h-0 flex-col overflow-hidden rounded-2xl border bg-white">
                     <BrowserPanel sessionId={run.sessionId} working={run.status === "running"} />
                   </div>
                 )}
               </div>
-              <aside className="space-y-6">
-                <form
-                  className="space-y-4 rounded-2xl border bg-white p-6"
+               <aside className="space-y-5 lg:sticky lg:top-6">
+                 <form
+                   className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_12px_32px_-28px_#0f172a55] md:p-6"
                   onSubmit={(event) => {
                     event.preventDefault()
                     void start()
                   }}
                 >
-                  <h2 className="text-sm font-semibold">运行应用</h2>
+                   <div className="border-b border-slate-100 pb-4"><p className="text-[11px] font-semibold tracking-[0.16em] text-teal-700">NEW RUN</p><h2 className="mt-1 text-lg font-semibold text-slate-900">运行应用</h2><p className="mt-1 text-xs text-slate-500">填写参数后，按已发布流程顺序执行。</p></div>
                   {app.definition.parameters.map((parameter) => (
                     <label key={parameter.key} className="block space-y-2 text-sm">
                       <span>
@@ -465,13 +540,12 @@ function AutomationDetail({ id }: { id: string }) {
                       ))}
                     </select>
                   </label>
-                  <p className="text-xs leading-5 text-muted-foreground">
-                    需要已有文件或登录状态时，选择原会话。新会话不会自动复制文件或登录状态。点击及处理脚本将逐步请求确认。
-                  </p>
+                   {app.definition.steps.some((step) => step.operation.type === "script") && <label className="flex items-start gap-2 text-xs leading-5"><input type="checkbox" checked={confirmedScripts} onChange={(event) => { pending.current = null; setConfirmedScripts(event.target.checked) }} /><span>我已核对已发布脚本和本次参数，确认本次运行中的固定脚本直接执行；脚本可能读写工作区文件。</span></label>}
+                   <details className="text-xs leading-5 text-slate-500"><summary className="cursor-pointer">工作区与确认说明</summary><p className="mt-2">需要已有文件或登录状态时，选择原会话。新会话不会自动复制文件或登录状态。网页点击仍需逐步确认。</p></details>
                   <Button
                     type="submit"
-                    disabled={busy || (!!run && ["queued", "running", "paused", "repairing"].includes(run.status))}
-                    className="w-full"
+                      disabled={busy || (app.definition.steps.some((step) => step.operation.type === "script") && !confirmedScripts) || (!!run && ["queued", "running", "paused", "repairing"].includes(run.status))}
+                     className="h-10 w-full bg-teal-700 text-white hover:bg-teal-800"
                   >
                     <Play className="me-2 size-3" />
                     {busy ? "正在处理…" : "运行应用"}

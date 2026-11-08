@@ -1,0 +1,91 @@
+{
+  "case": "统一自动化应用完整闭环（参考 RPA 场景：每日订单汇总）",
+  "time": "2026-11-08 11:11–11:22 (+08)",
+  "env": {
+    "baseServer": "http://127.0.0.1:15301 (hn-base-server, schema hn_browser_ui_20261030, 已加载当日代码)",
+    "saas": "http://localhost:14096 (opencode-saas-instruction-e2e, opencode-v2 PG)",
+    "user": "demo@example.com",
+    "model": "Yd-GLM/glm-5.3-flash"
+  },
+  "ids": {
+    "sessionId": "ses_e45245a70ffeAcPETqjOvxu0sX",
+    "promptId": "msg_1badba61a001HA2xy7F9abIBO8",
+    "draftId": "adraft_393851d9-a5a3-4d83-b9c3-10bf3acbf392",
+    "draftTestId": "arun_2898d392-9966-44af-a653-9722995e5ee6",
+    "appId": "auto_b171a9fe-ff53-4501-b6ea-c5bf061bb2b8",
+    "appRunId": "arun_4dd7d661-c2d1-44db-9247-8943cf5f89a7"
+  },
+  "phases": {
+    "1_任务讨论与真实执行": {
+      "window": "11:12:05–11:12:54",
+      "model": "调用（设计阶段预期）",
+      "evidence": "SSE: write data/orders.csv → shell 执行 summarize_orders.py exit=0 → read output/report.json {total:817.4,count:5} → text 总结",
+      "files": "sse-discuss.log"
+    },
+    "2_沉淀为固定草稿": {
+      "window": "11:15:06–11:16:35",
+      "ai": "结构化生成 90s",
+      "steps": 3,
+      "params": [
+        "orders_csv"
+      ],
+      "verification": "无(第3步内置读回核对)",
+      "files": "draft-candidate.json"
+    },
+    "3_草稿测试与发布": {
+      "window": "11:19:2x–11:20:06",
+      "confirms": 3,
+      "durationMs": 14742,
+      "status": "succeeded",
+      "noModel": true,
+      "published": "auto_b171a9fe-ff53-4501-b6ea-c5bf061bb2b8 v1",
+      "files": "sse-test.log publish-result.json"
+    },
+    "4_触发应用执行": {
+      "window": "11:21:13–11:21:21",
+      "durationMs": 5434,
+      "status": "succeeded",
+      "noModel": true,
+      "artifacts": [
+        "output/automation/arun_4dd7d661-c2d1-44db-9247-8943cf5f89a7/orders.csv",
+        "output/automation/arun_4dd7d661-c2d1-44db-9247-8943cf5f89a7/report.json"
+      ],
+      "expected": "total=817.40, count=5",
+      "actual": "订单数: 5 | 金额总和: 817.40",
+      "files": "sse-run.log run-result.json"
+    }
+  },
+  "pg": {
+    "draft": "adraft_393851d9 published=true legacy_app_id=null",
+    "app": "auto_b171a9fe v1 legacy_app_id=null",
+    "runs": [
+      [
+        "arun_2898d392(draft test)",
+        "succeeded",
+        3,
+        "14.7s"
+      ],
+      [
+        "arun_4dd7d661(app run)",
+        "succeeded",
+        3,
+        "5.4s"
+      ]
+    ],
+    "audit": "automation.create by demo"
+  },
+  "assertions": {
+    "讨论阶段模型真实执行并有产物证据": true,
+    "无证据不生成：候选仅复用已验证动作": true,
+    "草稿测试逐步确认(3次)后完整成功": true,
+    "发布有审计且草稿标记 publishedAppId": true,
+    "应用运行 8 秒完成且零模型调用(user/assistant 计数不变)": true,
+    "产物写入本次运行独立目录且数值正确": true
+  },
+  "findings": [
+    "会话未选模型时 prompt 立即 finish=error，用户难以理解（建议 base-server 建会话时带默认模型或返回明确错误）",
+    "assistant 分段完成标志会让按 completed 轮询的验证器提前返回（验收脚本应等 idle/execution.succeeded）",
+    "definition.verification 为空时产品不强校验产物；本用例靠第 3 步内置读回核对兜底（方案中验收层待后续阶段补强）"
+  ],
+  "passed": true
+}

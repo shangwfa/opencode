@@ -1,0 +1,376 @@
+{
+  "token": "9qRJWh1RNc17js3NNbRZwxUVuhrpFU9h.r0ddCzOfHh6Y0i0iqkkV6EWbNE3j1eAmiESbfCTLJGM=",
+  "sessionId": "ses_e4494dba7ffe9SiSF1ZwaWqgyC",
+  "promptId": "msg_1bb6b24db001OqvZngwavO7J15",
+  "messagesAtStart": {
+    "prompts": 0,
+    "assistants": 0,
+    "total": 0
+  },
+  "explore": {
+    "done": true,
+    "summary": "A 6 行 + B 4 行） | **10** |\n| 按 order_id 去重后行数（保留首次出现的记录） | **8** |\n| 移除的重复 ID | O002、O006 |\n| 有效记录数（仅 paid） | **5**，另移除 3 条 refunded：O003、O005、O008 |\n| 总金额 | **390.00** |\n\n### 分类统计\n| 分类 | 订单数 | 金额合计 |\n|---|---:|---:|\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |\n\n### 金额前三名（topN 默认 3，支持 `-n` 参数）\n1. O007 Grace — 200.00\n2. O001 Alice — 100.00\n3. O006 Frank — 40.00\n\n### 产物\n- `data/orders_a.csv` — 6 行数据\n- `data/orders_b.csv` — 4 行数据，其中包含 2 个与 A 重复的 order_id\n- `output/summary.json` — `grandTotal: 390.0`\n- `output/top.json` — 金额前三名\n- `output/report.md` — 订单汇总报告\n- `output/topn.py` — 可复用的前三名脚本，通过 `python3 output/topn.py -n 5` 调整 N\n\n### 第 8 步校验\n`summary.json` 中 `grandTotal = 390.00`，`report.md` 中总金额也是 `390.00`，**校验通过**。\n\n全程只读写本地沙箱文件，未访问网络。"
+  },
+  "candidate": {
+    "name": "订单数据汇总与报告自动化",
+    "description": "生成两份示例订单 CSV，合并并按 order_id 去重，筛选已支付订单，按分类汇总金额、生成金额前 N 名排行和 Markdown 报告，并校验报告总金额与汇总数据一致。",
+    "parameters": [
+      {
+        "key": "topN",
+        "label": "金额排行数量（N）",
+        "required": false,
+        "defaultValue": "3"
+      }
+    ],
+    "steps": [
+      {
+        "id": "generate-orders-a",
+        "title": "生成订单文件 A（6 条数据）",
+        "businessStage": "生成示例订单数据",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\nos.makedirs(out_dir, exist_ok=True)\npath = os.path.join(out_dir, \"orders_a.csv\")\n\nrows = [\n    [\"O001\", \"Alice\", \"electronics\", \"100.00\", \"paid\"],\n    [\"O002\", \"Bob\", \"books\", \"20.00\", \"paid\"],\n    [\"O003\", \"Carol\", \"electronics\", \"50.00\", \"refunded\"],\n    [\"O004\", \"Dave\", \"clothing\", \"30.00\", \"paid\"],\n    [\"O005\", \"Eve\", \"books\", \"15.00\", \"refunded\"],\n    [\"O006\", \"Frank\", \"clothing\", \"40.00\", \"paid\"],\n]\n\nwith open(path, \"w\", newline=\"\", encoding=\"utf-8\") as f:\n    w = csv.writer(f)\n    w.writerow([\"order_id\", \"customer\", \"category\", \"amount\", \"status\"])\n    w.writerows(rows)\n\nwith open(path, encoding=\"utf-8\") as f:\n    line_count = sum(1 for _ in f)\nprint(\"wrote\", path)\nprint(\"rows (including header):\", line_count)\nprint(\"data rows:\", line_count - 1)"
+        }
+      },
+      {
+        "id": "generate-orders-b",
+        "title": "生成订单文件 B（4 条数据，含重复与退款）",
+        "businessStage": "生成示例订单数据",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\nos.makedirs(out_dir, exist_ok=True)\npath = os.path.join(out_dir, \"orders_b.csv\")\n\nrows = [\n    [\"O007\", \"Grace\", \"electronics\", \"200.00\", \"paid\"],\n    [\"O002\", \"Bob\", \"books\", \"25.00\", \"paid\"],\n    [\"O008\", \"Heidi\", \"clothing\", \"60.00\", \"refunded\"],\n    [\"O006\", \"Frank\", \"clothing\", \"40.00\", \"paid\"],\n]\n\nwith open(path, \"w\", newline=\"\", encoding=\"utf-8\") as f:\n    w = csv.writer(f)\n    w.writerow([\"order_id\", \"customer\", \"category\", \"amount\", \"status\"])\n    w.writerows(rows)\n\nwith open(path, encoding=\"utf-8\") as f:\n    line_count = sum(1 for _ in f)\nprint(\"wrote\", path)\nprint(\"rows (including header):\", line_count)\nprint(\"data rows:\", line_count - 1)\nprint(\"duplicate order_ids vs A: O002, O006\")"
+        }
+      },
+      {
+        "id": "merge-and-dedupe",
+        "title": "合并订单并按 order_id 去重",
+        "businessStage": "合并去重订单",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, os\nfrom collections import Counter\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\ndef load(name):\n    with open(os.path.join(out_dir, name), newline=\"\", encoding=\"utf-8\") as f:\n        return list(csv.DictReader(f))\n\na = load(\"orders_a.csv\")\nb = load(\"orders_b.csv\")\nmerged = a + b\n\nseen = set()\ndeduped = []\ndup_ids = []\nfor r in merged:\n    oid = r[\"order_id\"]\n    if oid in seen:\n        dup_ids.append(oid)\n        continue\n    seen.add(oid)\n    deduped.append(r)\n\nprint(\"orders_a rows:\", len(a))\nprint(\"orders_b rows:\", len(b))\nprint(\"merged total rows:\", len(merged))\nprint(\"rows after dedupe (keep first):\", len(deduped))\nprint(\"duplicate order_ids removed:\", dup_ids)\nprint(\"order_id counts:\", dict(Counter(r[\"order_id\"] for r in merged)))"
+        }
+      },
+      {
+        "id": "filter-paid",
+        "title": "过滤退款记录，仅保留已支付订单",
+        "businessStage": "筛选有效订单",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\ndef load(name):\n    with open(os.path.join(out_dir, name), newline=\"\", encoding=\"utf-8\") as f:\n        return list(csv.DictReader(f))\n\nmerged = load(\"orders_a.csv\") + load(\"orders_b.csv\")\nseen = set()\ndeduped = []\nfor r in merged:\n    if r[\"order_id\"] in seen:\n        continue\n    seen.add(r[\"order_id\"])\n    deduped.append(r)\n\nvalid = [r for r in deduped if r[\"status\"].strip().lower() == \"paid\"]\nrefunded = [r for r in deduped if r[\"status\"].strip().lower() == \"refunded\"]\n\nprint(\"deduped rows:\", len(deduped))\nprint(\"valid (paid) records:\", len(valid))\nprint(\"refunded records dropped:\", len(refunded), [r[\"order_id\"] for r in refunded])\nfor r in valid:\n    print(\"  \", r[\"order_id\"], r[\"customer\"], r[\"category\"], r[\"amount\"], r[\"status\"])"
+        }
+      },
+      {
+        "id": "summarize-by-category",
+        "title": "按分类统计订单数与金额并写入 summary.json",
+        "businessStage": "统计订单数据",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, json, os\nfrom collections import OrderedDict\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\ndef load(name):\n    with open(os.path.join(out_dir, name), newline=\"\", encoding=\"utf-8\") as f:\n        return list(csv.DictReader(f))\n\nmerged = load(\"orders_a.csv\") + load(\"orders_b.csv\")\nseen, deduped = set(), []\nfor r in merged:\n    if r[\"order_id\"] in seen:\n        continue\n    seen.add(r[\"order_id\"])\n    deduped.append(r)\n\nvalid = [r for r in deduped if r[\"status\"].strip().lower() == \"paid\"]\n\ngroups = OrderedDict()\nfor r in valid:\n    cat = r[\"category\"]\n    g = groups.setdefault(cat, {\"category\": cat, \"count\": 0, \"total\": 0.0})\n    g[\"count\"] += 1\n    g[\"total\"] += float(r[\"amount\"])\n\ncategories = []\ngrand_total = 0.0\nfor cat in sorted(groups):\n    g = groups[cat]\n    g[\"total\"] = round(g[\"total\"], 2)\n    grand_total += g[\"total\"]\n    categories.append(g)\ngrand_total = round(grand_total, 2)\n\nsummary = {\"categories\": categories, \"grandTotal\": grand_total}\npath = os.path.join(out_dir, \"summary.json\")\nwith open(path, \"w\", encoding=\"utf-8\") as f:\n    json.dump(summary, f, ensure_ascii=False, indent=2)\n    f.write(\"\\n\")\n\nprint(\"wrote\", path)\nprint(open(path, encoding=\"utf-8\").read())"
+        }
+      },
+      {
+        "id": "top-n-orders",
+        "title": "按金额倒序生成前 N 名排行并写入 top.json",
+        "businessStage": "统计订单数据",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import csv, json, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\ndef load(name):\n    with open(os.path.join(out_dir, name), newline=\"\", encoding=\"utf-8\") as f:\n        return list(csv.DictReader(f))\n\nraw = os.environ.get(\"AUTOMATION_INPUT\", \"\") or \"{}\"\ntry:\n    params = json.loads(raw)\nexcept Exception:\n    params = {}\ntry:\n    n = int(params.get(\"topN\", 3))\nexcept (TypeError, ValueError):\n    n = 3\nn = max(n, 0)\n\nmerged = load(\"orders_a.csv\") + load(\"orders_b.csv\")\nseen, deduped = set(), []\nfor r in merged:\n    if r[\"order_id\"] in seen:\n        continue\n    seen.add(r[\"order_id\"])\n    deduped.append(r)\nvalid = [r for r in deduped if r[\"status\"].strip().lower() == \"paid\"]\n\ntop = sorted(valid, key=lambda r: float(r[\"amount\"]), reverse=True)[:n]\ndata = {\"top\": [\n    {\"order_id\": r[\"order_id\"], \"customer\": r[\"customer\"], \"amount\": float(r[\"amount\"])}\n    for r in top\n]}\npath = os.path.join(out_dir, \"top.json\")\nwith open(path, \"w\", encoding=\"utf-8\") as f:\n    json.dump(data, f, ensure_ascii=False, indent=2)\n    f.write(\"\\n\")\n\nprint(f\"wrote {path} (N={n})\")\nprint(open(path, encoding=\"utf-8\").read())"
+        }
+      },
+      {
+        "id": "generate-report",
+        "title": "生成订单汇总 Markdown 报告",
+        "businessStage": "生成并校验报告",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import json, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\nsummary = json.load(open(os.path.join(out_dir, \"summary.json\"), encoding=\"utf-8\"))\ncats = summary[\"categories\"]\ntotal_orders = sum(c[\"count\"] for c in cats)\ngrand_total = summary[\"grandTotal\"]\n\nlines = [\n    \"# 订单汇总报告\",\n    \"\",\n    f\"- 总单数：{total_orders}\",\n    f\"- 总金额：{grand_total:.2f}\",\n    \"\",\n    \"## 分类统计\",\n    \"\",\n    \"| 分类 | 订单数 | 金额合计 |\",\n    \"| --- | ---: | ---: |\",\n]\nfor c in cats:\n    lines.append(f\"| {c['category']} | {c['count']} | {c['total']:.2f} |\")\nlines.append(f\"| **合计** | **{total_orders}** | **{grand_total:.2f}** |\")\nlines.append(\"\")\n\ntext = \"\\n\".join(lines)\npath = os.path.join(out_dir, \"report.md\")\nwith open(path, \"w\", encoding=\"utf-8\") as f:\n    f.write(text)\n\nprint(\"wrote\", path)\nprint(text)"
+        }
+      },
+      {
+        "id": "validate-report",
+        "title": "校验报告总金额与汇总数据一致",
+        "businessStage": "生成并校验报告",
+        "operation": {
+          "type": "script",
+          "runtime": "python",
+          "source": "import json, re, os\n\nout_dir = os.environ.get(\"AUTOMATION_OUTPUT_DIR\", \".\")\n\nsummary = json.load(open(os.path.join(out_dir, \"summary.json\"), encoding=\"utf-8\"))\nreport = open(os.path.join(out_dir, \"report.md\"), encoding=\"utf-8\").read()\n\nm = re.search(r\"总金额：\\s*([0-9]+(?:\\.[0-9]+)?)\", report)\nsummary_total = round(float(summary[\"grandTotal\"]), 2)\n\nif not m:\n    print(\"校验失败: report.md 中未找到总金额\")\n    raise SystemExit(1)\n\nreport_total = round(float(m.group(1)), 2)\nprint(f\"summary.json grandTotal = {summary_total:.2f}\")\nprint(f\"report.md 总金额        = {report_total:.2f}\")\n\nif abs(summary_total - report_total) < 1e-9:\n    print(\"校验通过：两处总金额一致\")\nelse:\n    print(\"校验失败：两处总金额不一致\")\n    raise SystemExit(1)"
+        }
+      }
+    ],
+    "model": {
+      "id": "deepseek-v4-1-flash-261017",
+      "providerID": "Yd-DeepSeek",
+      "variant": "default"
+    }
+  },
+  "draftId": "adraft_9db7768b-1b56-4efb-90cc-a9f439dbce10",
+  "draftVersion": 1,
+  "draftTestId": "arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c",
+  "beforeTest": {
+    "prompts": 0,
+    "assistants": 0,
+    "total": 0
+  },
+  "draftTestFinal": {
+    "status": "succeeded",
+    "error": null,
+    "results": [
+      {
+        "output": "wrote /workspace/output/automation/arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c/orders_a.csv\nrows (including header): 7\ndata rows: 6",
+        "status": "succeeded",
+        "stepId": "generate-orders-a",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c/orders_b.csv\nrows (including header): 5\ndata rows: 4\nduplicate order_ids vs A: O002, O006",
+        "status": "succeeded",
+        "stepId": "generate-orders-b",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "orders_a rows: 6\norders_b rows: 4\nmerged total rows: 10\nrows after dedupe (keep first): 8\nduplicate order_ids removed: ['O002', 'O006']\norder_id counts: {'O001': 1, 'O002': 2, 'O003': 1, 'O004': 1, 'O005': 1, 'O006': 2, 'O007': 1, 'O008': 1}",
+        "status": "succeeded",
+        "stepId": "merge-and-dedupe",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "deduped rows: 8\nvalid (paid) records: 5\nrefunded records dropped: 3 ['O003', 'O005', 'O008']\n   O001 Alice electronics 100.00 paid\n   O002 Bob books 20.00 paid\n   O004 Dave clothing 30.00 paid\n   O006 Frank clothing 40.00 paid\n   O007 Grace electronics 200.00 paid",
+        "status": "succeeded",
+        "stepId": "filter-paid",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c/summary.json\n{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      \"category\": \"clothing\",\n      \"count\": 2,\n      \"total\": 70.0\n    },\n    {\n      \"category\": \"electronics\",\n      \"count\": 2,\n      \"total\": 300.0\n    }\n  ],\n  \"grandTotal\": 390.0\n}",
+        "status": "succeeded",
+        "stepId": "summarize-by-category",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c/top.json (N=3)\n{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    },\n    {\n      \"order_id\": \"O001\",\n      \"customer\": \"Alice\",\n      \"amount\": 100.0\n    },\n    {\n      \"order_id\": \"O006\",\n      \"customer\": \"Frank\",\n      \"amount\": 40.0\n    }\n  ]\n}",
+        "status": "succeeded",
+        "stepId": "top-n-orders",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c/report.md\n# 订单汇总报告\n- 总单数：5\n- 总金额：390.00\n## 分类统计\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |",
+        "status": "succeeded",
+        "stepId": "generate-report",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "summary.json grandTotal = 390.00\nreport.md 总金额        = 390.00\n校验通过：两处总金额一致",
+        "status": "succeeded",
+        "stepId": "validate-report",
+        "approved": false,
+        "repairAttempts": 0
+      }
+    ],
+    "decisions": [
+      {
+        "cursor": 0,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 1,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 2,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 3,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 4,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 5,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 6,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 7,
+        "action": "confirm",
+        "status": 200
+      }
+    ]
+  },
+  "afterTest": {
+    "prompts": 0,
+    "assistants": 0,
+    "total": 0
+  },
+  "appId": "auto_ef198ac7-e36f-4663-a77b-ba7f8b950110",
+  "appVersion": 1,
+  "runParameters": {
+    "topN": "3"
+  },
+  "beforeRun": {
+    "prompts": 0,
+    "assistants": 0,
+    "total": 0
+  },
+  "appRunId": "arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07",
+  "appRunFinal": {
+    "status": "succeeded",
+    "error": null,
+    "results": [
+      {
+        "output": "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/orders_a.csv\nrows (including header): 7\ndata rows: 6",
+        "status": "succeeded",
+        "stepId": "generate-orders-a",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/orders_b.csv\nrows (including header): 5\ndata rows: 4\nduplicate order_ids vs A: O002, O006",
+        "status": "succeeded",
+        "stepId": "generate-orders-b",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "orders_a rows: 6\norders_b rows: 4\nmerged total rows: 10\nrows after dedupe (keep first): 8\nduplicate order_ids removed: ['O002', 'O006']\norder_id counts: {'O001': 1, 'O002': 2, 'O003': 1, 'O004': 1, 'O005': 1, 'O006': 2, 'O007': 1, 'O008': 1}",
+        "status": "succeeded",
+        "stepId": "merge-and-dedupe",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "deduped rows: 8\nvalid (paid) records: 5\nrefunded records dropped: 3 ['O003', 'O005', 'O008']\n   O001 Alice electronics 100.00 paid\n   O002 Bob books 20.00 paid\n   O004 Dave clothing 30.00 paid\n   O006 Frank clothing 40.00 paid\n   O007 Grace electronics 200.00 paid",
+        "status": "succeeded",
+        "stepId": "filter-paid",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/summary.json\n{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      \"category\": \"clothing\",\n      \"count\": 2,\n      \"total\": 70.0\n    },\n    {\n      \"category\": \"electronics\",\n      \"count\": 2,\n      \"total\": 300.0\n    }\n  ],\n  \"grandTotal\": 390.0\n}",
+        "status": "succeeded",
+        "stepId": "summarize-by-category",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/top.json (N=3)\n{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    },\n    {\n      \"order_id\": \"O001\",\n      \"customer\": \"Alice\",\n      \"amount\": 100.0\n    },\n    {\n      \"order_id\": \"O006\",\n      \"customer\": \"Frank\",\n      \"amount\": 40.0\n    }\n  ]\n}",
+        "status": "succeeded",
+        "stepId": "top-n-orders",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/report.md\n# 订单汇总报告\n- 总单数：5\n- 总金额：390.00\n## 分类统计\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |",
+        "status": "succeeded",
+        "stepId": "generate-report",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "summary.json grandTotal = 390.00\nreport.md 总金额        = 390.00\n校验通过：两处总金额一致",
+        "status": "succeeded",
+        "stepId": "validate-report",
+        "approved": false,
+        "repairAttempts": 0
+      }
+    ],
+    "decisions": []
+  },
+  "afterRun": {
+    "prompts": 0,
+    "assistants": 0,
+    "total": 0
+  },
+  "secondRunParameters": {
+    "topN": "1"
+  },
+  "appRun2Id": "arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d",
+  "appRun2Final": {
+    "status": "succeeded",
+    "error": null,
+    "results": [
+      {
+        "output": "wrote /workspace/output/automation/arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d/orders_a.csv\nrows (including header): 7\ndata rows: 6",
+        "status": "succeeded",
+        "stepId": "generate-orders-a",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d/orders_b.csv\nrows (including header): 5\ndata rows: 4\nduplicate order_ids vs A: O002, O006",
+        "status": "succeeded",
+        "stepId": "generate-orders-b",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "orders_a rows: 6\norders_b rows: 4\nmerged total rows: 10\nrows after dedupe (keep first): 8\nduplicate order_ids removed: ['O002', 'O006']\norder_id counts: {'O001': 1, 'O002': 2, 'O003': 1, 'O004': 1, 'O005': 1, 'O006': 2, 'O007': 1, 'O008': 1}",
+        "status": "succeeded",
+        "stepId": "merge-and-dedupe",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "deduped rows: 8\nvalid (paid) records: 5\nrefunded records dropped: 3 ['O003', 'O005', 'O008']\n   O001 Alice electronics 100.00 paid\n   O002 Bob books 20.00 paid\n   O004 Dave clothing 30.00 paid\n   O006 Frank clothing 40.00 paid\n   O007 Grace electronics 200.00 paid",
+        "status": "succeeded",
+        "stepId": "filter-paid",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d/summary.json\n{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      \"category\": \"clothing\",\n      \"count\": 2,\n      \"total\": 70.0\n    },\n    {\n      \"category\": \"electronics\",\n      \"count\": 2,\n      \"total\": 300.0\n    }\n  ],\n  \"grandTotal\": 390.0\n}",
+        "status": "succeeded",
+        "stepId": "summarize-by-category",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d/top.json (N=1)\n{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    }\n  ]\n}",
+        "status": "succeeded",
+        "stepId": "top-n-orders",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "wrote /workspace/output/automation/arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d/report.md\n# 订单汇总报告\n- 总单数：5\n- 总金额：390.00\n## 分类统计\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |",
+        "status": "succeeded",
+        "stepId": "generate-report",
+        "approved": false,
+        "repairAttempts": 0
+      },
+      {
+        "output": "summary.json grandTotal = 390.00\nreport.md 总金额        = 390.00\n校验通过：两处总金额一致",
+        "status": "succeeded",
+        "stepId": "validate-report",
+        "approved": false,
+        "repairAttempts": 0
+      }
+    ],
+    "decisions": []
+  }
+}

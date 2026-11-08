@@ -9,6 +9,7 @@
  * 约定：列名显式 snake_case；时间用 timestamp（better-auth 需要 Date）。
  */
 import type { AutomationApp } from "@opencode/schema/automation-app"
+import type { AutomationInstruction } from "@opencode/schema/automation-instruction"
 import { sql } from "drizzle-orm"
 import {
   bigint,
@@ -445,14 +446,79 @@ export const automationApp = hnBase.table("automation_app", {
   id: text("id").primaryKey(),
   ownerId: text("owner_id").notNull().references(() => user.id),
   definition: jsonb("definition").$type<AutomationApp.Definition>().notNull(),
+  legacyAppId: text("legacy_app_id"),
   version: integer("version").notNull(),
   timeCreated: bigint("time_created", { mode: "number" }).notNull(),
   timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
-}, (t) => [index("automation_app_owner_idx").on(t.ownerId, t.timeUpdated)])
+}, (t) => [index("automation_app_owner_idx").on(t.ownerId, t.timeUpdated), uniqueIndex("automation_app_legacy_idx").on(t.ownerId, t.legacyAppId)])
+
+export const automationDraft = hnBase.table("automation_draft", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  sessionId: text("session_id").notNull(),
+  generationKey: text("generation_key"),
+  legacyAppId: text("legacy_app_id"),
+  definition: jsonb("definition").$type<AutomationApp.Definition>().notNull(),
+  version: integer("version").notNull(),
+  contentHash: text("content_hash").notNull(),
+  publishedAppId: text("published_app_id").references(() => automationApp.id),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [index("automation_draft_session_idx").on(t.ownerId, t.sessionId, t.timeUpdated), uniqueIndex("automation_draft_generation_idx").on(t.ownerId, t.sessionId, t.generationKey), uniqueIndex("automation_draft_legacy_idx").on(t.ownerId, t.legacyAppId)])
+
+export const instructionDraft = hnBase.table("instruction_draft", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  sessionId: text("session_id").notNull(),
+  generationKey: text("generation_key"),
+  definition: jsonb("definition").$type<AutomationInstruction.Definition>().notNull(),
+  version: integer("version").notNull(),
+  contentHash: text("content_hash").notNull(),
+  publishedAppId: text("published_app_id").references(() => instructionApp.id),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [index("instruction_draft_session_idx").on(t.ownerId, t.sessionId, t.timeUpdated), uniqueIndex("instruction_draft_generation_idx").on(t.ownerId, t.sessionId, t.generationKey)])
+
+export const instructionApp = hnBase.table("instruction_app", {
+  id: text("id").primaryKey(),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  definition: jsonb("definition").$type<AutomationInstruction.Definition>().notNull(),
+  version: integer("version").notNull(),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [index("instruction_app_owner_idx").on(t.ownerId, t.timeUpdated)])
+
+export const instructionRun = hnBase.table("instruction_run", {
+  id: text("id").primaryKey(),
+  appId: text("app_id").references(() => instructionApp.id),
+  draftId: text("draft_id").references(() => instructionDraft.id),
+  draftHash: text("draft_hash"),
+  ownerId: text("owner_id").notNull().references(() => user.id),
+  sessionId: text("session_id").notNull(),
+  requestKey: text("request_key").notNull(),
+  appVersion: integer("app_version").notNull(),
+  definition: jsonb("definition").$type<AutomationInstruction.Definition>().notNull(),
+  parameters: jsonb("parameters").$type<Record<string, string>>().notNull(),
+  promptId: text("prompt_id"),
+  steps: jsonb("steps").$type<AutomationInstruction.Step[]>().notNull().default(sql`'[]'::jsonb`),
+  status: text("status").$type<AutomationInstruction.Run["status"]>().notNull(),
+  output: text("output"),
+  error: text("error"),
+  regeneratedVersion: integer("regenerated_version"),
+  timeCreated: bigint("time_created", { mode: "number" }).notNull(),
+  timeUpdated: bigint("time_updated", { mode: "number" }).notNull(),
+}, (t) => [
+  index("instruction_run_app_idx").on(t.appId, t.timeCreated),
+  index("instruction_run_draft_idx").on(t.draftId, t.timeCreated),
+  uniqueIndex("instruction_run_request_idx").on(t.ownerId, t.requestKey),
+  uniqueIndex("instruction_run_active_idx").on(t.sessionId).where(sql`${t.status} IN ('queued','running','regenerating','paused')`),
+])
 
 export const automationRun = hnBase.table("automation_run", {
   id: text("id").primaryKey(),
-  appId: text("app_id").notNull().references(() => automationApp.id),
+  appId: text("app_id").references(() => automationApp.id),
+  draftId: text("draft_id").references(() => automationDraft.id),
+  draftHash: text("draft_hash"),
   ownerId: text("owner_id").notNull().references(() => user.id),
   sessionId: text("session_id").notNull(),
   targetId: text("target_id"),
@@ -475,7 +541,11 @@ export const automationRun = hnBase.table("automation_run", {
 ])
 
 export const schema = {
+  instructionDraft,
+  instructionApp,
+  instructionRun,
   automationApp,
+  automationDraft,
   automationRun,
   browserSession,
   browserScript,

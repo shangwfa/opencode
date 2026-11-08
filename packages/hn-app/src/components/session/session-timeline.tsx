@@ -55,6 +55,7 @@ export function SessionTimeline({
   phaseLabel,
   executionError,
   children,
+  footer,
   onFileLink,
   onImagePreview,
   className,
@@ -69,6 +70,8 @@ export function SessionTimeline({
   executionError?: unknown
   /** 与消息同宽、共享滚动的待回答问题。 */
   children?: ReactNode
+  /** 消息之后的独立区域（如草稿卡片），不与对话内容混排。 */
+  footer?: ReactNode
   /** 沙箱文件链接点击（预览弹窗由页面层持有） */
   onFileLink?: (href: string) => void
   /** 图片 part 点击放大（灯箱由页面层持有） */
@@ -170,6 +173,8 @@ export function SessionTimeline({
         </div>
       )}
       <div ref={anchorRef} />
+      {/* 独立区域（草稿卡片等）放在状态行之后，避免插在对话与「思考中」之间 */}
+      {footer}
       {/* 用户上滚后不再强制跟随，提供一个回到最新的入口 */}
       {/* 外层始终保留，避免显隐改变 flex gap 后触发底部滚动反馈循环。 */}
       <div className="pointer-events-none sticky bottom-2 z-10 h-0 shrink-0 self-center">

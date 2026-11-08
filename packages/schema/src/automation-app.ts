@@ -38,20 +38,50 @@ export const Step = Schema.Struct({
   operation: Operation,
 }).annotate({ identifier: "AutomationApp.Step" })
 
+export interface Resource extends Schema.Schema.Type<typeof Resource> {}
+export const Resource = Schema.Struct({
+  path: Schema.String,
+  content: Schema.String,
+}).annotate({ identifier: "AutomationApp.Resource" })
+
+export interface Verification extends Schema.Schema.Type<typeof Verification> {}
+export const Verification = Schema.Struct({
+  /** 相对 /workspace 的本次产物路径。 */
+  path: Schema.String,
+  contains: Schema.String.pipe(optional),
+}).annotate({ identifier: "AutomationApp.Verification" })
+
 export interface Definition extends Schema.Schema.Type<typeof Definition> {}
 export const Definition = Schema.Struct({
   name: Schema.String,
   description: Schema.String,
   parameters: Schema.Array(Parameter),
   steps: Schema.Array(Step),
+  resources: Schema.Array(Resource).pipe(optional),
+  verification: Verification.pipe(optional),
   model: Model.Ref.pipe(optional),
 }).annotate({ identifier: "AutomationApp.Definition" })
+
+export interface Draft extends Schema.Schema.Type<typeof Draft> {}
+export const Draft = Schema.Struct({
+  id: Schema.String,
+  ownerId: Schema.String,
+  sessionId: Schema.String,
+  definition: Definition,
+  version: Schema.Int,
+  contentHash: Schema.String,
+  legacyAppId: Schema.NullOr(Schema.String).pipe(optional),
+  publishedAppId: Schema.NullOr(Schema.String),
+  timeCreated: Schema.Number,
+  timeUpdated: Schema.Number,
+}).annotate({ identifier: "AutomationApp.Draft" })
 
 export interface App extends Schema.Schema.Type<typeof App> {}
 export const App = Schema.Struct({
   id: Schema.String,
   ownerId: Schema.String,
   definition: Definition,
+  legacyAppId: Schema.NullOr(Schema.String).pipe(optional),
   version: Schema.Int,
   timeCreated: Schema.Number,
   timeUpdated: Schema.Number,
@@ -75,7 +105,9 @@ export const StepResult = Schema.Struct({
 export interface Run extends Schema.Schema.Type<typeof Run> {}
 export const Run = Schema.Struct({
   id: Schema.String,
-  appId: Schema.String,
+  appId: Schema.NullOr(Schema.String),
+  draftId: Schema.NullOr(Schema.String).pipe(optional),
+  draftHash: Schema.NullOr(Schema.String).pipe(optional),
   ownerId: Schema.String,
   sessionId: Schema.String,
   targetId: Schema.NullOr(Schema.String),

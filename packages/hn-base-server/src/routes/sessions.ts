@@ -322,6 +322,27 @@ sessionRoutes.post("/:id/forms/:form/reply", async (c) => {
   return c.json(await res.json().catch(() => ({ replied: true })))
 })
 
+/** 待确认工具权限属于会话；只代理当前会话的请求，不能跨会话读取或代答。 */
+sessionRoutes.get("/:id/permissions", async (c) => {
+  const id = c.req.param("id")
+  await assertSession(c.get("userId"), id, "read", c)
+  const res = await saasFetch(`/api/session/${encodeURIComponent(id)}/permission`)
+  if (!res.ok) throw errors.upstream(502, `读取待确认权限失败（${res.status}）`)
+  return c.json(await res.json())
+})
+
+sessionRoutes.post("/:id/permissions/:request/reply", async (c) => {
+  const id = c.req.param("id")
+  await assertSession(c.get("userId"), id, "run", c)
+  const parsed = z.object({ decision: z.enum(["once", "reject"]) }).strict().safeParse(await c.req.json().catch(() => null))
+  if (!parsed.success) throw errors.invalid("请选择仅本次允许或拒绝", "decision")
+  const res = await saasFetch(`/api/session/${encodeURIComponent(id)}/permission/${encodeURIComponent(c.req.param("request"))}/reply`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(parsed.data),
+  })
+  if (!res.ok) throw errors.upstream(502, `权限确认失败（${res.status}）`)
+  return c.json({ replied: true })
+})
+
 /** 子会话 */
 sessionRoutes.get("/:id/children", async (c) => {
   const id = c.req.param("id")

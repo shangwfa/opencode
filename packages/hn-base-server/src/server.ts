@@ -7,9 +7,11 @@ import { env } from "./config/env.js"
 import { ensureSchema } from "./db/ensure-schema.js"
 import { pool } from "./db/index.js"
 import { startAutomationWorker } from "./lib/automation-worker.js"
+import { startInstructionWorker } from "./automation/instruction/worker.js"
 
 await ensureSchema(pool)
 startAutomationWorker()
+startInstructionWorker()
 
 const app = createApp()
 

@@ -1,0 +1,54 @@
+{
+  "suite": "统一自动化应用 · 多实际场景真实 E2E",
+  "date": "2026-11-08",
+  "env": {
+    "baseServer": "http://127.0.0.1:15301 (hn-base-server, schema hn_browser_ui_20261108→复用当日已加载代码, SaaS 14096)",
+    "model": "Yd-GLM/glm-5.3-flash",
+    "note": "每条用例均走完整链路：真实会话探索(模型执行)→生成固定草稿→草稿测试(逐步确认)→发布→触发应用执行；全程 SSE 监视（sse-<case>.log），断言按消息类型统计『无模型』。"
+  },
+  "cases": [
+    {
+      "id": "browser",
+      "title": "浏览器读取页面标题并落盘（agent-browser 真实打开 https://www.baidu.com）",
+      "passed": true,
+      "steps": "browser navigate + browser extract(title) + script 写 page-title.json",
+      "highlight": "浏览器动作与数据处理组合；navigate/extract 未触发暂停（非点击类），仅脚本步骤逐步确认一次",
+      "artifact": "output/automation/<runId>/page-title.json = {url:https://www.baidu.com, title:百度一下，你就知道}",
+      "appId": "auto_9b878b33-1c2f-4faf-8d73-d3191d899f70",
+      "appRun": "arun_8591850f-a4a3-4d03-8874-eb8807477209（5 秒完成，零模型）"
+    },
+    {
+      "id": "stats",
+      "title": "参数化数据统计（数字列表为参数，支持换参数重跑）",
+      "passed": true,
+      "steps": "script 解析数字并写清单 + script 计算 max/min/avg",
+      "highlight": "换参数重跑验证应用按参数执行而非死数据：默认 10,25,4,87,16→{max87,min4,avg28.4}；覆盖 3/9/27→{max27,min3,avg13.0}",
+      "appId": "auto_619bac78-9f46-479b-bd7c-03bd711548f3",
+      "secondRun": "换参数二次运行通过"
+    },
+    {
+      "id": "report",
+      "title": "文件生成：Markdown 周报 + Python 自校验",
+      "passed": true,
+      "steps": "script 生成 weekly-report.md + script 校验标题/行数",
+      "highlight": "文件生成场景，产物含一级标题『自动化周报』、生成日期、三个章节",
+      "appId": "auto_0b2c93aa-1acc-41fd-871c-88e831d95fd8"
+    },
+    {
+      "id": "guardrail",
+      "title": "证据不足时拒绝沉淀（护栏，见 notes-guardrail.md）",
+      "passed": true,
+      "expectation": "任务靠 webfetch/curl 完成、无 agent-browser/CDP 浏览器证据、无已验证固定脚本 → 草稿生成返回 400，不编造 navigate/extract/script",
+      "result": "服务如实逐条说明缺少的证据；应用库无半成品污染"
+    }
+  ],
+  "assertionsPerCase": {
+    "探索轮真实执行并留下证据": true,
+    "草稿仅复用已验证动作(无编造)": true,
+    "草稿测试逐步确认后干净成功(无 skip/repair)": true,
+    "发布含审计且草稿标记 publishedAppId": true,
+    "应用运行零模型调用(user/assistant 计数不变)": true,
+    "产物写入本次运行独立目录且内容正确": true
+  },
+  "overall": "4/4 通过"
+}

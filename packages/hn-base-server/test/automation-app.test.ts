@@ -3,6 +3,10 @@ import { Schema } from "effect"
 import { AutomationApp as A } from "@opencode/schema/automation-app"
 import { definition, interpolate, parameters, requiresConfirmation, resolveOperation } from "../src/lib/automation-app"
 import { scriptPlan, uniqueShellCommand } from "../src/lib/automation-runtime"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { execFileSync } from "node:child_process"
 
 const value: A.Definition = {
   name: "整理报告",
@@ -34,6 +38,17 @@ describe("自动化应用契约与验证", () => {
     expect(definition(staged)).toEqual(staged)
     expect(Object.hasOwn(Schema.encodeSync(A.Step)(value.steps[0]!), "businessStage")).toBe(false)
     expect(() => definition({ ...value, steps: [{ ...value.steps[0], businessStage: " " }] })).toThrow()
+  })
+  test("文本资源可保存，并拒绝危险路径、冲突及超限", () => {
+    const resources = [{ path: "lib/helper.py", content: "print('你好')" }]
+    expect(definition({ ...value, resources }).resources).toEqual(resources)
+    for (const bad of [
+      [{ path: "../escape", content: "" }], [{ path: "/absolute", content: "" }],
+      [{ path: ".env", content: "" }], [{ path: "secret.pem", content: "" }],
+      [resources[0], resources[0]], [{ path: "lib", content: "" }, resources[0]],
+      [{ path: "huge", content: "x".repeat(65537) }],
+      Array.from({ length: 33 }, (_, i) => ({ path: `file${i}`, content: "" })),
+    ]) expect(() => definition({ ...value, resources: bad })).toThrow()
   })
   test("拒绝无效、重复、未定义参数和任意能力类型", () => {
     for (const patch of [
@@ -83,5 +98,55 @@ describe("自动化应用契约与验证", () => {
     expect(setup.every((line) => line.length < 3200)).toBe(true)
     expect(uniqueShellCommand(setup[0]!)).not.toBe(uniqueShellCommand(setup[0]!))
     expect(() => scriptPlan(operation, {}, "../bad")).toThrow()
+    const resource = { path: "lib/helper.py", content: "敏感 ' $(touch injected)" }
+    const plan = scriptPlan(operation, {}, "run_2", [], [resource])
+    expect(plan.setup.join("\n")).not.toContain(resource.content)
+    expect(plan.setup.join("\n")).toContain(Buffer.from(JSON.stringify([resource])).toString("base64"))
+  })
+  test("运行计划将多文件资源还原到独立目录并传给脚本", () => {
+    const temp = mkdtempSync(join(tmpdir(), "automation-assets-"))
+    try {
+      const operation = { type: "script", runtime: "python", source: "import os,pathlib\np=pathlib.Path(os.environ['AUTOMATION_ASSETS_DIR'])\nprint((p/'lib'/'helper.txt').read_text())" } as const
+      const plan = scriptPlan(operation, {}, "test_run", [], [{ path: "lib/helper.txt", content: "你好 ' $()" }])
+      const replace = (text: string) => text.replaceAll("/workspace/.automation/test_run", `${temp}/run`).replaceAll("/workspace/output", `${temp}/output`)
+      for (const command of plan.setup) execFileSync("sh", ["-c", replace(command)])
+      const encoded = plan.command.match(/b64decode\("([^"]+)"\)/)?.[1]
+      expect(encoded).toBeDefined()
+      const bootstrap = replace(Buffer.from(encoded!, "base64").toString()).replace("cwd='/workspace'", `cwd='${temp}'`)
+      expect(execFileSync("python3", ["-c", bootstrap], { encoding: "utf8" }).trim()).toBe("你好 ' $()")
+    } finally {
+      rmSync(temp, { recursive: true, force: true })
+    }
+  })
+  /** 本地按 sandbox 布局执行一步脚本，返回 stdout。 */
+  function runScript(operation: A.ScriptOperation, input: Record<string, string>, results: A.StepResult[] = []) {
+    const temp = mkdtempSync(join(tmpdir(), "automation-run-"))
+    try {
+      const plan = scriptPlan(operation, input, "test_run", results)
+      const replace = (text: string) => text.replaceAll("/workspace/.automation/test_run", `${temp}/run`).replaceAll("/workspace/output", `${temp}/output`)
+      for (const command of plan.setup) execFileSync("sh", ["-c", replace(command)])
+      const encoded = plan.command.match(/b64decode\("([^"]+)"\)/)?.[1]
+      if (!encoded) throw new Error("缺少引导程序")
+      const bootstrap = replace(Buffer.from(encoded, "base64").toString()).replace("cwd='/workspace'", `cwd='${temp}'`)
+      return execFileSync("python3", ["-c", bootstrap], { encoding: "utf8" }).trim()
+    } finally {
+      rmSync(temp, { recursive: true, force: true })
+    }
+  }
+  // 实测缺陷：AI 生成的 JS 脚本用顶层 return 返回数据，执行器只捕获 stdout 导致后续步骤拿不到结果。
+  test("JS 顶层 return 的结果也会写入 stdout，后续步骤可解析", () => {
+    const compute = runScript({ type: "script", runtime: "javascript", source: "return { product: 42 }" }, {})
+    expect(compute).toBe('{"product":42}')
+    const report = runScript(
+      { type: "script", runtime: "javascript", source: "const fs=require('fs');const r=JSON.parse(fs.readFileSync(process.env.AUTOMATION_RESULTS_PATH,'utf8'));console.log(JSON.stringify({result:JSON.parse(r.compute).product}))" },
+      {},
+      [{ stepId: "compute", status: "succeeded", repairAttempts: 0, output: compute }],
+    )
+    expect(report).toBe('{"result":42}')
+    // 已用 console.log 的脚本不会被重复输出
+    expect(runScript({ type: "script", runtime: "javascript", source: "console.log('only')" }, {})).toBe("only")
+  })
+  test("Python 脚本仍按 stdout 原样输出", () => {
+    expect(runScript({ type: "script", runtime: "python", source: "import json,os\nprint(json.dumps({'v':json.loads(os.environ['AUTOMATION_INPUT'])['a']}))" }, { a: "9" })).toBe('{"v": "9"}')
   })
 })

@@ -33,6 +33,7 @@ const CdpScriptDetail = lazy(() => import("@/pages/cdp/scripts").then((module) =
 const CdpSession = lazy(() => import("@/pages/cdp/session").then((module) => ({ default: module.CdpSession })))
 const AutomationsPage = lazy(() => import("@/pages/automations").then((module) => ({ default: module.AutomationsPage })))
 const AutomationDetailPage = lazy(() => import("@/pages/automations").then((module) => ({ default: module.AutomationDetailPage })))
+const InstructionAppDetailPage = lazy(() => import("@/pages/instruction-apps").then((module) => ({ default: module.InstructionAppDetailPage })))
 
 export function App() {
   return (
@@ -73,6 +74,8 @@ export function App() {
           <Route index element={<CdpHome />} />
           <Route path="apps" element={<AutomationsPage />} />
           <Route path="apps/:automationId" element={<AutomationDetailPage />} />
+           <Route path="instruction-apps" element={<Navigate to="/cdp/apps" replace />} />
+          <Route path="instruction-apps/:appId" element={<InstructionAppDetailPage />} />
           <Route path="sessions" element={<CdpHistory />} />
           <Route path="scripts" element={<CdpScripts />} />
           <Route path="scripts/:scriptId" element={<CdpScriptDetail />} />

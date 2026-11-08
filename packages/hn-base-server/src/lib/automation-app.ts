@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { AutomationApp as A } from "@opencode/schema/automation-app"
 import { errors } from "./errors.js"
+import { nameAndDescription, parameters as parameterRules, resolveParameters, resources as resourceRules, verificationPath } from "../automation/shared/validation.js"
 
 export function definition(input: unknown): A.Definition {
   let value: A.Definition
@@ -9,24 +10,14 @@ export function definition(input: unknown): A.Definition {
   } catch {
     throw errors.invalid("应用定义格式不正确")
   }
-  if (!value.name.trim() || value.name.length > 120 || value.description.length > 4000)
-    throw errors.invalid("应用名称或说明超出限制")
-  if (!value.steps.length || value.steps.length > 100 || value.parameters.length > 30)
-    throw errors.invalid("应用需要 1–100 个步骤，最多 30 个参数")
-  const keys = new Set<string>(),
+  nameAndDescription(value.name, value.description)
+  if (!value.steps.length || value.steps.length > 100)
+    throw errors.invalid("应用需要 1–100 个步骤")
+  resourceRules(value.resources)
+  if (value.verification && (!verificationPath(value.verification.path) || (value.verification.contains?.length ?? 0) > 2000))
+    throw errors.invalid("结果校验路径或内容无效")
+  const keys = parameterRules(value.parameters),
     ids = new Set<string>()
-  for (const parameter of value.parameters) {
-    if (
-      !/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/.test(parameter.key) ||
-      ["constructor", "prototype", "__proto__"].includes(parameter.key) ||
-      keys.has(parameter.key) ||
-      !parameter.label.trim() ||
-      parameter.label.length > 120 ||
-      parameter.defaultValue.length > 4000
-    )
-      throw errors.invalid("参数名称无效或重复")
-    keys.add(parameter.key)
-  }
   for (const step of value.steps) {
     if (!step.id || step.id.length > 80 || ids.has(step.id) || !step.title.trim() || step.title.length > 300)
       throw errors.invalid("步骤名称无效或编号重复")
@@ -57,16 +48,7 @@ export function definition(input: unknown): A.Definition {
 }
 
 export function parameters(app: A.Definition, input: Record<string, string>) {
-  const result: Record<string, string> = {}
-  const keys = new Set(app.parameters.map((p) => p.key))
-  if (Object.keys(input).some((key) => !keys.has(key))) throw errors.invalid("包含未知参数")
-  for (const p of app.parameters) {
-    const value = input[p.key] ?? p.defaultValue
-    if (value.length > 8000 || (p.required && !value.trim())) throw errors.invalid(`请填写有效的「${p.label}」`)
-    result[p.key] = value
-  }
-  if (Buffer.byteLength(JSON.stringify(result)) > 24 * 1024) throw errors.invalid("运行参数总量不能超过 24 KiB")
-  return result
+  return resolveParameters(app.parameters, input)
 }
 
 export function interpolate(text: string, values: Readonly<Record<string, string>>) {

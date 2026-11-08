@@ -399,6 +399,32 @@ const cases: Array<{ id: string; title: string; level: string; run: () => Promis
       return { runId: run.id, output }
     },
   },
+  {
+    id: "C8", level: "复杂", title: "草稿独立测试、验证后发布与版本快照",
+    run: async () => {
+      const def = definition("会话草稿验收", [
+        browserStep("open", "打开验收页面", "navigate", { value: "http://127.0.0.1:18765" }),
+        browserStep("read", "读取标题", "extract", { selector: "#current-heading" }),
+      ])
+      const created = await call<{ id: string; version: number; contentHash: string }>("/automation-apps/drafts", { body: { sessionId: ctx.sessionId, definition: def } })
+      expectStatus(created.status, 201, "创建草稿")
+      const draft = created.data
+      const started = await call<A.Run>(`/automation-apps/drafts/${draft.id}/runs`, { body: { version: draft.version, requestKey: crypto.randomUUID(), parameters: {} } })
+      expectStatus(started.status, 201, "测试草稿")
+      ctx.runs.push(started.data.id)
+      check(started.data.appId === null, "测试草稿不得提前创建正式应用")
+      const done = await waitRun(started.data.id, (r) => ["succeeded", "failed", "paused"].includes(r.status))
+      check(done.status === "succeeded" && done.results[1]?.output?.includes("自动化验收标题"), `草稿测试输出不正确：${done.status} ${done.error ?? ""}`)
+      const [stored] = await db.select().from(automationRun).where(eq(automationRun.id, done.id))
+      check(stored?.draftId === draft.id && stored.draftHash === draft.contentHash && stored.appId === null, "PG 草稿测试快照不正确")
+      const published = await call<A.App>(`/automation-apps/drafts/${draft.id}/publish`, { body: { version: draft.version, runId: done.id } })
+      expectStatus(published.status, 201, "发布草稿")
+      const repeat = await startRun(published.data.id)
+      const final = await waitRun(repeat.id, (r) => ["succeeded", "failed", "paused"].includes(r.status))
+      check(final.status === "succeeded" && final.results[1]?.output?.includes("自动化验收标题"), "正式应用重复运行结果不正确")
+      return { draftId: draft.id, runId: done.id, appId: published.data.id, repeatRunId: repeat.id }
+    },
+  },
 ]
 
 try {

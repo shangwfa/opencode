@@ -303,6 +303,88 @@ const DDL = (s: string) => String.raw`
     time_updated bigint NOT NULL
   );
   CREATE INDEX IF NOT EXISTS automation_app_owner_idx ON "${s}"."automation_app" (owner_id, time_updated);
+  ALTER TABLE "${s}"."automation_app" ADD COLUMN IF NOT EXISTS legacy_app_id text;
+  CREATE UNIQUE INDEX IF NOT EXISTS automation_app_legacy_idx ON "${s}"."automation_app" (owner_id, legacy_app_id);
+  CREATE TABLE IF NOT EXISTS "${s}"."automation_draft" (
+    id text PRIMARY KEY,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    session_id text NOT NULL,
+    definition jsonb NOT NULL,
+    version integer NOT NULL,
+    content_hash text NOT NULL,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS automation_draft_session_idx ON "${s}"."automation_draft" (owner_id, session_id, time_updated);
+  ALTER TABLE "${s}"."automation_draft" ADD COLUMN IF NOT EXISTS published_app_id text REFERENCES "${s}"."automation_app"(id);
+  ALTER TABLE "${s}"."automation_draft" ADD COLUMN IF NOT EXISTS generation_key text;
+  ALTER TABLE "${s}"."automation_draft" ADD COLUMN IF NOT EXISTS legacy_app_id text;
+  CREATE UNIQUE INDEX IF NOT EXISTS automation_draft_generation_idx ON "${s}"."automation_draft" (owner_id, session_id, generation_key);
+  CREATE UNIQUE INDEX IF NOT EXISTS automation_draft_legacy_idx ON "${s}"."automation_draft" (owner_id, legacy_app_id);
+  CREATE TABLE IF NOT EXISTS "${s}"."instruction_draft" (
+    id text PRIMARY KEY,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    session_id text NOT NULL,
+    definition jsonb NOT NULL,
+    version integer NOT NULL,
+    content_hash text NOT NULL,
+    published_app_id text,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS "${s}"."instruction_app" (
+    id text PRIMARY KEY,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    definition jsonb NOT NULL,
+    version integer NOT NULL,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS instruction_app_owner_idx ON "${s}"."instruction_app" (owner_id, time_updated);
+  ALTER TABLE "${s}"."instruction_draft" ADD COLUMN IF NOT EXISTS published_app_id text;
+  ALTER TABLE "${s}"."instruction_draft" ADD COLUMN IF NOT EXISTS generation_key text;
+  CREATE UNIQUE INDEX IF NOT EXISTS instruction_draft_generation_idx ON "${s}"."instruction_draft" (owner_id, session_id, generation_key);
+  DO $$
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_constraint
+      WHERE conrelid = '"${s}"."instruction_draft"'::regclass AND conname = 'instruction_draft_published_app_fk'
+    ) THEN
+      ALTER TABLE "${s}"."instruction_draft" ADD CONSTRAINT instruction_draft_published_app_fk
+        FOREIGN KEY (published_app_id) REFERENCES "${s}"."instruction_app"(id);
+    END IF;
+  END $$;
+  CREATE INDEX IF NOT EXISTS instruction_draft_session_idx ON "${s}"."instruction_draft" (owner_id, session_id, time_updated);
+  CREATE TABLE IF NOT EXISTS "${s}"."instruction_run" (
+    id text PRIMARY KEY,
+    app_id text REFERENCES "${s}"."instruction_app"(id),
+    draft_id text REFERENCES "${s}"."instruction_draft"(id),
+    draft_hash text,
+    owner_id text NOT NULL REFERENCES "${s}"."user"(id),
+    session_id text NOT NULL,
+    request_key text NOT NULL,
+    app_version integer NOT NULL,
+    definition jsonb NOT NULL,
+    parameters jsonb NOT NULL,
+    prompt_id text,
+    steps jsonb NOT NULL DEFAULT '[]'::jsonb,
+    status text NOT NULL CHECK (status IN ('queued','running','regenerating','paused','succeeded','failed')),
+    output text,
+    error text,
+    regenerated_version integer,
+    time_created bigint NOT NULL,
+    time_updated bigint NOT NULL,
+    UNIQUE (owner_id, request_key),
+    CHECK (
+      (app_id IS NOT NULL AND draft_id IS NULL AND draft_hash IS NULL) OR
+      (app_id IS NULL AND draft_id IS NOT NULL AND draft_hash IS NOT NULL)
+    )
+  );
+  CREATE INDEX IF NOT EXISTS instruction_run_app_idx ON "${s}"."instruction_run" (app_id, time_created);
+  CREATE INDEX IF NOT EXISTS instruction_run_draft_idx ON "${s}"."instruction_run" (draft_id, time_created);
+  ALTER TABLE "${s}"."instruction_run" ADD COLUMN IF NOT EXISTS steps jsonb NOT NULL DEFAULT '[]'::jsonb;
+  CREATE UNIQUE INDEX IF NOT EXISTS instruction_run_active_idx ON "${s}"."instruction_run" (session_id)
+    WHERE status IN ('queued','running','regenerating','paused');
   CREATE TABLE IF NOT EXISTS "${s}"."automation_run" (
     id text PRIMARY KEY,
     app_id text NOT NULL REFERENCES "${s}"."automation_app"(id),
@@ -323,6 +405,14 @@ const DDL = (s: string) => String.raw`
     UNIQUE (owner_id, request_key)
   );
   ALTER TABLE "${s}"."automation_run" ADD COLUMN IF NOT EXISTS target_id text;
+  ALTER TABLE "${s}"."automation_run" ALTER COLUMN app_id DROP NOT NULL;
+  ALTER TABLE "${s}"."automation_run" ADD COLUMN IF NOT EXISTS draft_id text REFERENCES "${s}"."automation_draft"(id);
+  ALTER TABLE "${s}"."automation_run" ADD COLUMN IF NOT EXISTS draft_hash text;
+  ALTER TABLE "${s}"."automation_run" DROP CONSTRAINT IF EXISTS automation_run_source_check;
+  ALTER TABLE "${s}"."automation_run" ADD CONSTRAINT automation_run_source_check CHECK (
+    (app_id IS NOT NULL AND draft_id IS NULL AND draft_hash IS NULL) OR
+    (app_id IS NULL AND draft_id IS NOT NULL AND draft_hash IS NOT NULL)
+  );
   ALTER TABLE "${s}"."automation_run" DROP CONSTRAINT IF EXISTS automation_run_status_check;
   ALTER TABLE "${s}"."automation_run" ADD CONSTRAINT automation_run_status_check
     CHECK (status IN ('queued','running','paused','repairing','succeeded','failed'));

@@ -1,0 +1,115 @@
+{
+  "case": "orders",
+  "title": "多指令数据管道：双文件合并去重→过滤→汇总→三份产物+交叉校验",
+  "passed": true,
+  "ids": {
+    "sessionId": "ses_e4494dba7ffe9SiSF1ZwaWqgyC",
+    "promptId": "msg_1bb6b24db001OqvZngwavO7J15",
+    "draftId": "adraft_9db7768b-1b56-4efb-90cc-a9f439dbce10",
+    "draftTestId": "arun_ca60aa6e-ff77-4b17-9448-5cf866b7507c",
+    "appId": "auto_ef198ac7-e36f-4663-a77b-ba7f8b950110",
+    "appRunId": "arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07"
+  },
+  "steps": [
+    "生成示例订单数据 | 生成订单文件 A（6 条数据） | script",
+    "生成示例订单数据 | 生成订单文件 B（4 条数据，含重复与退款） | script",
+    "合并去重订单 | 合并订单并按 order_id 去重 | script",
+    "筛选有效订单 | 过滤退款记录，仅保留已支付订单 | script",
+    "统计订单数据 | 按分类统计订单数与金额并写入 summary.json | script",
+    "统计订单数据 | 按金额倒序生成前 N 名排行并写入 top.json | script",
+    "生成并校验报告 | 生成订单汇总 Markdown 报告 | script",
+    "生成并校验报告 | 校验报告总金额与汇总数据一致 | script"
+  ],
+  "complexity": {
+    "steps": 8,
+    "stages": 5,
+    "minSteps": 6,
+    "minStages": 5,
+    "ok": true
+  },
+  "parameters": [
+    "topN"
+  ],
+  "runParameters": {
+    "topN": "3"
+  },
+  "draftTest": {
+    "status": "succeeded",
+    "decisions": [
+      {
+        "cursor": 0,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 1,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 2,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 3,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 4,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 5,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 6,
+        "action": "confirm",
+        "status": 200
+      },
+      {
+        "cursor": 7,
+        "action": "confirm",
+        "status": 200
+      }
+    ],
+    "noModel": true
+  },
+  "appRun": {
+    "status": "succeeded",
+    "outputs": [
+      "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/orders_a.csv\nrows (including header): 7\ndata rows: 6",
+      "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/orders_b.csv\nrows (including header): 5\ndata rows: 4\nduplicate order_ids vs A: O002, O006",
+      "orders_a rows: 6\norders_b rows: 4\nmerged total rows: 10\nrows after dedupe (keep first): 8\nduplicate order_ids removed: ['O002', 'O006']\norder_id counts: {'O001': 1, 'O002': 2, 'O003': 1, 'O004': 1, 'O",
+      "deduped rows: 8\nvalid (paid) records: 5\nrefunded records dropped: 3 ['O003', 'O005', 'O008']\n   O001 Alice electronics 100.00 paid\n   O002 Bob books 20.00 paid\n   O004 Dave clothing 30.00 paid\n   O006",
+      "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/summary.json\n{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      ",
+      "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/top.json (N=3)\n{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    },\n    {\n ",
+      "wrote /workspace/output/automation/arun_9d71b9ec-4cf4-4f14-b6c0-7bb987b29d07/report.md\n# 订单汇总报告\n- 总单数：5\n- 总金额：390.00\n## 分类统计\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing ",
+      "summary.json grandTotal = 390.00\nreport.md 总金额        = 390.00\n校验通过：两处总金额一致"
+    ],
+    "noModel": true
+  },
+  "artifacts": {
+    "summary.json": "{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      \"category\": \"clothing\",\n      \"count\": 2,\n      \"total\": 70.0\n    },\n    {\n      \"category\": \"electronics\",\n      \"count\": 2,\n      \"total\": 300.0\n    }\n  ],\n  \"grandTotal\": 390.0\n}\n",
+    "top.json": "{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    },\n    {\n      \"order_id\": \"O001\",\n      \"customer\": \"Alice\",\n      \"amount\": 100.0\n    },\n    {\n      \"order_id\": \"O006\",\n      \"customer\": \"Frank\",\n      \"amount\": 40.0\n    }\n  ]\n}\n",
+    "report.md": "# 订单汇总报告\n\n- 总单数：5\n- 总金额：390.00\n\n## 分类统计\n\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |\n"
+  },
+  "artifactOk": true,
+  "secondRun": {
+    "appRunId": "arun_6f4ba944-a68d-47ae-a8a9-cc95e1986f2d",
+    "parameters": {
+      "topN": "1"
+    },
+    "ok": true,
+    "artifacts": {
+      "summary.json": "{\n  \"categories\": [\n    {\n      \"category\": \"books\",\n      \"count\": 1,\n      \"total\": 20.0\n    },\n    {\n      \"category\": \"clothing\",\n      \"count\": 2,\n      \"total\": 70.0\n    },\n    {\n      \"category\": \"electronics\",\n      \"count\": 2,\n      \"total\": 300.0\n    }\n  ],\n  \"grandTotal\": 390.0\n}\n",
+      "top.json": "{\n  \"top\": [\n    {\n      \"order_id\": \"O007\",\n      \"customer\": \"Grace\",\n      \"amount\": 200.0\n    }\n  ]\n}\n",
+      "report.md": "# 订单汇总报告\n\n- 总单数：5\n- 总金额：390.00\n\n## 分类统计\n\n| 分类 | 订单数 | 金额合计 |\n| --- | ---: | ---: |\n| books | 1 | 20.00 |\n| clothing | 2 | 70.00 |\n| electronics | 2 | 300.00 |\n| **合计** | **5** | **390.00** |\n"
+    }
+  },
+  "verification": null
+}
