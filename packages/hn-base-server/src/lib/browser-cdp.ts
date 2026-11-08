@@ -262,18 +262,31 @@ export function connectCdp(sessionId: string, target: string, signal?: AbortSign
       handshakeTimeout: 10_000,
       maxPayload: 8 * 1024 * 1024,
     })
+    let settled = false
     const cancel = () => ws.terminate()
-    const fail = () => {
+    // 从创建起就常驻一个 error 监听器，且永不移除。
+    // ws 库在没有任何 error 监听时 emit("error") 会抛成进程级异常（Unhandled error. ErrorEvent），
+    // 直接终止整个服务——登录、API 等其他请求随之全部不可用。
+    // 只用 once 不够：第一次 error 会先移除监听，terminate() 再触发一次就无人处理。
+    ws.on("error", () => {
       ws.terminate()
+      if (settled) return
+      settled = true
       reject(errors.upstream(502, "浏览器连接已断开"))
-    }
-    ws.once("error", fail)
+    })
     ws.once("close", () => signal?.removeEventListener("abort", cancel))
-    ws.once("open", () => resolve(ws))
+    ws.once("open", () => {
+      if (settled) return
+      settled = true
+      resolve(ws)
+    })
     signal?.addEventListener("abort", cancel, { once: true })
     if (signal?.aborted) {
       cancel()
-      reject(errors.upstream(502, "浏览器连接已取消"))
+      if (!settled) {
+        settled = true
+        reject(errors.upstream(502, "浏览器连接已取消"))
+      }
     }
   })
 }
@@ -305,27 +318,35 @@ export async function cdpCommand(
   const ws = await connectCdp(sessionId, target, signal ? AbortSignal.any([signal, deadline]) : deadline)
   try {
     return await new Promise<Record<string, unknown>>((resolve, reject) => {
-      const timer = setTimeout(() => reject(errors.upstream(504, "浏览器操作超时")), CDP_COMMAND_TIMEOUT_MS)
-      const fail = () => {
+      let settled = false
+      const finish = (fn: () => void) => {
+        if (settled) return
+        settled = true
         clearTimeout(timer)
-        reject(errors.upstream(502, "浏览器连接已断开"))
+        fn()
       }
+      const timer = setTimeout(() => finish(() => reject(errors.upstream(504, "浏览器操作超时"))), CDP_COMMAND_TIMEOUT_MS)
+      const fail = () => finish(() => reject(errors.upstream(502, "浏览器连接已断开")))
+      // error 用 on（常驻）而非 once：ws 库在无监听时 emit error 会抛出进程级异常。
+      ws.on("error", fail)
       ws.once("close", fail)
-      ws.once("error", fail)
       ws.on("message", (data) => {
         try {
           const message = JSON.parse(String(data))
           if (message.id !== 1) return
-          clearTimeout(timer)
-          if (message.error) reject(errors.invalid(String(message.error.message)))
+          if (message.error) finish(() => reject(errors.invalid(String(message.error.message))))
           else if (method === "Page.navigate" && message.result?.errorText)
-            reject(errors.upstream(502, `页面导航失败：${message.result.errorText}`))
-          else resolve(message.result ?? {})
+            finish(() => reject(errors.upstream(502, `页面导航失败：${message.result.errorText}`)))
+          else finish(() => resolve(message.result ?? {}))
         } catch {
           /* 忽略非 CDP 消息 */
         }
       })
-      ws.send(JSON.stringify({ id: 1, method, params }))
+      try {
+        ws.send(JSON.stringify({ id: 1, method, params }))
+      } catch {
+        fail()
+      }
     })
   } finally {
     ws.close()

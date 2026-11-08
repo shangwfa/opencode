@@ -349,8 +349,9 @@ browserRoutes.get("/sessions/:id/targets/:target/frames", async (c) => {
     const params = { format: "jpeg", quality: 65, maxWidth: 1920, maxHeight: 1080, everyNthFrame: 1 }
     let pending: Promise<void> = Promise.resolve()
     const ended = new Promise<void>((resolve) => {
+      // error 常驻监听：ws 库在无监听时 emit error 会抛出进程级异常。
+      ws.on("error", () => resolve())
       ws.once("close", () => resolve())
-      ws.once("error", () => resolve())
     })
     stream.onAbort(() => ws.terminate())
     ws.on("message", (raw) => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react"
 import { browserApi, readBrowserFrames, type BrowserTarget } from "@/lib/browser"
+import { BaseApiError } from "@/lib/base-api"
 
 export type ViewerFrame = { data: string; metadata?: { deviceWidth?: number; deviceHeight?: number } }
 type History = { currentIndex: number; entries: Array<{ id: number; url: string }> }
@@ -56,10 +57,15 @@ export function useCdpViewer(sessionId: string) {
         if (!stopped) return refresh()
       })
       .catch((cause) => {
-        if (!stopped) {
-          setError(String(cause instanceof Error ? cause.message : cause))
-          setStatus("down")
+        if (stopped) return
+        // 404 = 该会话没有浏览器会话记录（接口/脚本创建的任务不启动浏览器），不是连接故障。
+        if (cause instanceof BaseApiError && cause.status === 404) {
+          setStatus("unavailable")
+          setError("")
+          return
         }
+        setError(String(cause instanceof Error ? cause.message : cause))
+        setStatus("down")
       })
     return () => {
       stopped = true

@@ -51,6 +51,19 @@ export function createApp() {
   })
 
   app.get("/health", (c) => c.json({ ok: true }))
+
+  /**
+   * SaaS 可用性：浏览器经基础服务检查，SaaS 的 Basic 凭据不下发前端。
+   * SaaS 不可达时返回 ok:false（200），不要把鉴权 401 当成“服务挂了”。
+   */
+  app.get("/api/health/saas", requireAuth, async (c) => {
+    try {
+      const info = await saasJson<{ version?: unknown }>("/api/info")
+      return c.json({ ok: typeof info.version === "string", version: typeof info.version === "string" ? info.version : null })
+    } catch {
+      return c.json({ ok: false, version: null })
+    }
+  })
   app.get("/api/models", requireAuth, async (c) => {
     const result = await saasJson<{ data: Array<{ id: string; providerID: string; name?: string; limit?: unknown }> }>("/api/model")
     // 只返回模型展示信息，不转发 provider settings（可能含密钥）。

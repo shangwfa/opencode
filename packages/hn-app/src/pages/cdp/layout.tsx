@@ -111,7 +111,7 @@ export function CdpLayout() {
                 {[
                   { path: "/cdp", name: "开始任务", icon: Home },
                   { path: "/cdp/sessions", name: "历史任务", icon: History },
-                  { path: "/cdp/apps", name: "自动化应用", icon: Code2 },
+                   { path: "/cdp/apps", name: "自动化应用", icon: Code2 },
                 ].map(({ path, name, icon: Icon }) => (
                   <NavLink
                     key={path}
@@ -169,7 +169,7 @@ export function CdpLayout() {
           >
             <NavLink to="/cdp" end>开始任务</NavLink>
             <NavLink to="/cdp/sessions">历史任务</NavLink>
-            <NavLink to="/cdp/apps">自动化应用</NavLink>
+             <NavLink to="/cdp/apps">自动化应用</NavLink>
           </nav>
           <div className="cdp-route-content flex min-h-0 min-w-0 flex-1 flex-col"><Outlet /></div>
         </div>

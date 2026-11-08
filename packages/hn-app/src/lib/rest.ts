@@ -230,7 +230,6 @@ export async function readSandboxFile(
 ): Promise<SandboxFilePayload> {
   // 网关模式：经 hn-base-server 读取（带归属校验与 Bearer）
   if (authEnabled && opts.sessionId) {
-    try {
       const query = new URLSearchParams({ path })
       const res = await baseFetchRaw(
         `/api/sessions/${encodeURIComponent(opts.sessionId)}/fs/content?${query.toString()}`,
@@ -256,9 +255,7 @@ export async function readSandboxFile(
           source: "fs-read",
         }
       }
-    } catch {
-      // 网关不可达时回退直连链路（开发/混合部署）
-    }
+      throw new Error(res.status === 404 ? "文件不存在或已无法访问，请检查会话和沙箱状态。" : `读取文件失败（${res.status}）`)
   }
 
   // 通道 A
@@ -309,7 +306,7 @@ export async function readSandboxFile(
   } catch {
     // 落到最后的空结果
   }
-  return { content: "", mime: opts.mime ?? "text/plain", binary: false, source: "file-content" }
+  throw new Error("无法读取文件，请检查会话和沙箱状态。")
 }
 
 /** 绝对路径 → workspace 相对路径；不在 /workspace 下返回 null */

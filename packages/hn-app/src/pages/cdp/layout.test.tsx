@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { SESSION_PANEL_COLLAPSED_KEY } from "@/hooks/use-session-panel"
 import { browserApi } from "@/lib/browser"
 import { BrowserNavigationToggle, CdpLayout } from "./layout"
+import { AutomationDetailPage, AutomationsPage } from "@/pages/automations"
 
 vi.mock("@/lib/auth", () => ({ authEnabled: true }))
 vi.mock("@/lib/browser", () => ({ browserApi: { sessions: vi.fn(async () => ({ items: [] })) } }))
@@ -50,6 +51,38 @@ it("页头按钮将侧栏完全收起并持久化，切换子页后仍可展开"
   expect(sidebar().getAttribute("aria-hidden")).toBe("false")
   expect(sidebar().classList.contains("w-60")).toBe(true)
   expect(container.querySelector('[aria-label="刷新最近任务"]')).toBeNull()
+})
+
+it("桌面和移动导航都只显示一个应用入口", async () => {
+  await mount()
+  const desktop = container.querySelector('[aria-label="浏览器工作区导航"]')!
+  const mobile = container.querySelector('[aria-label="浏览器导航"]')!
+  expect(desktop.querySelectorAll('a[href="/cdp/apps"]')).toHaveLength(1)
+  expect(mobile.querySelectorAll('a[href="/cdp/apps"]')).toHaveLength(1)
+  expect(container.querySelectorAll('a[href="/cdp/instruction-apps"]')).toHaveLength(0)
+})
+
+it("自动化应用详情页可收起侧栏并重新展开", async () => {
+  await act(async () => root.render(
+    <MemoryRouter initialEntries={["/cdp/apps/auto_x"]}>
+      <Routes>
+        <Route path="/cdp" element={<CdpLayout />}>
+          <Route path="apps" element={<AutomationsPage />} />
+          <Route path="apps/:automationId" element={<AutomationDetailPage />} />
+        </Route>
+      </Routes>
+    </MemoryRouter>,
+  ))
+  const sidebar = () => container.querySelector<HTMLElement>('[aria-label="浏览器导航栏"]')!
+  const toggle = () => container.querySelector<HTMLButtonElement>('[aria-label="收起浏览器导航"], [aria-label="展开浏览器导航"]')
+  for (let i = 0; i < 30 && !toggle(); i++) await act(async () => new Promise((resolve) => setTimeout(resolve, 50)))
+  expect(toggle()).not.toBeNull()
+  await act(async () => toggle()!.click())
+  expect(sidebar().classList.contains("w-0")).toBe(true)
+  expect(localStorage.getItem(SESSION_PANEL_COLLAPSED_KEY)).toBe("1")
+  await act(async () => toggle()!.click())
+  expect(sidebar().classList.contains("w-60")).toBe(true)
+  expect(localStorage.getItem(SESSION_PANEL_COLLAPSED_KEY)).toBe("0")
 })
 
 it("沿用自由对话的折叠偏好与 Ctrl+B 快捷键", async () => {

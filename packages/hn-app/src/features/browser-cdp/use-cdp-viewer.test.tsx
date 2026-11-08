@@ -58,3 +58,20 @@ it("StrictMode 不重复启动沙箱；切换会话重新绑定，卸载取消�
   const lastSignal = mocks.frames.mock.calls.at(-1)![2] as AbortSignal
   expect(lastSignal.aborted).toBe(true)
 })
+
+it("会话没有浏览器记录时标记为不可用，而不是连接故障", async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const { BaseApiError } = await import("@/lib/base-api")
+  mocks.start.mockRejectedValue(new BaseApiError(404, "not_found", "资源不存在或无权访问"))
+  function Probe() {
+    const viewer = useCdpViewer("ses_none")
+    return <span>{viewer.status}</span>
+  }
+  const container = document.createElement("div")
+  root = createRoot(container)
+  await act(async () => {
+    root!.render(<Probe />)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+  expect(container.textContent).toBe("unavailable")
+})

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react"
 import { Link } from "react-router"
 import { ArrowUpRight, Boxes, FolderInput, MessagesSquare, RefreshCw, Server } from "lucide-react"
 import { opencodeSaasBaseUrl } from "@/utils/opencode-saas-base"
+import { authEnabled } from "@/lib/auth"
+import { baseFetch } from "@/lib/base-api"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -17,13 +19,20 @@ function useOpenCodeHealth() {
     setLoading(true)
     // 本仓库 SaaS 没有 /global/health（会落到 SPA 的 HTML），服务身份在 GET /api/info。
     // 只有拿到带 version 的 JSON 才算健康，避免把 200 的 HTML 误判为可用。
-    fetch(`${opencodeSaasBaseUrl()}/api/info`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        const body: unknown = await r.json()
-        if (typeof body !== "object" || body === null || typeof (body as { version?: unknown }).version !== "string")
-          throw new Error("非预期的服务响应")
-        return body as { version: string }
+    // 经基础服务时 SaaS 要求 Basic 鉴权，浏览器直连会 401 误报失败，故走 /api/health/saas。
+    const check = async (): Promise<{ ok: boolean; version: string | null }> => {
+      if (authEnabled) return baseFetch<{ ok: boolean; version: string | null }>("/api/health/saas")
+      const r = await fetch(`${opencodeSaasBaseUrl()}/api/info`)
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      const body: unknown = await r.json()
+      if (typeof body !== "object" || body === null || typeof (body as { version?: unknown }).version !== "string")
+        throw new Error("非预期的服务响应")
+      return { ok: true, version: (body as { version: string }).version }
+    }
+    check()
+      .then((body) => {
+        if (!body.ok || typeof body.version !== "string") throw new Error("服务不可用")
+        return { version: body.version }
       })
       .then((info) => setHealth({ healthy: true, version: info.version }))
       .catch((e: unknown) => setError(String(e)))

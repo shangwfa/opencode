@@ -97,7 +97,15 @@ export function BrowserPanel({
     }
   }
 
-  const statusLabel = control ? "接管中 · AI 已暂停" : working ? "AI 操作中" : viewer.status === "connecting" ? "正在连接" : "实时观察"
+  const statusLabel = control
+    ? "接管中 · AI 已暂停"
+    : working
+      ? "AI 操作中"
+      : viewer.status === "unavailable"
+        ? "无浏览器"
+        : viewer.status === "connecting"
+          ? "正在连接"
+          : "实时观察"
   const statusTone = control ? "bg-primary" : working ? "bg-emerald-500" : "bg-muted-foreground/40"
   const secure = viewer.url.startsWith("https://")
 
@@ -244,7 +252,12 @@ export function BrowserPanel({
         </Button>
       </form>
       {viewer.status === "connecting" && <div className="mx-3 mb-2 h-0.5 animate-pulse rounded-full bg-primary/50" aria-hidden />}
-      {(inputError || viewer.error) && (
+      {viewer.status === "unavailable" && (
+        <div className="mx-3 mb-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+          本会话没有浏览器环境。通过接口或脚本创建的任务只使用沙箱工作区，不启动浏览器；需要操作网页请从「开始任务」新建任务。
+        </div>
+      )}
+      {viewer.status !== "unavailable" && (inputError || viewer.error) && (
         <div role="alert" className="mx-3 mb-2 flex items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
           <span className="min-w-0 flex-1 break-words">{inputError || viewer.error}</span>
           <Button variant="outline" size="sm" onClick={viewer.restart}>
@@ -339,7 +352,13 @@ export function BrowserPanel({
           ) : (
             <div className="flex flex-col items-center gap-3 text-sm text-muted-foreground">
               <Monitor className="size-8" strokeWidth={1.5} />
-              <p>{viewer.status === "empty" ? "输入地址以打开标签页" : "等待浏览器画面…"}</p>
+              <p>
+                {viewer.status === "unavailable"
+                  ? "本会话未启动浏览器"
+                  : viewer.status === "empty"
+                    ? "输入地址以打开标签页"
+                    : "等待浏览器画面…"}
+              </p>
             </div>
           )}
           <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-card/90 px-2.5 py-1 text-[11px] text-muted-foreground shadow-xs backdrop-blur">

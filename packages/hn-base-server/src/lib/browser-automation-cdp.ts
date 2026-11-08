@@ -28,8 +28,9 @@ async function command(sessionId: string, target: string, method: string, params
         clearTimeout(timer)
         error ? reject(error) : resolve(result ?? {})
       }
+      // error 常驻监听：ws 库在无监听时 emit error 会抛出进程级异常。
+      ws.on("error", (error) => finish(error))
       ws.once("close", () => finish(new Error("浏览器连接中断，结果可能不确定")))
-      ws.once("error", (error) => finish(error))
       ws.on("message", (data) => {
         try {
           const message = JSON.parse(String(data))
